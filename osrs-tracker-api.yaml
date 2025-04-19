@@ -24,14 +24,14 @@ spec:
         - name: regcred
       containers:
         - name: osrs-tracker-api
-          image: freekmencke/osrs-tracker-api@sha256:2efeeecd4890953e0c89e0b52eee1745617bad700ba4155a934fc9c24852ed63
+          image: freekmencke/osrs-tracker-api@sha256:a6f88bd44eb6d60499e1b7b4ba3153201ce8ebd8435b4a6824c5f335dc92a24a
           imagePullPolicy: Always
           envFrom:
             - secretRef:
                 name: aws-mongodb-credentials
           env:
-            - name: ORIGIN
-              value: https://osrs-tracker-api.freekmencke.com
+            - name: CORS_ORIGIN
+              value: https://osrs-tracker.freekmencke.com
             - name: OSRS_API_BASE_URL
               value: https://runescape-api.freekmencke.com/rs
           ports:
@@ -41,13 +41,13 @@ spec:
             httpGet:
               path: /healthy
               port: 9090
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /healthy
               port: 9090
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 5
 ---
 apiVersion: v1

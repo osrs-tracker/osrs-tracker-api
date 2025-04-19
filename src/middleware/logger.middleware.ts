@@ -5,10 +5,8 @@ import * as morgan from 'morgan';
 @Injectable()
 export class LoggerMiddleware implements NestMiddleware {
   private morganMiddleware = morgan((tokens, req, res) => {
-    const responseTime = tokens['response-time'](req, res);
-
     const isError = Number(tokens['status'](req, res) ?? 500) >= 500;
-    const isWarn = Number(responseTime ?? 0) >= 1000;
+    const isWarn = Number(tokens['status'](req, res) ?? 400) >= 400;
 
     return JSON.stringify({
       level: isError ? 'error' : isWarn ? 'warn' : 'info',
@@ -17,8 +15,7 @@ export class LoggerMiddleware implements NestMiddleware {
       method: tokens['method'](req, res),
       host: tokens['req'](req, res, 'host'),
       url: tokens['url'](req, res),
-      responseTime: responseTime + 'ms',
-      cache: tokens['res'](req, res, 'x-cache'),
+      responseTime: tokens['response-time'](req, res) + 'ms',
       userAgent: tokens['user-agent'](req, res),
     });
   });
