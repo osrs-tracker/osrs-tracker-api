@@ -23,7 +23,7 @@
     "docker:build": "docker build -t freekmencke/osrs-tracker-api:latest .",
     "docker:push": "docker push freekmencke/osrs-tracker-api:latest",
     "prettier": "prettier --write \"src/**/*.ts\"",
-    "prettier:ci": "prettier \"src/**/*.ts\"",
+    "prettier:ci": "prettier --check \"src/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
