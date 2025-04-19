@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osrs-tracker-api
+  namespace: default
+  labels:
+    app: osrs-tracker-api
+spec:
+  replicas: 2
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: osrs-tracker-api
+  template:
+    metadata:
+      labels:
+        app: osrs-tracker-api
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: '9090'
+        prometheus.io/scrape: 'true'
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+        - name: osrs-tracker-api
+          image: freekmencke/osrs-tracker-api@sha256:857e54da201a36b4a2cc5a4959da22bb66f696ee6fac828910fb357f8bf22c06
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: aws-mongodb-credentials
+          env:
+            - name: ORIGIN
+              value: https://osrs-tracker-api.freekmencke.com
+            - name: OSRS_API_BASE_URL
+              value: https://runescape-api.freekmencke.com/rs
+          ports:
+            - containerPort: 8080
+            - containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /healthy
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthy
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: osrs-tracker-api-service
+  namespace: default
+spec:
+  selector:
+    app: osrs-tracker-api
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: osrs-tracker-api-ingress
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: 'letsencrypt-prod'
+    nginx.ingress.kubernetes.io/limit-rps: '50'
+    nginx.ingress.kubernetes.io/limit-rpm: '3000'
+    nginx.ingress.kubernetes.io/limit-connections: '50'
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: '5'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - osrs-tracker-api.freekmencke.com
+      secretName: osrs-tracker-api-tls
+  rules:
+    - host: osrs-tracker-api.freekmencke.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: osrs-tracker-api-service
+                port:
+                  number: 80
