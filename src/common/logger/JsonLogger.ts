@@ -3,10 +3,10 @@ import { Injectable, LoggerService } from '@nestjs/common';
 @Injectable()
 export class JSONLogger implements LoggerService {
   /**
-   * Write a 'log' level log.
+   * Write a 'info' level log.
    */
   log(message: any, ...optionalParams: any[]) {
-    this.writeLog('log', message, optionalParams);
+    this.writeLog('info', message, optionalParams);
   }
 
   /**
@@ -23,7 +23,7 @@ export class JSONLogger implements LoggerService {
     this.writeLog('warn', message, optionalParams);
   }
 
-  private writeLog(level: 'log' | 'error' | 'warn', message: any, _optionalParams: any[]): void {
+  private writeLog(level: 'info' | 'error' | 'warn', message: any, _optionalParams: any[]): void {
     console.log(
       JSON.stringify({
         level,
