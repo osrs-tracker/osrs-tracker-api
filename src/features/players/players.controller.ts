@@ -38,6 +38,7 @@ export class PlayersController {
     @Param('username') username: string,
     @Query('scrapingOffset', new DefaultValuePipe(0), ParseIntPipe) scrapingOffset: number,
     @Query('includeLatestHiscoreEntry', new DefaultValuePipe(false), ParseBoolPipe) includeLatestHiscoreEntry: boolean,
+    @Query('skipRefresh', new DefaultValuePipe(false), ParseBoolPipe) skipRefresh: boolean,
   ) {
     if (!username) return new BadRequestException('No username provided');
     if (username.length > 12) return new BadRequestException('Usernames must be between 1 and 12 characters long.');
@@ -48,15 +49,17 @@ export class PlayersController {
     const player = await this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
     const playerHasOffset = player?.scrapingOffsets?.includes(scrapingOffset);
 
+    if (skipRefresh) return player; // Skip refresh if requested
+
     if (
       !player || // Player does not exist
       !playerHasOffset || // Player does not have the requested scraping offset
       differenceInHours(new Date(), player.lastModified) >= PLAYER_CONFIG.minPlayerRefreshTime // Player is older than the refresh time
     ) {
-      this.logger.log(`Player "${username} not found for offset "${scrapingOffset}" or outdated. Refreshing...`);
+      this.logger.log(`Player '${username} not found for offset '${scrapingOffset}' or outdated. Refreshing...`);
       const refreshed = await this.playersService.refreshPlayerInfo(username, scrapingOffset, !playerHasOffset);
-      if (!refreshed) throw new NotFoundException(`Player "${username}" not found`);
-      else this.logger.log(`Player "${username}" refreshed successfully.`);
+      if (!refreshed) throw new NotFoundException(`Player '${username}' not found`);
+      else this.logger.log(`Player '${username}' refreshed successfully.`);
       return this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry); // Retry fetching the player
     }
 
