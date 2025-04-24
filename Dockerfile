@@ -19,10 +19,14 @@ RUN npm run build
 # Stage 2: Setup production environment
 FROM node:22-alpine AS production
 
+
 WORKDIR /app
 
+# Install runtime dependencies for Sharp
+RUN npm install --cpu=x64 --os=linux --libc=musl sharp
+
 # Copy built application from the build stage
-COPY --from=build /app/dist ./dist
+COPY --from=build /app/dist .
 
 # Set environment variables
 ENV NODE_ENV=production
@@ -34,7 +38,7 @@ EXPOSE $PORT
 EXPOSE $METRICS_PORT
 
 # Command to run the application
-CMD ["node", "dist/main"]
+CMD ["node", "main"]
 
 # Health check using the /healthy endpoint available in server.ts
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \

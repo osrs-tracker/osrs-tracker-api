@@ -3,7 +3,9 @@ module.exports = (options, webpack) => {
 
   return {
     ...options,
-    externals: [],
+    externals: {
+      sharp: 'commonjs sharp',
+    },
     plugins: [
       ...options.plugins,
       new webpack.IgnorePlugin({
