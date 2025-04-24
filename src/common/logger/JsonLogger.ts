@@ -12,8 +12,11 @@ export class JSONLogger implements LoggerService {
   /**
    * Write an 'error' level log.
    */
-  error(message: any, ...optionalParams: any[]) {
-    this.writeLog('error', message, optionalParams);
+  error(message: Error, ...optionalParams: any[]) {
+    process.stderr.write(message.stack!);
+    process.stdout.write('\n');
+
+    this.writeLog('error', `${message.name}: ${message.message}`, optionalParams);
   }
 
   /**
