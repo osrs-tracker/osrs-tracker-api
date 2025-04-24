@@ -3,6 +3,7 @@ import {
   Controller,
   DefaultValuePipe,
   Get,
+  Header,
   HttpException,
   HttpStatus,
   NotFoundException,
@@ -19,6 +20,7 @@ export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
 
   @Get()
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
   @ApiOperation({ summary: 'Get the last fetched items' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getRecentItems(@Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number) {
@@ -26,6 +28,7 @@ export class ItemsController {
   }
 
   @Get(':id')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
   @ApiOperation({ summary: 'Get an item by ID' })
   @ApiParam({ name: 'id', description: 'Item ID' })
   async getById(@Param('id', new DefaultValuePipe(0), ParseIntPipe) id: number) {
@@ -39,6 +42,7 @@ export class ItemsController {
   }
 
   @Get('search/:query')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
   @ApiOperation({ summary: 'Search for items by name' })
   @ApiParam({ name: 'query', description: 'Search query' })
   async searchItems(@Param('query') query: string) {
