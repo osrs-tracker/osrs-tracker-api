@@ -57,7 +57,7 @@ export class PlayersController {
 
     response.setHeader(
       'Cache-Control', // Set cache control to 15 minutes (900 seconds) or time until the minimum refresh time has passed
-      `max-age=${Math.min(900, differenceInSeconds(addHours(player!.lastModified, PLAYER_CONFIG.minPlayerRefreshTime), new Date()))}`,
+      `max-age=${Math.min(900, differenceInSeconds(addHours(player?.lastModified ?? new Date(), PLAYER_CONFIG.minPlayerRefreshTime), new Date()))}`,
     );
 
     if (skipRefresh) return player; // Skip refresh if requested

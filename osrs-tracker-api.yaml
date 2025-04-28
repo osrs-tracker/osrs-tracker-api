@@ -2,8 +2,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: osrs-tracker
-  labels:
-    app: osrs-tracker
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -29,7 +27,7 @@ spec:
     spec:
       containers:
         - name: osrs-tracker-api
-          image: freekmencke/osrs-tracker-api@sha256:75580390e97545eec7459ba4c814281d7bbde2200d6622d56b6a8ad882075da9
+          image: freekmencke/osrs-tracker-api@sha256:c92417ae6d836cecd979515532eb8d186a6b66d7539b824b9aaef37c2ecb2f5c
           imagePullPolicy: Always
           envFrom:
             - secretRef:
@@ -40,7 +38,7 @@ spec:
             - name: OSRS_API_BASE_URL
               value: https://runescape-api.freekmencke.com/rs
           ports:
-            - containerPort: 8080
+            - containerPort: 3000
             - containerPort: 9090
           readinessProbe:
             httpGet:
@@ -64,7 +62,7 @@ spec:
   selector:
     app: osrs-tracker-api
   ports:
-    - port: 80
+    - port: 3000
       targetPort: 3000
       protocol: TCP
       name: http
@@ -101,4 +99,4 @@ spec:
               service:
                 name: osrs-tracker-api-service
                 port:
-                  number: 80
+                  number: 3000
