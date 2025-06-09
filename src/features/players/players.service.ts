@@ -19,10 +19,12 @@ export class PlayersService {
   ) {}
 
   async getPlayer(
-    username: string,
+    _username: string,
     scrapingOffset: number,
     includeLatestHiscoreEntry: boolean,
   ): Promise<Player | null> {
+    const username = this.normalizeUsername(_username);
+
     await this.collection.createIndex({ username: 1 }, { unique: true });
 
     const player = await this.collection.findOne<Player>(
@@ -47,11 +49,13 @@ export class PlayersService {
   }
 
   async getPlayerHiscores(
-    username: string,
+    _username: string,
     scrapingOffset: number,
     size: number,
     skip: number,
   ): Promise<HiscoreEntry[] | null> {
+    const username = this.normalizeUsername(_username);
+
     await this.collection.createIndex({ username: 1 }, { unique: true });
 
     await this.collection.updateOne(
@@ -121,7 +125,9 @@ export class PlayersService {
    * @param scrapingOffset The `scrapingOffset` will be added to the player's `scrapingOffsets` if not already present.
    * @param initialScrape If true, will also add an initial `hiscoreEntry` for this `scrapingOffset`.
    */
-  async refreshPlayerInfo(username: string, scrapingOffset: number, initialScrape: boolean): Promise<boolean> {
+  async refreshPlayerInfo(_username: string, scrapingOffset: number, initialScrape: boolean): Promise<boolean> {
+    const username = this.normalizeUsername(_username);
+
     const [player, sourceString] = await this.determinePlayerStatusAndType(username);
 
     if (player === null) return false;
@@ -145,7 +151,9 @@ export class PlayersService {
   }
 
   /** Returns determined player if determined, and normal sourceString, */
-  private async determinePlayerStatusAndType(username: string): Promise<[Player | null, string]> {
+  private async determinePlayerStatusAndType(_username: string): Promise<[Player | null, string]> {
+    const username = this.normalizeUsername(_username);
+
     const [normal, ironman, ultimate, hardcore] = await Promise.all([
       this.getHiscore(username, PlayerType.Normal),
       this.getHiscore(username, PlayerType.Ironman),
@@ -174,5 +182,9 @@ export class PlayersService {
 
     const result = await fetch(hiscoreUrl, { agent: this.agent, headers: { 'cache-control': 'no-cache' } });
     return result.ok ? result.text() : null;
+  }
+
+  private normalizeUsername(username: string): string {
+    return username.trim().toLowerCase();
   }
 }
