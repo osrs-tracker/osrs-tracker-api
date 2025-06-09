@@ -10,6 +10,7 @@ import { SWAGGER_CONFIG } from './config/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: CORS_CONFIG, logger: new JSONLogger() });
   app.enableShutdownHooks();
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
 
   const appMetrics = await NestFactory.create(AppMetricsModule);
   appMetrics.enableShutdownHooks();
