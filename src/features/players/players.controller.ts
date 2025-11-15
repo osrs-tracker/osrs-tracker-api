@@ -46,11 +46,11 @@ export class PlayersController {
     @Query('includeLatestHiscoreEntry', new DefaultValuePipe(false), ParseBoolPipe) includeLatestHiscoreEntry: boolean,
     @Query('skipRefresh', new DefaultValuePipe(false), ParseBoolPipe) skipRefresh: boolean,
   ) {
-    if (!username) return new BadRequestException('No username provided');
-    if (username.length > 12) return new BadRequestException('Usernames must be between 1 and 12 characters long.');
+    if (!username) throw new BadRequestException('No username provided');
+    if (username.length > 12) throw new BadRequestException('Usernames must be between 1 and 12 characters long.');
 
-    if (isNaN(scrapingOffset)) return new BadRequestException('Invalid scraping offset');
-    if (scrapingOffset < -12 || scrapingOffset > 11) return new BadRequestException('ScrapingOffset < -12 or > 11.');
+    if (isNaN(scrapingOffset)) throw new BadRequestException('Invalid scraping offset');
+    if (scrapingOffset < -12 || scrapingOffset > 11) throw new BadRequestException('ScrapingOffset < -12 or > 11.');
 
     const player = await this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
     const playerHasOffset = player?.scrapingOffsets?.includes(scrapingOffset);
@@ -93,11 +93,11 @@ export class PlayersController {
     @Query('size', new DefaultValuePipe(7), ParseIntPipe) size: number,
     @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
   ) {
-    if (!username) return new BadRequestException('No username provided');
-    if (username.length > 12) return new BadRequestException('Usernames must be between 1 and 12 characters long.');
+    if (!username) throw new BadRequestException('No username provided');
+    if (username.length > 12) throw new BadRequestException('Usernames must be between 1 and 12 characters long.');
 
-    if (isNaN(scrapingOffset)) return new BadRequestException('Invalid scraping offset');
-    if (scrapingOffset < -12 || scrapingOffset > 11) return new BadRequestException('ScrapingOffset < -12 or > 11.');
+    if (isNaN(scrapingOffset)) throw new BadRequestException('Invalid scraping offset');
+    if (scrapingOffset < -12 || scrapingOffset > 11) throw new BadRequestException('ScrapingOffset < -12 or > 11.');
 
     return this.playersService.getPlayerHiscores(username, scrapingOffset, size, skip);
   }
