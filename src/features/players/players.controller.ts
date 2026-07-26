@@ -60,7 +60,10 @@ export class PlayersController {
       `max-age=${Math.min(900, differenceInSeconds(addHours(player?.lastModified ?? new Date(), PLAYER_CONFIG.minPlayerRefreshTime), new Date()))}`,
     );
 
-    if (skipRefresh) return player; // Skip refresh if requested
+    if (skipRefresh) {
+      if (!player) throw new NotFoundException(`Player '${username}' not found`);
+      return player; // Skip refresh if requested
+    }
 
     if (
       !player || // Player does not exist
