@@ -3,7 +3,7 @@ import { OsrsNewsItem } from '@osrs-tracker/models';
 import { XMLParser } from 'fast-xml-parser';
 import { Agent } from 'https';
 import fetch from 'node-fetch';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 
 @Injectable()
 export class NewsService {
