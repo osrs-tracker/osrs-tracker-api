@@ -37,6 +37,7 @@
     "@nestjs/platform-express": "^11.1.28",
     "@nestjs/swagger": "^11.4.6",
     "@osrs-tracker/models": "^0.6.0",
+    "commitizen": "^4.3.2",
     "date-fns": "^4.4.0",
     "express-prom-bundle": "^8.0.0",
     "fast-xml-parser": "^5.10.1",
