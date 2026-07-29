@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule } from '@nestjs/swagger';
-import * as promBundle from 'express-prom-bundle';
+import promBundle from 'express-prom-bundle';
 import { AppMetricsModule } from './app-metrics.module';
 import { AppModule } from './app.module';
 import { JSONLogger } from './common/logger/JsonLogger';
