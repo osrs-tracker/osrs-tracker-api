@@ -19,7 +19,7 @@
     "url": "github:osrs-tracker/osrs-tracker-api"
   },
   "scripts": {
-    "build": "NODE_ENV=production nest build",
+    "build": "NODE_ENV=production nest build -b webpack",
     "docker:build": "docker build -t freekmencke/osrs-tracker-api:latest .",
     "docker:push": "docker push freekmencke/osrs-tracker-api:latest",
     "prettier": "prettier --write \"src/**/*.ts\"",
