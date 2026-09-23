@@ -45,6 +45,13 @@ export class PlayersService {
       },
     );
 
+    if (includeLatestHiscoreEntry && player) {
+      return {
+        ...player,
+        hiscoreEntries: player.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? [],
+      };
+    }
+
     return player;
   }
 
@@ -90,7 +97,7 @@ export class PlayersService {
       ])
       .next();
 
-    return player?.hiscoreEntries ?? null;
+    return player?.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? null;
   }
 
   getLastFetchedPlayers(limit: number): Promise<Player[]> {
@@ -116,6 +123,10 @@ export class PlayersService {
       )
       .sort({ lastHiscoreFetch: -1 }) // Sort by lastHiscoreFetch in descending order
       .limit(limit)
+      .map((player) => ({
+        ...player,
+        hiscoreEntries: player.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? [],
+      }))
       .toArray();
   }
 
@@ -128,7 +139,7 @@ export class PlayersService {
   async refreshPlayerInfo(_username: string, scrapingOffset: number, initialScrape: boolean): Promise<boolean> {
     const username = this.normalizeUsername(_username);
 
-    const [player, sourceString] = await this.determinePlayerStatusAndType(username);
+    const [player, partialHiscoreEntry] = await this.determinePlayerStatusAndType(username);
 
     if (player === null) return false;
 
@@ -137,7 +148,18 @@ export class PlayersService {
       {
         $set: player,
         $addToSet: { scrapingOffsets: scrapingOffset },
-        ...(initialScrape ? { $push: { hiscoreEntries: { scrapingOffset, sourceString, date: new Date() } } } : {}),
+        ...(initialScrape
+          ? {
+              $push: {
+                hiscoreEntries: {
+                  scrapingOffset,
+                  sourceString: 'LEGACY',
+                  date: new Date(),
+                  ...partialHiscoreEntry!,
+                },
+              },
+            }
+          : {}),
       },
       {
         upsert: true,
@@ -151,7 +173,9 @@ export class PlayersService {
   }
 
   /** Returns determined player if determined, and normal sourceString, */
-  private async determinePlayerStatusAndType(_username: string): Promise<[Player | null, string]> {
+  private async determinePlayerStatusAndType(
+    _username: string,
+  ): Promise<[Player | null, Pick<HiscoreEntry, 'skills' | 'activities'>]> {
     const username = this.normalizeUsername(_username);
 
     const [normal, ironman, ultimate, hardcore] = await Promise.all([
@@ -161,12 +185,12 @@ export class PlayersService {
       this.getHiscore(username, PlayerType.Hardcore),
     ]);
 
-    if (normal === null) return [null, ''];
+    if (normal === null) return [null, { skills: [], activities: [] }];
 
     return [
       {
         username,
-        combatLevel: PlayerUtils.getCombatLevel(normal),
+        combatLevel: PlayerUtils.getCombatLevel(normal.skills),
         type: PlayerUtils.determineType(ironman, ultimate, hardcore),
         status: PlayerUtils.determineStatus(normal, ironman, ultimate),
         diedAsHardcore: PlayerUtils.getTotalXp(hardcore) < PlayerUtils.getTotalXp(ironman),
@@ -176,15 +200,29 @@ export class PlayersService {
     ];
   }
 
-  private async getHiscore(username: string, type: PlayerType): Promise<string | null> {
+  private async getHiscore(
+    username: string,
+    type: PlayerType,
+  ): Promise<Pick<HiscoreEntry, 'skills' | 'activities'> | null> {
     const hiscoreUrl =
-      process.env.OSRS_API_BASE_URL + `/m=${PlayerUtils.getHiscoreTable(type)}/index_lite.ws?player=${username}`;
+      process.env.OSRS_API_BASE_URL + `/m=${PlayerUtils.getHiscoreTable(type)}/index_lite.json?player=${username}`;
 
     const result = await fetch(hiscoreUrl, { agent: this.agent, headers: { 'cache-control': 'no-cache' } });
-    return result.ok ? result.text() : null;
+    return result.ok ? (result.json() as Promise<Pick<HiscoreEntry, 'skills' | 'activities'>>) : null;
   }
 
   private normalizeUsername(username: string): string {
     return username.trim().toLowerCase();
+  }
+
+  /**
+   * @deprecated Remove this when we get rid of the sourceString field in the database.
+   * If the skills array is not empty, set sourceString to LEGACY, saves a lot of data.
+   */
+  private stripSourceStringFromHiscoreEntry(hiscoreEntry: HiscoreEntry): HiscoreEntry {
+    return {
+      ...hiscoreEntry,
+      sourceString: hiscoreEntry.skills?.length > 0 ? 'LEGACY' : hiscoreEntry.sourceString,
+    };
   }
 }
