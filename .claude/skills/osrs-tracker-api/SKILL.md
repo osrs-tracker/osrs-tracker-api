@@ -26,7 +26,13 @@ Shared types come from `@osrs-tracker/models`.
 - `src/config/`: `cors.ts` (allows `CORS_ORIGIN` and `http://localhost:4200`) and `swagger.ts`.
 - Env vars: `MONGODB_URI`, `MONGODB_USERNAME`, `MONGODB_PASSWORD`, `MONGODB_DATABASE`, `OSRS_API_BASE_URL`,
   `CORS_ORIGIN`, `PORT`, `METRICS_PORT`, `NODE_ENV`. Locally they come from `.env` (gitignored, never commit it); in the
-  cluster from the `aws-mongodb-credentials` secret plus the `env:` block in the yaml.
+  cluster from the `aws-mongodb-credentials` secret plus the `env:` block in the yaml (`env:` overrides the secret's own
+  `OSRS_API_BASE_URL` key).
+- External services: `OSRS_API_BASE_URL` is `https://runescape-api.freekmencke.com/rs`, an AWS API Gateway proxy to
+  `https://secure.runescape.com` that passes Jagex's headers through unchanged. MongoDB is Atlas (db `osrs-tracker`),
+  reached with username/password (SCRAM), not MONGODB-AWS. Lambdas in the sibling `osrs-tracker-aws` repo also write to
+  `players` (hiscore entries) and `items` (hourly upsert), and publish `@osrs-tracker/models` and
+  `@osrs-tracker/hiscores`.
 
 ## NestJS conventions
 
