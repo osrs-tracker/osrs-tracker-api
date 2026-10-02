@@ -1,5 +1,6 @@
 ## 2026/10/02
 
+- Trimmed the project skill to repo-specific rules, added `.env.example` and ignored `tsconfig.tsbuildinfo`.
 - Documented the player pause/resume contract, Mongo pipeline-update rules, shared packages and prod testing in the
   project skill.
 - Resumed tracking of paused players (no hiscores for 7 days) when they're found on the hiscores again.

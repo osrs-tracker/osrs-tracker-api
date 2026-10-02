@@ -1,67 +1,55 @@
 ---
 name: osrs-tracker-api
 description:
-  Conventions, NestJS 11 best practices, verification and the deploy workflow for osrs-tracker-api. Use when writing or
-  reviewing code in this repo, adding or changing endpoints or Cache-Control headers, or building, deploying, committing
-  or pushing it.
+  Repo-specific rules for the osrs-tracker-api NestJS/MongoDB service: Cache-Control rules for the web app's SSR
+  transfer cache, Mongo pipeline-update pitfalls, the player pause/resume contract, production testing, and the
+  Docker → Kubernetes deploy. Use when adding or changing endpoints, Cache-Control headers or player/item writes,
+  testing against production data, or building, deploying, committing or pushing this repo.
 ---
 
 # osrs-tracker-api
 
-NestJS 11 API on Express 5 backed by MongoDB (native driver, no ODM), deployed as a Docker image to Kubernetes. Its main
-consumer is the Angular SSR app in the sibling repo `../osrs-tracker-web`, which has its own `osrs-tracker-web` skill.
-Shared types come from `@osrs-tracker/models`.
+NestJS API on Express backed by MongoDB (native driver, no ODM), deployed as a Docker image to Kubernetes. Its main
+consumer is the Angular SSR app in the sibling repo `../osrs-tracker-web`.
 
-## Layout
+## Non-obvious layout
 
-- `src/main.ts`: bootstrap: CORS, JSON logger, Prometheus metrics on a separate app (`METRICS_PORT`, `/healthy`).
-  Swagger is at `/swagger` outside production.
-- `src/app.module.ts`: imports the global/common modules and feature modules, and applies `LoggerMiddleware` and
-  `NoIndexMiddleware` to all routes.
-- `src/common/<thing>/`: a factory provider plus a module per shared dependency: `mongo` (`'MONGO_CLIENT'`,
-  `'MONGODB_DATABASE'`, and index creation), `agent` (`'AGENT'`, keep-alive https agent), `xml` (`'XML_PARSER'`),
-  `logger`.
-- `src/features/<feature>/`: `<feature>.module.ts`, `.controller.ts`, `.service.ts`, plus optional `.config.ts` and
-  `.utils.ts`.
-- `src/config/`: `cors.ts` (allows `CORS_ORIGIN` and `http://localhost:4200`) and `swagger.ts`.
-- Env vars: `MONGODB_URI`, `MONGODB_USERNAME`, `MONGODB_PASSWORD`, `MONGODB_DATABASE`, `OSRS_API_BASE_URL`,
-  `CORS_ORIGIN`, `PORT`, `METRICS_PORT`, `NODE_ENV`. Locally they come from `.env` (gitignored, never commit it); in the
-  cluster from the `aws-mongodb-credentials` secret plus the `env:` block in the yaml (`env:` overrides the secret's own
-  `OSRS_API_BASE_URL` key).
-- External services: `OSRS_API_BASE_URL` is `https://runescape-api.freekmencke.com/rs`, an AWS API Gateway proxy to
-  `https://secure.runescape.com` that passes Jagex's headers through unchanged. MongoDB is Atlas (db `osrs-tracker`),
-  reached with username/password (SCRAM), not MONGODB-AWS. Lambdas in the sibling `osrs-tracker-aws` repo also write to
-  `players` (hiscore entries) and `items` (hourly upsert).
-- Shared packages: `@osrs-tracker/models` (the `Player`/`Item` types) is owned by the `osrs-tracker-aws` repo, and the
-  user publishes it with an OTP. Right after a publish, bump with `npm i @osrs-tracker/models@^x.y.z --prefer-online`,
-  because the registry CDN's dist-tags lag.
-
-## NestJS conventions
-
-Match the surrounding code; these are the patterns the codebase already uses:
-
-- **Feature modules** declare their own controllers and providers and export the service. Shared infrastructure is
-  injected with string tokens and `@Inject('TOKEN')`. `MongoModule` is `@Global()`, so features don't import it.
-- **Controllers stay thin**: parse with built-in pipes (`ParseIntPipe`, `ParseBoolPipe`, `DefaultValuePipe`), validate
-  explicitly, and throw Nest HTTP exceptions (`BadRequestException`, `NotFoundException`) with a clear message. Business
-  logic and DB access belong in the service.
-- **Every endpoint gets Swagger decorators**: `@ApiTags` on the controller; `@ApiOperation`, `@ApiParam` and `@ApiQuery`
-  on each handler.
-- **Mongo**: use the typed `collection` getter, always add a `projection` (exclude `_id`), use `hint` when an index
-  exists, and create new indexes in `mongo.provider.ts`. In aggregation-pipeline updates, wrap player data and user
-  input in `$literal` (strings starting with `$` would otherwise be read as field paths), prepend `hiscoreEntries` with
-  `$concatArrays` (they're stored newest first), merge offsets with `$setUnion`, and keep `upsert`/`hint`.
-- **Logging**: `private readonly logger = new Logger(ClassName.name)`. Don't use `console`.
+- Shared infrastructure in `src/common/<thing>/` is injected with string tokens (`@Inject('MONGODB_DATABASE')`,
+  `'MONGO_CLIENT'`, `'AGENT'`, `'XML_PARSER'`). `MongoModule` is `@Global()`, so features don't import it. New indexes
+  go in `mongo.provider.ts`.
+- `src/config/cors.ts` always allows `http://localhost:4200` besides `CORS_ORIGIN`.
+- Env vars are listed in `.env.example`. Locally they come from `.env` (gitignored, never commit it); in the cluster
+  from the `aws-mongodb-credentials` secret plus the `env:` block in `osrs-tracker-api.yaml`, which overrides the
+  secret's own `OSRS_API_BASE_URL` key.
 - Prefer `@Res({ passthrough: true })` when you only need to set headers. A plain `@Res()` (as in `news/image`) makes
   you responsible for sending the response.
 
+## External services and shared packages
+
+- `OSRS_API_BASE_URL` is an AWS API Gateway proxy to `https://secure.runescape.com` that passes Jagex's headers through
+  unchanged.
+- MongoDB is Atlas, reached with username/password (SCRAM), not MONGODB-AWS. Lambdas in the sibling `osrs-tracker-aws`
+  repo also write to `players` (hiscore entries, pausing) and `items` (hourly upsert), so don't assume the API is the
+  only writer.
+- `@osrs-tracker/models` (the `Player`/`Item` types) is owned by `osrs-tracker-aws` and published by the maintainer.
+  Right after a publish, bump with `npm i @osrs-tracker/models@^x.y.z --prefer-online`, because the registry CDN's
+  dist-tags lag.
+
+## Mongo pipeline updates
+
+In aggregation-pipeline updates, wrap player data and user input in `$literal` (strings starting with `$` would
+otherwise be read as field paths), prepend `hiscoreEntries` with `$concatArrays` (they're stored newest first), merge
+offsets with `$setUnion`, and keep `upsert`/`hint`.
+
 ## Pausing and resuming players
 
-The `process-players` Lambda (osrs-tracker-aws) pauses a player after 7 consecutive days of hiscore 404s: it moves
-`scrapingOffsets` to `pausedScrapingOffsets` and tracks `hiscoreNotFoundSince`/`hiscoreNotFoundCount`, so the player is
-no longer queued. `refreshPlayerInfo` resumes the player on any successful refresh, in one pipeline update: it merges
-the paused offsets back and removes the three pause fields. The API **never** counts 404s itself (any non-OK hiscore
-response looks the same to it, including Jagex being down), and it leaves the pause fields alone when a refresh fails.
+The Lambda pauses players whose hiscores keep returning 404 (`pausedScrapingOffsets`, `hiscoreNotFoundSince`,
+`hiscoreNotFoundCount`). The API side of the contract, in `refreshPlayerInfo`:
+
+- On any successful refresh, resume in the same update: merge `pausedScrapingOffsets` back into `scrapingOffsets` and
+  remove the three pause fields.
+- **Never** count 404s. Any non-OK hiscore response looks the same to the API, including Jagex being down.
+- On a failed refresh, leave the pause fields alone.
 
 ## Cache-Control (important)
 
@@ -72,7 +60,7 @@ flashing back to skeletons). So never use those as a default.
 - Read-only, slow-changing data: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/news/image` 604800).
 - **GET routes with DB writes** (`/items/:id` sets `lastFetch`, `/players/:username/hiscores` sets `lastHiscoreFetch`)
   and the recent-items/players lists: `max-age=0, must-revalidate`. Browsers then revalidate every time, so the handler
-  and its write always run. Express 5 computes the ETag and the 304 inside `res.send()`, after the handler has finished.
+  and its write always run. Express computes the ETag and the 304 inside `res.send()`, after the handler has finished.
 - `/players/:username`: dynamic `max-age`, clamped to `[0, 900]` and capped at the time left until the player's refresh
   window, so no refresh is ever skipped.
 - When adding a GET route that writes, give it `max-age=0, must-revalidate`, and note the write in a comment.
@@ -80,26 +68,12 @@ flashing back to skeletons). So never use those as a default.
 ## Verify before handing off
 
 ```bash
-npx tsc --noEmit -p tsconfig.json
+npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build
 ```
 
-```bash
-npm run lint:ci
-```
-
-```bash
-npm run prettier:ci
-```
-
-```bash
-npm run build
-```
-
-`npm run lint:ci` only reports problems. `npm run lint` runs `eslint --fix`, so check `git diff` after using it. The
-repo has no tests. To test against production data, run the API locally (the `.env` points at the prod database) and use
-the user's old account **ToxSick** as the test player. Ask the user before writing to it, record its state first, and
-restore it afterwards. If `tsc` leaves a `tsconfig.tsbuildinfo` behind, delete it. CI (`.github/workflows/nodejs.yml`,
-Node 24) runs `lint:ci`, `prettier:ci` and build on every push to `main`.
+`npm run lint` runs `eslint --fix`, so check `git diff` after using it. The repo has no tests. To test against
+production data, run the API locally (`.env` points at the prod database) and use **ToxSick** as the test player. Ask
+the user before writing to it, record its state first, and restore it afterwards.
 
 ## Deploy (Docker → Kubernetes)
 
@@ -118,8 +92,7 @@ Node 24) runs `lint:ci`, `prettier:ci` and build on every push to `main`.
    kubectl -n osrs-tracker get deploy osrs-tracker-api -o jsonpath='{.spec.template.spec.containers[0].image}'
    ```
 
-5. **Review the diff before applying.** Applying without reviewing is blocked. Expect only the image digest (plus a
-   `generation` bump):
+5. Review the diff before applying. Expect only the image digest (plus a `generation` bump):
 
    ```bash
    kubectl diff -f osrs-tracker-api.yaml
@@ -138,8 +111,8 @@ Node 24) runs `lint:ci`, `prettier:ci` and build on every push to `main`.
    kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m
    ```
 
-8. If the change affects what the web app renders, check the web side too. Its auto-generated pages refresh on an
-   interval (`/` every 5 min), so a cached page can show the old API behaviour for a few minutes.
+8. If the change affects what the web app renders, check the web side too. Its pages are regenerated on an interval (`/`
+   every 5 min), so a cached page can show the old API behaviour for a few minutes.
 
 ## Commit and push
 
@@ -150,5 +123,4 @@ Node 24) runs `lint:ci`, `prettier:ci` and build on every push to `main`.
 - Commits are GPG-signed. If signing fails with "Inappropriate ioctl for device", ask the user to unlock the key in
   their own terminal (`echo test | gpg --clearsign > /dev/null`); never use `--no-gpg-sign`.
 - Push over HTTPS via `gh` (`gh auth setup-git` is configured). If `gh auth status` fails, ask the user to log in.
-- Deploying without committing leaves production running code that isn't on GitHub, so commit and push in the same
-  session as the deploy.
+- Deploying without committing leaves production running code that isn't on GitHub, so always commit and push a deploy.
