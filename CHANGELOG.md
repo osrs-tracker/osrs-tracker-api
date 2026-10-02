@@ -6,3 +6,4 @@
 - Updated CI to `actions/checkout@v7` and `actions/setup-node@v7`, and made CI lint fail instead of auto-fixing.
 - dependency updates
 - Documented the external services (RuneScape API proxy, MongoDB Atlas, AWS Lambdas) in the project skill.
+- Expanded the README with an overview, how the API fits into OSRS Tracker and how to run it locally.
