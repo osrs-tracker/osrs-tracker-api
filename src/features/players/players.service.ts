@@ -133,6 +133,12 @@ export class PlayersService {
   /**
    * Refreshes the player info for the given `username`.
    *
+   * Pause/resume contract with the `process-players` Lambda (osrs-tracker-aws): the Lambda owns the not-found
+   * bookkeeping (`hiscoreNotFoundCount`, `hiscoreNotFoundSince`) and, after 7 days of 404s, moves `scrapingOffsets`
+   * into `pausedScrapingOffsets` so the player is no longer queued. A successful refresh here resumes tracking by
+   * merging the paused offsets back and removing the pause fields. A failed refresh leaves them untouched, since a
+   * non-OK hiscore response can also be an outage rather than a missing player.
+   *
    * @param scrapingOffset The `scrapingOffset` will be added to the player's `scrapingOffsets` if not already present.
    * @param initialScrape If true, will also add an initial `hiscoreEntry` for this `scrapingOffset`.
    */
@@ -143,24 +149,39 @@ export class PlayersService {
 
     if (player === null) return false;
 
+    const hiscoreEntry: HiscoreEntry = {
+      scrapingOffset,
+      sourceString: 'LEGACY',
+      date: new Date(),
+      ...partialHiscoreEntry,
+    };
+
+    // Aggregation pipeline update, values are wrapped in $literal so strings starting with '$' aren't field paths.
     const { upsertedCount, modifiedCount } = await this.collection.updateOne(
       { username: player.username },
-      {
-        $set: player,
-        $addToSet: { scrapingOffsets: scrapingOffset },
-        ...(initialScrape
-          ? {
-              $push: {
-                hiscoreEntries: {
-                  scrapingOffset,
-                  sourceString: 'LEGACY',
-                  date: new Date(),
-                  ...partialHiscoreEntry!,
-                },
-              },
-            }
-          : {}),
-      },
+      [
+        {
+          $set: {
+            ...Object.fromEntries(Object.entries(player).map(([key, value]) => [key, { $literal: value }])),
+            scrapingOffsets: {
+              $setUnion: [
+                { $ifNull: ['$scrapingOffsets', []] },
+                { $ifNull: ['$pausedScrapingOffsets', []] },
+                [scrapingOffset],
+              ],
+            },
+            ...(initialScrape
+              ? {
+                  // Prepend, entries are stored newest first.
+                  hiscoreEntries: {
+                    $concatArrays: [[{ $literal: hiscoreEntry }], { $ifNull: ['$hiscoreEntries', []] }],
+                  },
+                }
+              : {}),
+          },
+        },
+        { $unset: ['pausedScrapingOffsets', 'hiscoreNotFoundSince', 'hiscoreNotFoundCount'] },
+      ],
       {
         upsert: true,
         hint: { username: 1 },
