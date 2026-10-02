@@ -1,10 +1,10 @@
 ---
 name: osrs-tracker-api
-description:
+description: >-
   Repo-specific rules for the osrs-tracker-api NestJS/MongoDB service: Cache-Control rules for the web app's SSR
-  transfer cache, Mongo pipeline-update pitfalls, the player pause/resume contract, production testing, and the
-  Docker → Kubernetes deploy. Use when adding or changing endpoints, Cache-Control headers or player/item writes,
-  testing against production data, or building, deploying, committing or pushing this repo.
+  transfer cache, Mongo pipeline-update pitfalls, the player pause/resume contract, production testing, and the Docker →
+  Kubernetes deploy. Use when adding or changing endpoints, Cache-Control headers or player/item writes, testing against
+  production data, or building, deploying, committing or pushing this repo.
 ---
 
 # osrs-tracker-api
