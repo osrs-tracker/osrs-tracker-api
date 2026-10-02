@@ -4,6 +4,9 @@
   "private": true,
   "description": "This repository contains the NestJS API for OSRS Tracker.",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24"
+  },
   "config": {
     "commitizen": {
       "path": "./node_modules/cz-conventional-changelog"
@@ -28,7 +31,8 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "lint:ci": "eslint \"{src,apps,libs,test}/**/*.ts\""
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",
@@ -58,7 +62,7 @@
     "@swc/core": "^1.15.46",
     "@types/express": "^5.0.6",
     "@types/morgan": "^1.9.10",
-    "@types/node": "^24.13.3",
+    "@types/node": "^24.19.1",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.8.0",
@@ -72,6 +76,6 @@
   },
   "allowScripts": {
     "@scarf/scarf@1.4.0": true,
-    "@swc/core@1.15.46": true
+    "@swc/core@1.16.13": true
   }
 }
