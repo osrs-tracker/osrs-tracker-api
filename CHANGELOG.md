@@ -1,5 +1,7 @@
 ## 2026/10/02
 
+- Documented the player pause/resume contract, Mongo pipeline-update rules, shared packages and prod testing in the
+  project skill.
 - Resumed tracking of paused players (no hiscores for 7 days) when they're found on the hiscores again.
 - Allowed caching of API responses so the web app's SSR transfer cache can reuse them (no more `no-store`/`no-cache`).
 - Clamped the dynamic `max-age` of `/players/:username` to a minimum of 0.

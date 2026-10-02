@@ -31,8 +31,10 @@ Shared types come from `@osrs-tracker/models`.
 - External services: `OSRS_API_BASE_URL` is `https://runescape-api.freekmencke.com/rs`, an AWS API Gateway proxy to
   `https://secure.runescape.com` that passes Jagex's headers through unchanged. MongoDB is Atlas (db `osrs-tracker`),
   reached with username/password (SCRAM), not MONGODB-AWS. Lambdas in the sibling `osrs-tracker-aws` repo also write to
-  `players` (hiscore entries) and `items` (hourly upsert), and publish `@osrs-tracker/models` and
-  `@osrs-tracker/hiscores`.
+  `players` (hiscore entries) and `items` (hourly upsert).
+- Shared packages: `@osrs-tracker/models` (the `Player`/`Item` types) is owned by the `osrs-tracker-aws` repo, and the
+  user publishes it with an OTP. Right after a publish, bump with `npm i @osrs-tracker/models@^x.y.z --prefer-online`,
+  because the registry CDN's dist-tags lag.
 
 ## NestJS conventions
 
@@ -46,10 +48,20 @@ Match the surrounding code; these are the patterns the codebase already uses:
 - **Every endpoint gets Swagger decorators**: `@ApiTags` on the controller; `@ApiOperation`, `@ApiParam` and `@ApiQuery`
   on each handler.
 - **Mongo**: use the typed `collection` getter, always add a `projection` (exclude `_id`), use `hint` when an index
-  exists, and create new indexes in `mongo.provider.ts`.
+  exists, and create new indexes in `mongo.provider.ts`. In aggregation-pipeline updates, wrap player data and user
+  input in `$literal` (strings starting with `$` would otherwise be read as field paths), prepend `hiscoreEntries` with
+  `$concatArrays` (they're stored newest first), merge offsets with `$setUnion`, and keep `upsert`/`hint`.
 - **Logging**: `private readonly logger = new Logger(ClassName.name)`. Don't use `console`.
 - Prefer `@Res({ passthrough: true })` when you only need to set headers. A plain `@Res()` (as in `news/image`) makes
   you responsible for sending the response.
+
+## Pausing and resuming players
+
+The `process-players` Lambda (osrs-tracker-aws) pauses a player after 7 consecutive days of hiscore 404s: it moves
+`scrapingOffsets` to `pausedScrapingOffsets` and tracks `hiscoreNotFoundSince`/`hiscoreNotFoundCount`, so the player is
+no longer queued. `refreshPlayerInfo` resumes the player on any successful refresh, in one pipeline update: it merges
+the paused offsets back and removes the three pause fields. The API **never** counts 404s itself (any non-OK hiscore
+response looks the same to it, including Jagex being down), and it leaves the pause fields alone when a refresh fails.
 
 ## Cache-Control (important)
 
@@ -84,7 +96,9 @@ npm run build
 ```
 
 `npm run lint:ci` only reports problems. `npm run lint` runs `eslint --fix`, so check `git diff` after using it. The
-repo has no tests. If `tsc` leaves a `tsconfig.tsbuildinfo` behind, delete it. CI (`.github/workflows/nodejs.yml`,
+repo has no tests. To test against production data, run the API locally (the `.env` points at the prod database) and use
+the user's old account **ToxSick** as the test player. Ask the user before writing to it, record its state first, and
+restore it afterwards. If `tsc` leaves a `tsconfig.tsbuildinfo` behind, delete it. CI (`.github/workflows/nodejs.yml`,
 Node 24) runs `lint:ci`, `prettier:ci` and build on every push to `main`.
 
 ## Deploy (Docker → Kubernetes)
