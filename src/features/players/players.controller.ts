@@ -26,7 +26,7 @@ export class PlayersController {
   constructor(private readonly playersService: PlayersService) {}
 
   @Get('')
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Cache-Control', 'max-age=0, must-revalidate')
   @ApiOperation({ summary: 'Get the last fetched players' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getRecentPlayers(@Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number) {
@@ -57,7 +57,7 @@ export class PlayersController {
 
     response.setHeader(
       'Cache-Control', // Set cache control to 15 minutes (900 seconds) or time until the minimum refresh time has passed
-      `max-age=${Math.min(900, differenceInSeconds(addHours(player?.lastModified ?? new Date(), PLAYER_CONFIG.minPlayerRefreshTime), new Date()))}`,
+      `max-age=${Math.max(0, Math.min(900, differenceInSeconds(addHours(player?.lastModified ?? new Date(), PLAYER_CONFIG.minPlayerRefreshTime), new Date())))}`,
     );
 
     if (skipRefresh) {
@@ -84,7 +84,7 @@ export class PlayersController {
   }
 
   @Get(':username/hiscores')
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Cache-Control', 'max-age=0, must-revalidate')
   @ApiOperation({ summary: "Get a player's hiscores by username" })
   @ApiParam({ name: 'username' })
   @ApiQuery({ name: 'scrapingOffset', required: false, type: Number })

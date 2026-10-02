@@ -18,7 +18,7 @@ export class NewsController {
   constructor(private readonly newsService: NewsService) {}
 
   @Get()
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Cache-Control', 'public, max-age=300')
   @ApiOperation({ summary: 'Get recent news articles' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getRecentNews(@Query('limit', new DefaultValuePipe(4), ParseIntPipe) limit: number) {
