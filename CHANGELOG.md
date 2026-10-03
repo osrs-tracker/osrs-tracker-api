@@ -1,5 +1,7 @@
 ## 2026/10/03
 
+- The ingress runs on Traefik (ingress-nginx is retired); the rate limits moved to Traefik Middlewares with the
+  same values.
 - Project skill: documented the release flow (PR, review, deploy, update the PR, merge).
 - Fixed a `url.parse()` deprecation warning in the logs.
 - Project skill: ask whether to commit straight to `main` or open a PR, and how to clean up after a merge.
