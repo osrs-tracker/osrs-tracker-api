@@ -26,17 +26,26 @@ export class NewsController {
   }
 
   @Get('image')
-  @Header('Cache-Control', 'max-age=604800')
-  @Header('Content-Type', 'image/webp')
   @ApiOperation({ summary: 'Get image as WebP' })
   @ApiQuery({ name: 'url', required: true, type: String })
   async getImageAsWebp(@Res() res: Response, @Query('url') url: string) {
-    const OSRS_CDN_ORIGIN = 'https://cdn.runescape.com/';
+    const OSRS_CDN_ORIGIN = 'https://cdn.runescape.com';
 
     if (!url) throw new BadRequestException('No URL provided');
-    if (url.length > 512) throw new BadRequestException('URL must be 256 characters or less');
-    if (!url.startsWith(OSRS_CDN_ORIGIN)) throw new BadRequestException(`URL must start with "${OSRS_CDN_ORIGIN}"`);
+    if (url.length > 512) throw new BadRequestException('URL must be 512 characters or less');
 
-    return res.send(await this.newsService.getImageAsWebp(url));
+    const parsedUrl = URL.parse(url);
+    // Only plain CDN paths: a query string or hash would let every request create a new image cache entry.
+    if (parsedUrl?.origin !== OSRS_CDN_ORIGIN || parsedUrl.username || parsedUrl.password) {
+      throw new BadRequestException(`URL must start with "${OSRS_CDN_ORIGIN}/"`);
+    }
+    if (parsedUrl.search || parsedUrl.hash) throw new BadRequestException('URL must not contain a query or hash');
+
+    const webp = await this.newsService.getImageAsWebp(parsedUrl.href);
+
+    // Set only on success (not with @Header), so browsers don't cache a rejected URL or failed fetch for a week
+    res.setHeader('Cache-Control', 'max-age=604800');
+    res.setHeader('Content-Type', 'image/webp');
+    return res.send(webp);
   }
 }

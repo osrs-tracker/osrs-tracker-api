@@ -16,6 +16,7 @@ import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { addHours, differenceInHours, differenceInSeconds } from 'date-fns';
 import { Response } from 'express';
 import { PLAYER_CONFIG } from './player.config';
+import { ParseUsernamePipe } from './parse-username.pipe';
 import { PlayersService } from './players.service';
 
 @ApiTags('players')
@@ -30,6 +31,8 @@ export class PlayersController {
   @ApiOperation({ summary: 'Get the last fetched players' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getRecentPlayers(@Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number) {
+    if (limit < 1 || limit > 50) throw new BadRequestException('Limit must be between 1 and 50.');
+
     return this.playersService.getLastFetchedPlayers(limit);
   }
 
@@ -41,14 +44,11 @@ export class PlayersController {
   @ApiQuery({ name: 'skipRefresh', required: false, type: Boolean })
   async getByUsername(
     @Res({ passthrough: true }) response: Response,
-    @Param('username') username: string,
+    @Param('username', ParseUsernamePipe) username: string,
     @Query('scrapingOffset', new DefaultValuePipe(0), ParseIntPipe) scrapingOffset: number,
     @Query('includeLatestHiscoreEntry', new DefaultValuePipe(false), ParseBoolPipe) includeLatestHiscoreEntry: boolean,
     @Query('skipRefresh', new DefaultValuePipe(false), ParseBoolPipe) skipRefresh: boolean,
   ) {
-    if (!username) throw new BadRequestException('No username provided');
-    if (username.length > 12) throw new BadRequestException('Usernames must be between 1 and 12 characters long.');
-
     if (isNaN(scrapingOffset)) throw new BadRequestException('Invalid scraping offset');
     if (scrapingOffset < -12 || scrapingOffset > 11) throw new BadRequestException('ScrapingOffset < -12 or > 11.');
 
@@ -91,16 +91,15 @@ export class PlayersController {
   @ApiQuery({ name: 'size', required: false, type: Number })
   @ApiQuery({ name: 'skip', required: false, type: Number })
   getHiscoresByUsername(
-    @Param('username') username: string,
+    @Param('username', ParseUsernamePipe) username: string,
     @Query('scrapingOffset', new DefaultValuePipe(0), ParseIntPipe) scrapingOffset: number,
     @Query('size', new DefaultValuePipe(7), ParseIntPipe) size: number,
     @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
   ) {
-    if (!username) throw new BadRequestException('No username provided');
-    if (username.length > 12) throw new BadRequestException('Usernames must be between 1 and 12 characters long.');
-
     if (isNaN(scrapingOffset)) throw new BadRequestException('Invalid scraping offset');
     if (scrapingOffset < -12 || scrapingOffset > 11) throw new BadRequestException('ScrapingOffset < -12 or > 11.');
+    if (size < 1 || size > 100) throw new BadRequestException('Size must be between 1 and 100.');
+    if (skip < 0) throw new BadRequestException('Skip must be 0 or greater.');
 
     return this.playersService.getPlayerHiscores(username, scrapingOffset, size, skip);
   }
