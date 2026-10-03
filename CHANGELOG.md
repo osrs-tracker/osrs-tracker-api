@@ -1,3 +1,7 @@
+## 2026/10/03
+
+- Fixed a `url.parse()` deprecation warning in the logs.
+
 ## 2026/10/02
 
 - Fixed the project skill's frontmatter so its description parses as YAML again.
