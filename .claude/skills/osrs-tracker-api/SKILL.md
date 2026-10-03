@@ -118,8 +118,17 @@ the user before writing to it, record its state first, and restore it afterwards
 
 - **Every change gets a `CHANGELOG.md` entry** in the same commit: a `## YYYY/MM/DD` heading (newest first; add to
   today's heading if it exists) with short bullets.
-- Commit straight to `main` with conventional commits (`fix(scope): …`, `feat(scope): …`; commitizen is configured).
-  Include the image digest bump in the same commit as the code it deploys.
+- **Ask the user whether to commit straight to `main` or open a PR**, every time, before committing. `main` requires a
+  PR and passing `lint` and `build` checks (no approvals), which the user's admin account can bypass, so a direct push
+  works and shows a "bypassed rule violations" notice.
+  - Straight to `main`: push, then watch the CI run (`gh run watch --exit-status`).
+  - PR: commit on a `<type>/<short-name>` branch, push it, `gh pr create --base main` and check `gh pr checks`. Once the
+    user says it's merged, `git switch main && git pull --ff-only`, delete the local branch with `git branch -d` and
+    `git fetch --prune` (GitHub deletes the remote branch on merge).
+  - Deploying from a PR branch leaves production running unmerged code: tell the user, and don't deploy from `main`
+    until the PR is merged.
+- Use conventional commits (`fix(scope): …`, `feat(scope): …`; commitizen is configured). Include the image digest bump
+  in the same commit as the code it deploys.
 - Commits are GPG-signed. If signing fails with "Inappropriate ioctl for device", ask the user to unlock the key in
   their own terminal (`echo test | gpg --clearsign > /dev/null`); never use `--no-gpg-sign`.
 - Push over HTTPS via `gh` (`gh auth setup-git` is configured). If `gh auth status` fails, ask the user to log in.

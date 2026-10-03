@@ -1,6 +1,7 @@
 ## 2026/10/03
 
 - Fixed a `url.parse()` deprecation warning in the logs.
+- Project skill: ask whether to commit straight to `main` or open a PR, and how to clean up after a merge.
 
 ## 2026/10/02
 
