@@ -7,6 +7,7 @@
 - Security: `/news/image` only accepts plain `cdn.runescape.com` URLs (no query or hash), refuses redirects, non-images,
   bodies over 10 MB and images over 25M pixels, and caches at most 50 MB of images (`lru-cache`), with a throttled
   warning in the logs when it has to evict.
+- `/news/image` errors no longer carry the week-long `Cache-Control` of a successful image response.
 - Security: bounded `limit` (1-50) on `/players` and `/items`, and `size` (1-100) and `skip` (≥ 0) on hiscores.
 - Security: moved `commitizen` to dev dependencies, overrode `@nestjs/swagger`'s `js-yaml` to 5.4.2, pinned `sharp` in
   the Docker image and run the container as the `node` user.

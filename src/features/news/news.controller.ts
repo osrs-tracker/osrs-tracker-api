@@ -26,8 +26,6 @@ export class NewsController {
   }
 
   @Get('image')
-  @Header('Cache-Control', 'max-age=604800')
-  @Header('Content-Type', 'image/webp')
   @ApiOperation({ summary: 'Get image as WebP' })
   @ApiQuery({ name: 'url', required: true, type: String })
   async getImageAsWebp(@Res() res: Response, @Query('url') url: string) {
@@ -43,6 +41,11 @@ export class NewsController {
     }
     if (parsedUrl.search || parsedUrl.hash) throw new BadRequestException('URL must not contain a query or hash');
 
-    return res.send(await this.newsService.getImageAsWebp(parsedUrl.href));
+    const webp = await this.newsService.getImageAsWebp(parsedUrl.href);
+
+    // Set only on success (not with @Header), so browsers don't cache a rejected URL or failed fetch for a week
+    res.setHeader('Cache-Control', 'max-age=604800');
+    res.setHeader('Content-Type', 'image/webp');
+    return res.send(webp);
   }
 }
