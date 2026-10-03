@@ -1,5 +1,6 @@
 ## 2026/10/03
 
+- Project skill: documented the release flow (PR, review, deploy, update the PR, merge).
 - Fixed a `url.parse()` deprecation warning in the logs.
 - Project skill: ask whether to commit straight to `main` or open a PR, and how to clean up after a merge.
 - Security: usernames must be valid OSRS names (1-12 letters, numbers, spaces, `-`, `_`), so double URL-encoded names

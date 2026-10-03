@@ -4,7 +4,7 @@ description: >-
   Repo-specific rules for the osrs-tracker-api NestJS/MongoDB service: Cache-Control rules for the web app's SSR
   transfer cache, Mongo pipeline-update pitfalls, the player pause/resume contract, production testing, and the Docker →
   Kubernetes deploy. Use when adding or changing endpoints, Cache-Control headers or player/item writes, testing against
-  production data, or building, deploying, committing or pushing this repo.
+  production data, or building, deploying, committing, pushing, releasing or shipping this repo.
 ---
 
 # osrs-tracker-api
@@ -114,13 +114,28 @@ the user before writing to it, record its state first, and restore it afterwards
 8. If the change affects what the web app renders, check the web side too. Its pages are regenerated on an interval (`/`
    every 5 min), so a cached page can show the old API behaviour for a few minutes.
 
+## Release ("release it", "ship it")
+
+When the user asks to release or ship, run the whole flow without asking for confirmation between steps. Stop and report
+only if a step fails.
+
+1. **PR**: commit on a `<type>/<short-name>` branch (code, `CHANGELOG.md`), push it and `gh pr create --base main`.
+2. **Review the PR's code** (`gh pr diff`): look for bugs, convention violations and leftovers, fix what you find, and
+   re-run the verification steps.
+3. **Deploy to production** following the deploy steps above, including the production checks.
+4. **Update the PR** with the deploy changes: commit the image digest bump to the branch, push, and record the deployed
+   digest and the check results in the PR description. `gh pr edit` can fail on a Projects (classic) GraphQL error; use
+   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>` instead.
+5. **Merge** once everything is fine and all checks pass (`gh pr checks <n> --watch`): `gh pr merge <n> --merge`, then
+   `git switch main && git pull --ff-only`, `git branch -d <branch>` and `git fetch --prune`.
+
 ## Commit and push
 
 - **Every change gets a `CHANGELOG.md` entry** in the same commit: a `## YYYY/MM/DD` heading (newest first; add to
   today's heading if it exists) with short bullets.
-- **Ask the user whether to commit straight to `main` or open a PR**, every time, before committing. `main` requires a
-  PR and passing `lint` and `build` checks (no approvals), which the user's admin account can bypass, so a direct push
-  works and shows a "bypassed rule violations" notice.
+- For releases, follow the flow above. Otherwise, **ask the user whether to commit straight to `main` or open a PR**,
+  every time, before committing. `main` requires a PR and passing `lint` and `build` checks (no approvals), which the
+  user's admin account can bypass, so a direct push works and shows a "bypassed rule violations" notice.
   - Straight to `main`: push, then watch the CI run (`gh run watch --exit-status`).
   - PR: commit on a `<type>/<short-name>` branch, push it, `gh pr create --base main` and check `gh pr checks`. Once the
     user says it's merged, `git switch main && git pull --ff-only`, delete the local branch with `git branch -d` and
