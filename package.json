@@ -41,10 +41,10 @@
     "@nestjs/platform-express": "^11.1.28",
     "@nestjs/swagger": "^11.4.6",
     "@osrs-tracker/models": "^0.8.0",
-    "commitizen": "^4.3.2",
     "date-fns": "^4.4.0",
     "express-prom-bundle": "^8.0.0",
     "fast-xml-parser": "^5.10.1",
+    "lru-cache": "^11.5.3",
     "mongodb": "^7.5.0",
     "morgan": "^1.11.0",
     "node-fetch": "^3.3.2",
@@ -64,6 +64,7 @@
     "@types/express": "^5.0.6",
     "@types/morgan": "^1.9.10",
     "@types/node": "^24.19.1",
+    "commitizen": "^4.3.2",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.8.0",
@@ -78,5 +79,10 @@
   "allowScripts": {
     "@scarf/scarf@1.4.0": true,
     "@swc/core@1.16.13": true
+  },
+  "overrides": {
+    "@nestjs/swagger": {
+      "js-yaml": "5.4.2"
+    }
   }
 }

@@ -23,7 +23,7 @@ export class PlayersService {
     scrapingOffset: number,
     includeLatestHiscoreEntry: boolean,
   ): Promise<Player | null> {
-    const username = this.normalizeUsername(_username);
+    const username = PlayerUtils.normalizeUsername(_username);
 
     await this.collection.createIndex({ username: 1 }, { unique: true });
 
@@ -61,7 +61,7 @@ export class PlayersService {
     size: number,
     skip: number,
   ): Promise<HiscoreEntry[] | null> {
-    const username = this.normalizeUsername(_username);
+    const username = PlayerUtils.normalizeUsername(_username);
 
     await this.collection.createIndex({ username: 1 }, { unique: true });
 
@@ -143,7 +143,10 @@ export class PlayersService {
    * @param initialScrape If true, will also add an initial `hiscoreEntry` for this `scrapingOffset`.
    */
   async refreshPlayerInfo(_username: string, scrapingOffset: number, initialScrape: boolean): Promise<boolean> {
-    const username = this.normalizeUsername(_username);
+    const username = PlayerUtils.normalizeUsername(_username);
+
+    // Never upsert a name that isn't a valid OSRS name (e.g. a double URL-encoded one that the hiscores still resolve).
+    if (!PlayerUtils.isValidUsername(username)) throw new Error(`Refusing to store invalid username '${username}'`);
 
     const [player, partialHiscoreEntry] = await this.determinePlayerStatusAndType(username);
 
@@ -197,7 +200,7 @@ export class PlayersService {
   private async determinePlayerStatusAndType(
     _username: string,
   ): Promise<[Player | null, Pick<HiscoreEntry, 'skills' | 'activities'>]> {
-    const username = this.normalizeUsername(_username);
+    const username = PlayerUtils.normalizeUsername(_username);
 
     const [normal, ironman, ultimate, hardcore] = await Promise.all([
       this.getHiscore(username, PlayerType.Normal),
@@ -226,14 +229,11 @@ export class PlayersService {
     type: PlayerType,
   ): Promise<Pick<HiscoreEntry, 'skills' | 'activities'> | null> {
     const hiscoreUrl =
-      process.env.OSRS_API_BASE_URL + `/m=${PlayerUtils.getHiscoreTable(type)}/index_lite.json?player=${username}`;
+      process.env.OSRS_API_BASE_URL +
+      `/m=${PlayerUtils.getHiscoreTable(type)}/index_lite.json?player=${encodeURIComponent(username)}`;
 
     const result = await fetch(hiscoreUrl, { agent: this.agent, headers: { 'cache-control': 'no-cache' } });
     return result.ok ? (result.json() as Promise<Pick<HiscoreEntry, 'skills' | 'activities'>>) : null;
-  }
-
-  private normalizeUsername(username: string): string {
-    return username.trim().toLowerCase();
   }
 
   /**

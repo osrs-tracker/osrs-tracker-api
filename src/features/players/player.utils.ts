@@ -1,6 +1,17 @@
 import { HiscoreEntry, HiscoreSkill, PlayerStatus, PlayerType } from '@osrs-tracker/models';
 
 export class PlayerUtils {
+  /** OSRS display names: 1-12 letters, numbers, spaces, hyphens and underscores (after normalizing to lowercase). */
+  private static readonly USERNAME_REGEX = /^[a-z0-9 _-]{1,12}$/;
+
+  static normalizeUsername(username: string): string {
+    return username.trim().toLowerCase();
+  }
+
+  static isValidUsername(username: string): boolean {
+    return PlayerUtils.USERNAME_REGEX.test(username);
+  }
+
   /** Resolve correct hiscore table for `PlayerType`. */
   static getHiscoreTable(type: PlayerType): string {
     switch (type) {
@@ -59,7 +70,6 @@ export class PlayerUtils {
 
   /** Transforms sourceString into totalXp, so we can use it to compare hiscores. */
   static getTotalXp(hiscoreEntry: Partial<HiscoreEntry> | null): number {
-    console.log(hiscoreEntry?.skills?.[0]?.xp);
     return hiscoreEntry?.skills?.[0]?.xp ?? Number.MAX_SAFE_INTEGER;
   }
 }

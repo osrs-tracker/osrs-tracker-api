@@ -23,7 +23,7 @@ FROM node:24-alpine AS production
 WORKDIR /app
 
 # Install runtime dependencies for Sharp
-RUN npm install --cpu=x64 --os=linux --libc=musl sharp
+RUN npm install --cpu=x64 --os=linux --libc=musl sharp@0.35.5
 
 # Copy built application from the build stage
 COPY --from=build /app/dist .
@@ -36,6 +36,9 @@ ENV METRICS_PORT=9090
 # Expose the port the app runs on
 EXPOSE $PORT
 EXPOSE $METRICS_PORT
+
+# Run as the image's unprivileged user instead of root
+USER node
 
 # Command to run the application
 CMD ["node", "main"]

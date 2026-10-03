@@ -24,6 +24,8 @@ export class ItemsController {
   @ApiOperation({ summary: 'Get the last fetched items' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getRecentItems(@Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number) {
+    if (limit < 1 || limit > 50) throw new BadRequestException('Limit must be between 1 and 50.');
+
     return this.itemsService.getLastFetchedItems(limit);
   }
 

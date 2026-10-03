@@ -2,6 +2,17 @@
 
 - Fixed a `url.parse()` deprecation warning in the logs.
 - Project skill: ask whether to commit straight to `main` or open a PR, and how to clean up after a merge.
+- Security: usernames must be valid OSRS names (1-12 letters, numbers, spaces, `-`, `_`), so double URL-encoded names
+  are rejected and never stored; the hiscore lookup URL-encodes the username.
+- Security: `/news/image` only accepts plain `cdn.runescape.com` URLs (no query or hash), refuses redirects, non-images,
+  bodies over 10 MB and images over 25M pixels, and caches at most 50 MB of images (`lru-cache`), with a throttled
+  warning in the logs when it has to evict.
+- Security: bounded `limit` (1-50) on `/players` and `/items`, and `size` (1-100) and `skip` (≥ 0) on hiscores.
+- Security: moved `commitizen` to dev dependencies, overrode `@nestjs/swagger`'s `js-yaml` to 5.4.2, pinned `sharp` in
+  the Docker image and run the container as the `node` user.
+- Removed a leftover `console.log` from the total XP calculation.
+- Database: removed 7 duplicate players stored under an invalid username (uppercase or with `'`/`,`) whose history
+  was already in the valid record, and lowercased the 5 remaining uppercase usernames so they can be found again.
 
 ## 2026/10/02
 
