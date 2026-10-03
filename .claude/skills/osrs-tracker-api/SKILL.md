@@ -127,8 +127,8 @@ the user before writing to it, record its state first, and restore it afterwards
     `git fetch --prune` (GitHub deletes the remote branch on merge).
   - Deploying from a PR branch leaves production running unmerged code: tell the user, and don't deploy from `main`
     until the PR is merged.
-- Use conventional commits (`fix(scope): …`, `feat(scope): …`; commitizen is configured). Include the image digest bump
-  in the same commit as the code it deploys.
+- Use conventional commits (`fix(scope): …`, `feat(scope): …`). Include the image digest bump in the same commit as the
+  code it deploys.
 - Commits are GPG-signed. If signing fails with "Inappropriate ioctl for device", ask the user to unlock the key in
   their own terminal (`echo test | gpg --clearsign > /dev/null`); never use `--no-gpg-sign`.
 - Push over HTTPS via `gh` (`gh auth setup-git` is configured). If `gh auth status` fails, ask the user to log in.

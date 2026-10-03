@@ -12,6 +12,7 @@
 - Security: moved `commitizen` to dev dependencies, overrode `@nestjs/swagger`'s `js-yaml` to 5.4.2, pinned `sharp` in
   the Docker image and run the container as the `node` user.
 - Removed a leftover `console.log` from the total XP calculation.
+- Removed the unused `commitizen` dev dependency (and its `braces` audit findings).
 - Database: removed 7 duplicate players stored under an invalid username (uppercase or with `'`/`,`) whose history
   was already in the valid record, and lowercased the 5 remaining uppercase usernames so they can be found again.
 
