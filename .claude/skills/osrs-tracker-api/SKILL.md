@@ -59,9 +59,9 @@ state and restore it afterwards.
 
 1. Verify (in a release, passing CI counts).
 2. `npm run docker:build && npm run docker:push`, then put the digest in the `image:` line of `osrs-tracker-api.yaml`.
-   If `docker` is missing or the engine is down, start Docker Desktop from Windows:
-   `"/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe" desktop start` (WSL's `docker` exists only while it
-   runs).
+   If `docker` is missing or the engine is down, start Docker Desktop from Windows and close the window it opens (it
+   keeps running in the tray):
+   `"/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe" desktop start && powershell.exe -NoProfile -Command 'Get-Process "Docker Desktop" | % { [void]$_.CloseMainWindow() }'`
 3. Confirm the live image matches the yaml, so you don't roll back someone else's deploy:
    `kubectl -n osrs-tracker get deploy osrs-tracker-api -o jsonpath='{.spec.template.spec.containers[0].image}'`
 4. `kubectl diff -f osrs-tracker-api.yaml` — expect only the digest (plus `generation`).
