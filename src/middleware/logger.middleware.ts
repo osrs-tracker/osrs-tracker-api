@@ -17,6 +17,9 @@ export class LoggerMiddleware implements NestMiddleware {
       url: tokens['url'](req, res),
       responseTime: tokens['response-time'](req, res) + 'ms',
       userAgent: tokens['user-agent'](req, res),
+      clientIp: tokens['remote-addr'](req, res),
+      referer: tokens['referrer'](req, res),
+      contentLength: tokens['res'](req, res, 'content-length'),
     });
   });
 
