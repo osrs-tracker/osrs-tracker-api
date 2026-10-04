@@ -4,6 +4,9 @@
   yet, instead of crash-looping after a node reboot. A `startupProbe` gives it up to 3 minutes to come up.
 - Request logs include the client IP (from Traefik's `X-Forwarded-For`, via `trust proxy`), the referer and the response
   size, for security.
+- Prometheus metrics label requests with the route they matched (e.g. `/players/:username`) or `#unmatched`, instead of
+  the URL, so every player name or scanner URL no longer creates its own time series. Request logs have the same value
+  in a new `route` field, next to the full `url`.
 
 ## 2026/10/03
 

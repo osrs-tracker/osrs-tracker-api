@@ -1,6 +1,7 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 import morgan from 'morgan';
+import { routeLabel } from '../common/route/route-label';
 
 @Injectable()
 export class LoggerMiddleware implements NestMiddleware {
@@ -14,6 +15,7 @@ export class LoggerMiddleware implements NestMiddleware {
       status: tokens['status'](req, res),
       method: tokens['method'](req, res),
       host: tokens['req'](req, res, 'host'),
+      route: routeLabel(req as Request),
       url: tokens['url'](req, res),
       responseTime: tokens['response-time'](req, res) + 'ms',
       userAgent: tokens['user-agent'](req, res),
