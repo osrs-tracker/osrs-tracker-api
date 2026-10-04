@@ -24,6 +24,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: CORS_CONFIG, logger: new JSONLogger() });
   app.enableShutdownHooks();
   app.getHttpAdapter().getInstance().disable('x-powered-by');
+  // Traefik is the only hop in front of the API and overwrites any client-sent X-Forwarded-For, so req.ip is the client
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   const appMetrics = await NestFactory.create(AppMetricsModule);
   appMetrics.enableShutdownHooks();

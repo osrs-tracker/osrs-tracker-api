@@ -2,6 +2,8 @@
 
 - The API retries its MongoDB connection at startup (every 10s, up to 12 times) when DNS or the network isn't ready
   yet, instead of crash-looping after a node reboot. A `startupProbe` gives it up to 3 minutes to come up.
+- Request logs include the client IP (from Traefik's `X-Forwarded-For`, via `trust proxy`), the referer and the response
+  size, for security.
 
 ## 2026/10/03
 
