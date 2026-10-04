@@ -9,61 +9,47 @@ description: >-
 
 # osrs-tracker-api
 
-NestJS API on Express backed by MongoDB (native driver, no ODM), deployed as a Docker image to Kubernetes. Its main
-consumer is the Angular SSR app in the sibling repo `../osrs-tracker-web`.
+NestJS API backed by MongoDB Atlas (native driver, SCRAM auth), deployed as a Docker image to Kubernetes. Its main
+consumer is the Angular SSR app in `../osrs-tracker-web`.
 
-## Non-obvious layout
+## Non-obvious setup
 
-- Shared infrastructure in `src/common/<thing>/` is injected with string tokens (`@Inject('MONGODB_DATABASE')`,
-  `'MONGO_CLIENT'`, `'AGENT'`, `'XML_PARSER'`). `MongoModule` is `@Global()`, so features don't import it. New indexes
-  go in `mongo.provider.ts`.
-- `src/config/cors.ts` always allows `http://localhost:4200` besides `CORS_ORIGIN`.
-- Env vars are listed in `.env.example`. Locally they come from `.env` (gitignored, never commit it); in the cluster
-  from the `aws-mongodb-credentials` secret plus the `env:` block in `osrs-tracker-api.yaml`, which overrides the
-  secret's own `OSRS_API_BASE_URL` key.
-- Prefer `@Res({ passthrough: true })` when you only need to set headers. A plain `@Res()` (as in `news/image`) makes
-  you responsible for sending the response.
-
-## External services and shared packages
-
-- `OSRS_API_BASE_URL` is an AWS API Gateway proxy to `https://secure.runescape.com` that passes Jagex's headers through
-  unchanged.
-- MongoDB is Atlas, reached with username/password (SCRAM), not MONGODB-AWS. Lambdas in the sibling `osrs-tracker-aws`
-  repo also write to `players` (hiscore entries, pausing) and `items` (hourly upsert), so don't assume the API is the
-  only writer.
-- `@osrs-tracker/models` (the `Player`/`Item` types) is owned by `osrs-tracker-aws` and published by the maintainer.
-  Right after a publish, bump with `npm i @osrs-tracker/models@^x.y.z --prefer-online`, because the registry CDN's
-  dist-tags lag.
+- Shared infrastructure in `src/common/` is injected with string tokens (`@Inject('MONGODB_DATABASE')`,
+  `'MONGO_CLIENT'`, `'AGENT'`, `'XML_PARSER'`). `MongoModule` is global. New indexes go in `mongo.provider.ts`.
+- Env vars: `.env.example` lists them, `.env` holds local values. In the cluster they come from the
+  `aws-mongodb-credentials` secret plus the `env:` block in `osrs-tracker-api.yaml`, which overrides the secret's
+  `OSRS_API_BASE_URL`.
+- `OSRS_API_BASE_URL` is an API Gateway proxy to `https://secure.runescape.com` that passes Jagex's headers through.
+- Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert); the
+  API isn't the only writer.
+- `@osrs-tracker/models` is published from osrs-tracker-aws. Right after a publish, bump with `--prefer-online` (the
+  registry's dist-tags lag).
 
 ## Mongo pipeline updates
 
-In aggregation-pipeline updates, wrap player data and user input in `$literal` (strings starting with `$` would
-otherwise be read as field paths), prepend `hiscoreEntries` with `$concatArrays` (they're stored newest first), merge
-offsets with `$setUnion`, and keep `upsert`/`hint`.
+Wrap player data and user input in `$literal` (strings starting with `$` are read as field paths), prepend
+`hiscoreEntries` with `$concatArrays` (stored newest first), merge offsets with `$setUnion`, and keep `upsert`/`hint`.
 
 ## Pausing and resuming players
 
 The Lambda pauses players whose hiscores keep returning 404 (`pausedScrapingOffsets`, `hiscoreNotFoundSince`,
-`hiscoreNotFoundCount`). The API side of the contract, in `refreshPlayerInfo`:
+`hiscoreNotFoundCount`). In `refreshPlayerInfo`:
 
-- On any successful refresh, resume in the same update: merge `pausedScrapingOffsets` back into `scrapingOffsets` and
+- On a successful refresh, resume in the same update: merge `pausedScrapingOffsets` back into `scrapingOffsets` and
   remove the three pause fields.
-- **Never** count 404s. Any non-OK hiscore response looks the same to the API, including Jagex being down.
-- On a failed refresh, leave the pause fields alone.
+- On a failed refresh, leave them alone. **Never** count 404s here: to the API, any non-OK response looks the same,
+  including Jagex being down.
 
 ## Cache-Control (important)
 
-Every GET handler must set `Cache-Control` deliberately. The web app's Angular SSR transfer cache **drops any response
-whose header contains `no-store`, `no-cache` or `private`**, which makes the browser refetch on hydration (visible as UI
-flashing back to skeletons). So never use those as a default.
+Every GET handler sets `Cache-Control` deliberately. The web app's SSR transfer cache **drops responses with `no-store`,
+`no-cache` or `private`**, which makes the UI flash back to skeletons on hydration, so never use those.
 
 - Read-only, slow-changing data: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/news/image` 604800).
-- **GET routes with DB writes** (`/items/:id` sets `lastFetch`, `/players/:username/hiscores` sets `lastHiscoreFetch`)
-  and the recent-items/players lists: `max-age=0, must-revalidate`. Browsers then revalidate every time, so the handler
-  and its write always run. Express computes the ETag and the 304 inside `res.send()`, after the handler has finished.
-- `/players/:username`: dynamic `max-age`, clamped to `[0, 900]` and capped at the time left until the player's refresh
-  window, so no refresh is ever skipped.
-- When adding a GET route that writes, give it `max-age=0, must-revalidate`, and note the write in a comment.
+- **GET routes that write** (`/items/:id`, `/players/:username/hiscores`) and the recent-items/players lists:
+  `max-age=0, must-revalidate`, so the handler and its write always run. Note the write in a comment.
+- `/players/:username`: dynamic `max-age`, clamped to `[0, 900]` and capped at the time until the player's refresh
+  window.
 
 ## Verify before handing off
 
@@ -71,88 +57,50 @@ flashing back to skeletons). So never use those as a default.
 npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build
 ```
 
-`npm run lint` runs `eslint --fix`, so check `git diff` after using it. The repo has no tests. To test against
-production data, run the API locally (`.env` points at the prod database) and use **ToxSick** as the test player. Ask
-the user before writing to it, record its state first, and restore it afterwards.
+There are no tests. To test against production data, run the API locally (`.env` points at prod) with **ToxSick** as the
+test player: ask before writing to it, record its state and restore it afterwards.
 
 ## Deploy (Docker → Kubernetes)
 
-1. Pass the verification steps above (in a release, a passing CI run on the PR counts).
-2. Build and push:
-
-   ```bash
-   npm run docker:build && npm run docker:push
-   ```
-
-3. Copy the pushed digest (`latest: digest: sha256:…`) into the `image:` line of `osrs-tracker-api.yaml`
-   (`freekmencke/osrs-tracker-api@sha256:…`).
-4. Before changing anything, check that the live image matches the yaml, so you don't roll back someone else's deploy:
+1. Pass the verification steps (in a release, a passing CI run counts).
+2. `npm run docker:build && npm run docker:push`
+3. Put the pushed digest in the `image:` line of `osrs-tracker-api.yaml`.
+4. Check the live image matches the yaml first, so you don't roll back someone else's deploy:
 
    ```bash
    kubectl -n osrs-tracker get deploy osrs-tracker-api -o jsonpath='{.spec.template.spec.containers[0].image}'
    ```
 
-5. Review the diff before applying. Expect only the image digest (plus a `generation` bump):
-
-   ```bash
-   kubectl diff -f osrs-tracker-api.yaml
-   ```
-
-6. Apply and wait:
-
-   ```bash
-   kubectl apply -f osrs-tracker-api.yaml && kubectl -n osrs-tracker rollout status deploy/osrs-tracker-api --timeout=300s
-   ```
-
-7. Smoke test production (`https://osrs-tracker-api.freekmencke.com`): request the routes you changed with
-   `curl -s -D - -o /dev/null` and check the status and `cache-control`. Check the pod logs:
-
-   ```bash
-   kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m
-   ```
-
-8. If the change affects what the web app renders, check the web side too, in a real browser with the Playwright MCP
-   tools (screenshot, network requests, console errors; see the web repo's skill). Its pages are regenerated on an
-   interval (`/` every 5 min), so a cached page can show the old API behaviour for a few minutes.
+5. `kubectl diff -f osrs-tracker-api.yaml`: expect only the digest (plus `generation`).
+6. `kubectl apply -f osrs-tracker-api.yaml && kubectl -n osrs-tracker rollout status deploy/osrs-tracker-api --timeout=300s`
+7. Smoke test `https://osrs-tracker-api.freekmencke.com`: `curl -s -D - -o /dev/null` the changed routes (status and
+   `cache-control`), and check `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m`.
+8. If it changes what the web app renders, check those pages in the browser too (see the web skill). Cached pages can
+   show the old behaviour for up to 5 minutes.
 
 ## Release ("release it", "ship it")
 
-When the user asks to release or ship, run the whole flow without asking for confirmation between steps. Stop and report
-only if a step fails.
+Run the whole flow without asking between steps; stop only if a step fails. Verify locally once before committing; after
+that CI is the gate, so don't re-run checks locally.
 
-The local verification steps run once, before committing. After that, CI is the gate: don't re-run lint, prettier or
-tests locally for later commits, and run the Docker build while CI runs instead of after it.
-
-1. **PR**: commit on a `<type>/<short-name>` branch (code, `CHANGELOG.md`), push it and `gh pr create --base main`.
-2. **Review the PR's code** (`gh pr diff`): look for bugs, convention violations and leftovers. Fix what you find and
-   push; CI checks the fix.
-3. **Build the image while CI runs**: start `npm run docker:build && npm run docker:push` and `gh pr checks <n> --watch`
-   in the background at the same time.
-4. **Deploy to production** once CI passes, following the deploy steps above from step 3, including the production
-   checks.
-5. **Update the PR** with the deploy changes: commit the image digest bump to the branch, push, and record the deployed
-   digest and the check results in the PR description. `gh pr edit` can fail on a Projects (classic) GraphQL error; use
-   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>` instead.
-6. **Merge** once the checks on the deploy commit pass (`gh pr checks <n> --watch`): `gh pr merge <n> --merge`, then
-   `git switch main && git pull --ff-only`, `git branch -d <branch>` and `git fetch --prune`.
+1. Commit on a `<type>/<short-name>` branch, push, `gh pr create --base main`.
+2. Review `gh pr diff` for bugs and leftovers; fix and push.
+3. In the background, run the Docker build and push alongside `gh pr checks <n> --watch`.
+4. Once CI passes, deploy (steps 3–8 above).
+5. Commit the digest to the branch, push, and put the digest and check results in the PR description.
+6. Once the checks pass, `gh pr merge <n> --merge`, then switch to `main`, pull, `git branch -d <branch>`,
+   `git fetch --prune`.
 
 ## Commit and push
 
-- **Every change gets a `CHANGELOG.md` entry** in the same commit: a `## YYYY/MM/DD` heading (newest first; add to
-  today's heading if it exists) with short bullets.
-- For releases, follow the flow above. Documentation-only changes (skills, docs, no code or deploy) go straight to
-  `main`. Otherwise, **ask the user whether to commit straight to `main` or open a PR**, every time, before committing.
-  `main` requires a PR and passing `lint` and `build` checks (no approvals), which the user's admin account can bypass,
-  so a direct push works and shows a "bypassed rule violations" notice.
-  - Straight to `main`: push, then watch the CI run (`gh run watch --exit-status`).
-  - PR: commit on a `<type>/<short-name>` branch, push it, `gh pr create --base main` and check `gh pr checks`. Once the
-    user says it's merged, `git switch main && git pull --ff-only`, delete the local branch with `git branch -d` and
-    `git fetch --prune` (GitHub deletes the remote branch on merge).
-  - Deploying from a PR branch leaves production running unmerged code: tell the user, and don't deploy from `main`
-    until the PR is merged.
-- Use conventional commits (`fix(scope): …`, `feat(scope): …`). Include the image digest bump in the same commit as the
-  code it deploys.
-- Commits are GPG-signed. If signing fails with "Inappropriate ioctl for device", ask the user to unlock the key in
-  their own terminal (`echo test | gpg --clearsign > /dev/null`); never use `--no-gpg-sign`.
-- Push over HTTPS via `gh` (`gh auth setup-git` is configured). If `gh auth status` fails, ask the user to log in.
-- Deploying without committing leaves production running code that isn't on GitHub, so always commit and push a deploy.
+- Doc-only changes (skills, docs) go straight to `main`. Otherwise, outside a release, **ask every time** whether to
+  commit to `main` or open a PR. The admin account bypasses `main`'s PR rule; after a direct push, watch CI with
+  `gh run watch --exit-status`. After a PR merges, do the switch-back from release step 6.
+- A deploy from a PR branch runs unmerged code: tell the user, and don't deploy from `main` until it's merged.
+- Conventional commits. Commit and push in the same session as a deploy, so production never runs code that isn't on
+  GitHub.
+- **Every change gets a `CHANGELOG.md` entry** under a `## YYYY/MM/DD` heading, newest first.
+- If GPG signing fails with "Inappropriate ioctl for device", ask the user to run
+  `echo test | gpg --clearsign > /dev/null` in their terminal. Never use `--no-gpg-sign`.
+- `gh pr edit` can fail on a Projects (classic) error; use
+  `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>`.
