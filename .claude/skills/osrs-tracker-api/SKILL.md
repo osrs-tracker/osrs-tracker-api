@@ -99,7 +99,9 @@ that CI is the gate, so don't re-run checks locally.
 - A deploy from a PR branch runs unmerged code: tell the user, and don't deploy from `main` until it's merged.
 - Conventional commits. Commit and push in the same session as a deploy, so production never runs code that isn't on
   GitHub.
-- **Every change gets a `CHANGELOG.md` entry** under a `## YYYY/MM/DD` heading, newest first.
+- **Every change gets a `CHANGELOG.md` entry** under a `## YYYY/MM/DD` heading, newest first. Busy days get `###`
+  subtitles (by area, "Behind the scenes" last); extend an existing entry rather than add a near-duplicate, and don't
+  repeat the subtitle in its entries.
 - If GPG signing fails with "Inappropriate ioctl for device", ask the user to run
   `echo test | gpg --clearsign > /dev/null` in their terminal. Never use `--no-gpg-sign`.
 - `gh pr edit` can fail on a Projects (classic) error; use
