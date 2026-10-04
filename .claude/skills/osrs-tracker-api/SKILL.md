@@ -111,8 +111,9 @@ the user before writing to it, record its state first, and restore it afterwards
    kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m
    ```
 
-8. If the change affects what the web app renders, check the web side too. Its pages are regenerated on an interval (`/`
-   every 5 min), so a cached page can show the old API behaviour for a few minutes.
+8. If the change affects what the web app renders, check the web side too, in a real browser with the Playwright MCP
+   tools (screenshot, network requests, console errors; see the web repo's skill). Its pages are regenerated on an
+   interval (`/` every 5 min), so a cached page can show the old API behaviour for a few minutes.
 
 ## Release ("release it", "ship it")
 
