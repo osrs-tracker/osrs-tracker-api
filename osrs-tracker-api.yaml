@@ -40,6 +40,13 @@ spec:
           ports:
             - containerPort: 3000
             - containerPort: 9090
+          # /healthy only answers once MongoDB is connected, so allow 3 min for the connect retries in mongo.provider.ts
+          startupProbe:
+            httpGet:
+              path: /healthy
+              port: 9090
+            periodSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /healthy

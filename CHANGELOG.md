@@ -1,3 +1,8 @@
+## 2026/10/04
+
+- The API retries its MongoDB connection at startup (every 10s, up to 12 times) when DNS or the network isn't ready
+  yet, instead of crash-looping after a node reboot. A `startupProbe` gives it up to 3 minutes to come up.
+
 ## 2026/10/03
 
 - The ingress runs on Traefik (ingress-nginx is retired); the rate limits moved to Traefik Middlewares with the
