@@ -41,6 +41,27 @@ export class PlayersService {
           type: 1,
           scrapingOffsets: 1,
           hiscoreEntries: includeLatestHiscoreEntry ? { $elemMatch: { scrapingOffset } } : undefined,
+          // Date of the oldest stored entry for this offset (entries are stored newest first). The clean-hiscores Lambda
+          // removes entries older than MAX_AGE_IN_DAYS, so this is where the history starts, not when tracking started.
+          trackedSince: {
+            $ifNull: [
+              {
+                $getField: {
+                  field: 'date',
+                  input: {
+                    $last: {
+                      $filter: {
+                        input: { $ifNull: ['$hiscoreEntries', []] },
+                        as: 'entry',
+                        cond: { $eq: ['$$entry.scrapingOffset', scrapingOffset] },
+                      },
+                    },
+                  },
+                },
+              },
+              null,
+            ],
+          },
         },
       },
     );

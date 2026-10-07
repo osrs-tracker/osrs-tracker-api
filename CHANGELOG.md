@@ -1,5 +1,8 @@
 ## 2026/10/07
 
+- `GET /players/:username` returns `trackedSince`: the date of the oldest stored hiscore entry for the requested
+  `scrapingOffset`, or `null` when there are none. Old entries are cleaned up, so it's where the stored history starts
+  (about 60 days back at most), not when tracking started. `@osrs-tracker/models` is bumped to 0.9.0 for the new field.
 - `GET /players` accepts an optional `scrapingOffset` (-12 to 11) and then returns each player's newest hiscore entry
   for that offset, so the XP gained in the recent lookups is measured from the right point. Without it, nothing changes.
 - Behind the scenes: code changes are formatted automatically and checked for lint and formatting errors before they're
