@@ -37,8 +37,11 @@ The Lambda pauses players whose hiscores keep 404ing (`pausedScrapingOffsets`, `
 - Success: resume in the same update — merge `pausedScrapingOffsets` into `scrapingOffsets`, unset the three fields.
 - Not found (404/400 on the normal table) or failed (any other status, network error, timeout, or any of the four
   tables failing): write nothing and leave them alone. **Never** count 404s here; the Lambda owns that bookkeeping.
-- `GET /players/:username` answers 404 only for not found. Failed returns the stored player with `refreshFailed: true`
-  (`Cache-Control: max-age=60`), or 503 (`max-age=0, must-revalidate`) when the player isn't stored.
+- `POST /players/:username/lookup` answers 404 only for not found. Failed returns the stored player with
+  `refreshFailed: true`, or 503 when the player isn't stored.
+- GETs never write: `GET /players/:username` returns a stored player as stored (stale or not, never refreshed), and an
+  unknown player as a live preview from `determinePlayerStatusAndType` that isn't stored (`scrapingOffsets: []`,
+  `trackedSince: null`), 404 only for not found and 503 when the hiscores fail. `skipRefresh` skips the preview (404).
 
 ## Cache-Control (important)
 
@@ -46,10 +49,11 @@ Set it deliberately on every GET. The web app's SSR transfer cache **drops `no-s
 responses**, making the UI flash back to skeletons on hydration — never use them.
 
 - Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/news/image` 604800).
-- GET routes that write (`/items/:id`, `/players/:username/hiscores`) and the recent-items/players lists:
-  `max-age=0, must-revalidate` so the handler always runs. Comment the write.
-- `/players/:username`: dynamic `max-age`, clamped to `[0, 900]` and capped at the time until the refresh window;
-  `max-age=60` when the refresh failed so it's retried soon.
+- GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR.
+- `/items/:id`, `/players/:username/hiscores` and the recent-items/players lists: `max-age=0, must-revalidate` so
+  they're always fresh.
+- `/players/:username`: stored players get a dynamic `max-age`, clamped to `[0, 900]` and capped at the time until the
+  refresh window; the preview of an unknown player and the 503 get `max-age=0, must-revalidate`.
 
 ## Verify
 
