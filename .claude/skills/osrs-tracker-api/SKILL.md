@@ -10,7 +10,8 @@ description: >-
 # osrs-tracker-api
 
 NestJS + MongoDB Atlas (native driver), deployed as a Docker image to Kubernetes. Main consumer: the Angular SSR app in
-`../osrs-tracker-web`.
+`../osrs-tracker-web`. The `conventions-reviewer` agent reviews diffs against this file at runtime, so keep code rules
+here, not in the agent.
 
 ## Setup gotchas
 
@@ -75,7 +76,7 @@ state and restore it afterwards.
 Run end to end without asking; stop only on failure. Verify locally once before committing; after that CI is the gate.
 
 1. Commit on a `<type>/<short-name>` branch, push, `gh pr create --base main`.
-2. Review `gh pr diff` for bugs and leftovers; fix and push.
+2. Review `gh pr diff` for bugs and leftovers while the `conventions-reviewer` agent checks the PR; fix both and push.
 3. In the background, Docker build/push alongside `gh pr checks <n> --watch`.
 4. Once CI passes, deploy (steps 2–7).
 5. Commit the digest, push, and add the digest and check results to the PR description.

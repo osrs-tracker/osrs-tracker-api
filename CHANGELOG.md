@@ -1,9 +1,16 @@
+## 2026/10/07
+
+- Behind the scenes: code changes are formatted automatically and checked for lint and formatting errors before they're
+  pushed, and reviewed against the project's conventions before release. The automatic build only runs when the code or
+  its dependencies change, not for deploys or documentation (unless the previous build didn't pass), and reuses the
+  installed dependencies until they change.
+
 ## 2026/10/04
 
 - Project skill: documented the changelog conventions (`###` subtitles on busy days, no near-duplicate entries) and
   tightened the wording throughout.
-- The API retries its MongoDB connection at startup (every 10s, up to 12 times) when DNS or the network isn't ready
-  yet, instead of crash-looping after a node reboot. A `startupProbe` gives it up to 3 minutes to come up.
+- The API retries its MongoDB connection at startup (every 10s, up to 12 times) when DNS or the network isn't ready yet,
+  instead of crash-looping after a node reboot. A `startupProbe` gives it up to 3 minutes to come up.
 - Request logs include the client IP (from Traefik's `X-Forwarded-For`, via `trust proxy`), the referer and the response
   size, for security.
 - Prometheus metrics label requests with the route they matched (e.g. `/players/:username`) or `#unmatched`, instead of
@@ -12,8 +19,8 @@
 
 ## 2026/10/03
 
-- The ingress runs on Traefik (ingress-nginx is retired); the rate limits moved to Traefik Middlewares with the
-  same values.
+- The ingress runs on Traefik (ingress-nginx is retired); the rate limits moved to Traefik Middlewares with the same
+  values.
 - Project skill: documented the release flow (PR, review, deploy, update the PR, merge).
 - Fixed a `url.parse()` deprecation warning in the logs.
 - Project skill: ask whether to commit straight to `main` or open a PR, and how to clean up after a merge.
