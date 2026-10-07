@@ -53,6 +53,7 @@ export class PlayersService {
           status: 1,
           type: 1,
           scrapingOffsets: 1,
+          pausedScrapingOffsets: 1, // Still tracked (they have a history), resumed by the next successful refresh
           hiscoreEntries: includeLatestHiscoreEntry ? { $elemMatch: { scrapingOffset } } : undefined,
           // Date of the oldest stored entry for this offset (entries are stored newest first). The clean-hiscores Lambda
           // removes entries older than MAX_AGE_IN_DAYS, so this is where the history starts, not when tracking started.

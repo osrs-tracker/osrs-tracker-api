@@ -5,6 +5,8 @@
   `lastFetch` (204). The player one does what `GET /players/:username` does (refresh or start tracking when needed, same
   404/503/`refreshFailed` responses) and also sets `lastHiscoreFetch`. Bots (detected with `isbot`) and requests
   without a user agent get a 204 and write nothing. The GETs still write until the web app uses the POSTs.
+- `GET /players/:username` (and the new lookup POST) return `pausedScrapingOffsets` for players whose tracking the
+  hiscores-scraper paused, so the web app can still show their history.
 - `GET /players/:username` no longer answers 404 for a stored player when the hiscores are down. 404 means Jagex itself
   doesn't know the player. When the hiscores fail (error status, network error, 10s timeout), a stored player is
   returned as stored with `refreshFailed: true` and `Cache-Control: max-age=60`, and an unknown player gets a 503. A
