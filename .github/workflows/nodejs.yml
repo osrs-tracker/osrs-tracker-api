@@ -7,27 +7,73 @@ on:
     branches: ['main']
 
 jobs:
+  # Build only runs when something it depends on changed since the previous push, so commits like a deploy digest or
+  # docs skip it. A skipped job still satisfies the required check; a workflow-level `paths` filter wouldn't.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        name: Check for source or dependency changes
+        env:
+          # A new push to a PR compares with the previous push, not the base branch, so a digest commit doesn't rerun
+          # the build for the PR's earlier source changes
+          BEFORE:
+            ${{ (github.event_name == 'push' || github.event.action == 'synchronize') && github.event.before ||
+            github.event.pull_request.base.sha }}
+          AFTER: ${{ github.event.pull_request.head.sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ] \
+            || ! files=$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null); then
+            echo "No previous commit to compare with, running everything."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf 'Changed files:\n%s\n' "$files"
+          if printf '%s\n' "$files" \
+            | grep -q -E '^(src/|\.github/|package(-lock)?\.json$|tsconfig[^/]*\.json$|nest-cli\.json$|webpack\.config\.js$)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Skipping is only safe if build passed (or was safely skipped) on the commit compared with; otherwise a
+          # docs-only push after a failed build would turn the PR green
+          previous=$(gh api "repos/$REPO/commits/$BEFORE/check-runs?filter=latest&per_page=100" \
+            --jq '[.check_runs[] | select(.name == "build") | "\(.name)=\(.conclusion)"] | sort | join(" ")' \
+            2>/dev/null) || true
+          if [ "$previous" = "build=success" ] || [ "$previous" = "build=skipped" ]; then
+            echo "No source or dependency changes and $BEFORE passed ($previous), skipping build."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No source or dependency changes, but $BEFORE didn't pass build (${previous:-no results}), running it."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
+
   lint:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24.x'
-          cache: 'npm'
-      - run: npm ci
+      - uses: ./.github/actions/setup-deps
       - run: npm run lint:ci
       - run: npm run prettier:ci
 
   build:
+    needs: changes
+    # `!cancelled()` runs it when `changes` itself fails, so a broken check can't skip the build
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24.x'
-          cache: 'npm'
-      - run: npm ci
+      - uses: ./.github/actions/setup-deps
       - run: npm run build
