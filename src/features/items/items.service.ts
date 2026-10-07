@@ -29,15 +29,7 @@ export class ItemsService {
   }
 
   getItem(id: number): Promise<Item | null> {
-    return this.collection.findOneAndUpdate(
-      { id: id },
-      { $set: { lastFetch: new Date() } },
-      {
-        hint: { id: 1 },
-        projection: { _id: 0 },
-        returnDocument: 'after', // Important: returns the document after the update
-      },
-    ) as Promise<Item | null>;
+    return this.collection.findOne<Item>({ id: id }, { hint: { id: 1 }, projection: { _id: 0 } });
   }
 
   /** Records a visitor's lookup for the recent items list. Doesn't create unknown items. */
