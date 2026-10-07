@@ -1,5 +1,9 @@
 ## 2026/10/07
 
+- `GET /players/:username` no longer answers 404 for a stored player when the hiscores are down. 404 means Jagex itself
+  doesn't know the player. When the hiscores fail (error status, network error, 10s timeout), a stored player is
+  returned as stored with `refreshFailed: true` and `Cache-Control: max-age=60`, and an unknown player gets a 503. A
+  refresh also fails when only one of the ironman tables is down, instead of storing the wrong account type.
 - `GET /players/:username` returns `trackedSince`: the date of the oldest stored hiscore entry for the requested
   `scrapingOffset`, or `null` when there are none. Old entries are cleaned up, so it's where the stored history starts
   (about 60 days back at most), not when tracking started. `@osrs-tracker/models` is bumped to 0.9.0 for the new field.

@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Query,
   Res,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { addHours, differenceInHours, differenceInSeconds } from 'date-fns';
@@ -78,9 +79,21 @@ export class PlayersController {
     ) {
       this.logger.log(`Player '${username} not found for offset '${scrapingOffset}' or outdated. Refreshing...`);
 
-      const refreshed = await this.playersService.refreshPlayerInfo(username, scrapingOffset, !playerHasOffset);
-      if (!refreshed) throw new NotFoundException(`Player '${username}' not found`);
-      else this.logger.log(`Player '${username}' refreshed successfully.`);
+      const result = await this.playersService.refreshPlayerInfo(username, scrapingOffset, !playerHasOffset);
+      if (result === 'notFound') throw new NotFoundException(`Player '${username}' not found`);
+
+      if (result === 'failed') {
+        if (!player) {
+          response.setHeader('Cache-Control', 'max-age=0, must-revalidate'); // Don't cache the outage
+          throw new ServiceUnavailableException(`The hiscores can't be reached, try again later.`);
+        }
+
+        this.logger.warn(`Couldn't refresh player '${username}', returning the stored player.`);
+        response.setHeader('Cache-Control', 'max-age=60'); // Retry the refresh soon
+        return { ...player, refreshFailed: true };
+      }
+
+      this.logger.log(`Player '${username}' refreshed successfully.`);
 
       response.setHeader('Cache-Control', 'max-age=900'); // Set cache control to 900 seconds (15 minutes)
       return this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry); // Retry fetching the player

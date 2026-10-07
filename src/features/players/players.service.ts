@@ -1,13 +1,26 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { HiscoreEntry, Player, PlayerType } from '@osrs-tracker/models';
 import { Agent } from 'https';
 import { Collection, Db } from 'mongodb';
 import fetch from 'node-fetch';
 import { PlayerUtils } from './player.utils';
 
+type PartialHiscoreEntry = Pick<HiscoreEntry, 'skills' | 'activities'>;
+
+/**
+ * - `found`: the player is on this hiscore table.
+ * - `notFound`: HTTP 404 (or 400 for an invalid name), the player is not on this hiscore table.
+ * - `failed`: any other status, a network error, a timeout or an unexpected body. Could be an outage.
+ */
+type HiscoreResult = { status: 'found'; hiscore: PartialHiscoreEntry } | { status: 'notFound' } | { status: 'failed' };
+
+export type RefreshResult = 'refreshed' | 'notFound' | 'failed';
+
 @Injectable()
 export class PlayersService {
   private readonly COLLECTION_NAME = 'players';
+  private readonly HISCORE_FETCH_TIMEOUT_MS = 10_000;
+  private readonly logger = new Logger(PlayersService.name);
 
   get collection(): Collection<Player> {
     return this.db.collection(this.COLLECTION_NAME);
@@ -175,21 +188,24 @@ export class PlayersService {
    * Pause/resume contract with the `process-players` Lambda (osrs-tracker-aws): the Lambda owns the not-found
    * bookkeeping (`hiscoreNotFoundCount`, `hiscoreNotFoundSince`) and, after 7 days of 404s, moves `scrapingOffsets`
    * into `pausedScrapingOffsets` so the player is no longer queued. A successful refresh here resumes tracking by
-   * merging the paused offsets back and removing the pause fields. A failed refresh leaves them untouched, since a
-   * non-OK hiscore response can also be an outage rather than a missing player.
+   * merging the paused offsets back and removing the pause fields. A refresh that isn't `refreshed` writes nothing and
+   * leaves them untouched: the Lambda does the 404 counting.
    *
    * @param scrapingOffset The `scrapingOffset` will be added to the player's `scrapingOffsets` if not already present.
    * @param initialScrape If true, will also add an initial `hiscoreEntry` for this `scrapingOffset`.
+   * @returns `notFound` when the player isn't on the normal hiscores, `failed` when the hiscores couldn't be reached.
    */
-  async refreshPlayerInfo(_username: string, scrapingOffset: number, initialScrape: boolean): Promise<boolean> {
+  async refreshPlayerInfo(_username: string, scrapingOffset: number, initialScrape: boolean): Promise<RefreshResult> {
     const username = PlayerUtils.normalizeUsername(_username);
 
     // Never upsert a name that isn't a valid OSRS name (e.g. a double URL-encoded one that the hiscores still resolve).
     if (!PlayerUtils.isValidUsername(username)) throw new Error(`Refusing to store invalid username '${username}'`);
 
-    const [player, partialHiscoreEntry] = await this.determinePlayerStatusAndType(username);
+    const result = await this.determinePlayerStatusAndType(username);
 
-    if (player === null) return false;
+    if (result.status !== 'found') return result.status;
+
+    const { player, partialHiscoreEntry } = result;
 
     const hiscoreEntry: HiscoreEntry = {
       scrapingOffset,
@@ -232,47 +248,78 @@ export class PlayersService {
 
     if (!upsertedCount && !modifiedCount) throw new Error('Player failed to be upserted');
 
-    return true;
+    return 'refreshed';
   }
 
-  /** Returns determined player if determined, and normal sourceString, */
+  /**
+   * Determines the player's type and status from the four hiscore tables. Fails when any table couldn't be reached,
+   * since a missing table would otherwise look like the player not being on it and change their type.
+   */
   private async determinePlayerStatusAndType(
     _username: string,
-  ): Promise<[Player | null, Pick<HiscoreEntry, 'skills' | 'activities'>]> {
+  ): Promise<
+    { status: 'found'; player: Player; partialHiscoreEntry: PartialHiscoreEntry } | { status: 'notFound' | 'failed' }
+  > {
     const username = PlayerUtils.normalizeUsername(_username);
 
-    const [normal, ironman, ultimate, hardcore] = await Promise.all([
+    const results = await Promise.all([
       this.getHiscore(username, PlayerType.Normal),
       this.getHiscore(username, PlayerType.Ironman),
       this.getHiscore(username, PlayerType.Ultimate),
       this.getHiscore(username, PlayerType.Hardcore),
     ]);
 
-    if (normal === null) return [null, { skills: [], activities: [] }];
+    if (results[0].status === 'notFound') return { status: 'notFound' };
+    if (results.some((result) => result.status === 'failed')) return { status: 'failed' };
 
-    return [
-      {
+    const [normal, ironman, ultimate, hardcore] = results.map((result) =>
+      result.status === 'found' ? result.hiscore : null,
+    );
+
+    return {
+      status: 'found',
+      player: {
         username,
-        combatLevel: PlayerUtils.getCombatLevel(normal.skills),
+        combatLevel: PlayerUtils.getCombatLevel(normal!.skills),
         type: PlayerUtils.determineType(ironman, ultimate, hardcore),
         status: PlayerUtils.determineStatus(normal, ironman, ultimate),
         diedAsHardcore: PlayerUtils.getTotalXp(hardcore) < PlayerUtils.getTotalXp(ironman),
         lastModified: new Date(),
       } as Player,
-      normal,
-    ];
+      partialHiscoreEntry: normal!,
+    };
   }
 
-  private async getHiscore(
-    username: string,
-    type: PlayerType,
-  ): Promise<Pick<HiscoreEntry, 'skills' | 'activities'> | null> {
+  private async getHiscore(username: string, type: PlayerType): Promise<HiscoreResult> {
     const hiscoreUrl =
       process.env.OSRS_API_BASE_URL +
       `/m=${PlayerUtils.getHiscoreTable(type)}/index_lite.json?player=${encodeURIComponent(username)}`;
 
-    const result = await fetch(hiscoreUrl, { agent: this.agent, headers: { 'cache-control': 'no-cache' } });
-    return result.ok ? (result.json() as Promise<Pick<HiscoreEntry, 'skills' | 'activities'>>) : null;
+    try {
+      const response = await fetch(hiscoreUrl, {
+        agent: this.agent,
+        headers: { 'cache-control': 'no-cache' },
+        signal: AbortSignal.timeout(this.HISCORE_FETCH_TIMEOUT_MS),
+      });
+
+      if (response.status === 404 || response.status === 400) return { status: 'notFound' };
+
+      if (!response.ok) {
+        this.logger.warn(`Hiscores (${type}) returned HTTP ${response.status} for '${username}'`);
+        return { status: 'failed' };
+      }
+
+      const hiscore = (await response.json()) as PartialHiscoreEntry;
+      if (!Array.isArray(hiscore?.skills)) {
+        this.logger.warn(`Hiscores (${type}) returned an unexpected body for '${username}'`);
+        return { status: 'failed' };
+      }
+
+      return { status: 'found', hiscore };
+    } catch (error) {
+      this.logger.warn(`Hiscores (${type}) request failed for '${username}': ${(error as Error).message}`);
+      return { status: 'failed' };
+    }
   }
 
   /**
