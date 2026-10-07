@@ -100,34 +100,52 @@ export class PlayersService {
     return player?.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? null;
   }
 
-  getLastFetchedPlayers(limit: number): Promise<Player[]> {
-    return this.collection
-      .find<Player>(
-        {
-          lastHiscoreFetch: { $exists: true }, // Ensure lastHiscoreFetch exists
-        },
-        {
-          hint: { lastHiscoreFetch: -1 }, // Use the index on lastHiscoreFetch
-          projection: {
-            _id: 0,
-            username: 1,
-            combatLevel: 1,
-            diedAsHardcore: 1,
-            lastModified: 1,
-            status: 1,
-            type: 1,
-            scrapingOffsets: 1,
-            hiscoreEntries: { $slice: 1 },
+  /**
+   * Returns the most recently looked up players with their newest hiscore entry, for `scrapingOffset` when given or for
+   * any offset otherwise.
+   */
+  async getLastFetchedPlayers(limit: number, scrapingOffset?: number): Promise<Player[]> {
+    const players = await this.collection
+      .aggregate<Player>(
+        [
+          { $match: { lastHiscoreFetch: { $exists: true } } }, // Ensure lastHiscoreFetch exists
+          { $sort: { lastHiscoreFetch: -1 } }, // Sort by lastHiscoreFetch in descending order
+          { $limit: limit },
+          {
+            $project: {
+              _id: 0,
+              username: 1,
+              combatLevel: 1,
+              diedAsHardcore: 1,
+              lastModified: 1,
+              status: 1,
+              type: 1,
+              scrapingOffsets: 1,
+              hiscoreEntries: {
+                $slice: [
+                  scrapingOffset === undefined
+                    ? { $ifNull: ['$hiscoreEntries', []] }
+                    : {
+                        $filter: {
+                          input: { $ifNull: ['$hiscoreEntries', []] },
+                          as: 'entry',
+                          cond: { $eq: ['$$entry.scrapingOffset', scrapingOffset] },
+                        },
+                      },
+                  1,
+                ],
+              },
+            },
           },
-        },
+        ],
+        { hint: { lastHiscoreFetch: -1 } }, // Use the index on lastHiscoreFetch
       )
-      .sort({ lastHiscoreFetch: -1 }) // Sort by lastHiscoreFetch in descending order
-      .limit(limit)
-      .map((player) => ({
-        ...player,
-        hiscoreEntries: player.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? [],
-      }))
       .toArray();
+
+    return players.map((player) => ({
+      ...player,
+      hiscoreEntries: player.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? [],
+    }));
   }
 
   /**

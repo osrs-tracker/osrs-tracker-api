@@ -30,10 +30,16 @@ export class PlayersController {
   @Header('Cache-Control', 'max-age=0, must-revalidate')
   @ApiOperation({ summary: 'Get the last fetched players' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  getRecentPlayers(@Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number) {
+  @ApiQuery({ name: 'scrapingOffset', required: false, type: Number })
+  getRecentPlayers(
+    @Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number,
+    @Query('scrapingOffset', new ParseIntPipe({ optional: true })) scrapingOffset?: number,
+  ) {
     if (limit < 1 || limit > 50) throw new BadRequestException('Limit must be between 1 and 50.');
+    if (scrapingOffset !== undefined && (scrapingOffset < -12 || scrapingOffset > 11))
+      throw new BadRequestException('ScrapingOffset < -12 or > 11.');
 
-    return this.playersService.getLastFetchedPlayers(limit);
+    return this.playersService.getLastFetchedPlayers(limit, scrapingOffset);
   }
 
   @Get(':username')
