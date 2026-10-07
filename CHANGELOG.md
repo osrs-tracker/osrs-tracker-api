@@ -1,5 +1,7 @@
 ## 2026/10/07
 
+- `GET /players` accepts an optional `scrapingOffset` (-12 to 11) and then returns each player's newest hiscore entry
+  for that offset, so the XP gained in the recent lookups is measured from the right point. Without it, nothing changes.
 - Behind the scenes: code changes are formatted automatically and checked for lint and formatting errors before they're
   pushed, and reviewed against the project's conventions before release. The automatic build only runs when the code or
   its dependencies change, not for deploys or documentation (unless the previous build didn't pass), and reuses the
