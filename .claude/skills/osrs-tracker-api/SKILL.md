@@ -35,7 +35,10 @@ The Lambda pauses players whose hiscores keep 404ing (`pausedScrapingOffsets`, `
 `hiscoreNotFoundCount`). In `refreshPlayerInfo`:
 
 - Success: resume in the same update — merge `pausedScrapingOffsets` into `scrapingOffsets`, unset the three fields.
-- Failure: leave them alone. **Never** count 404s here; any non-OK response (including Jagex being down) looks the same.
+- Not found (404/400 on the normal table) or failed (any other status, network error, timeout, or any of the four
+  tables failing): write nothing and leave them alone. **Never** count 404s here; the Lambda owns that bookkeeping.
+- `GET /players/:username` answers 404 only for not found. Failed returns the stored player with `refreshFailed: true`
+  (`Cache-Control: max-age=60`), or 503 (`max-age=0, must-revalidate`) when the player isn't stored.
 
 ## Cache-Control (important)
 
@@ -45,7 +48,8 @@ responses**, making the UI flash back to skeletons on hydration — never use th
 - Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/news/image` 604800).
 - GET routes that write (`/items/:id`, `/players/:username/hiscores`) and the recent-items/players lists:
   `max-age=0, must-revalidate` so the handler always runs. Comment the write.
-- `/players/:username`: dynamic `max-age`, clamped to `[0, 900]` and capped at the time until the refresh window.
+- `/players/:username`: dynamic `max-age`, clamped to `[0, 900]` and capped at the time until the refresh window;
+  `max-age=60` when the refresh failed so it's retried soon.
 
 ## Verify
 
