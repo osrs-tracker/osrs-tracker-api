@@ -4,18 +4,24 @@ import {
   DefaultValuePipe,
   Get,
   Header,
+  HttpCode,
+  HttpStatus,
   Logger,
   NotFoundException,
   Param,
   ParseBoolPipe,
   ParseIntPipe,
+  Post,
   Query,
+  Req,
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { addHours, differenceInHours, differenceInSeconds } from 'date-fns';
-import { Response } from 'express';
+import { Player } from '@osrs-tracker/models';
+import { Request, Response } from 'express';
+import { isBotRequest } from '../../common/bot/is-bot-request';
 import { PLAYER_CONFIG } from './player.config';
 import { ParseUsernamePipe } from './parse-username.pipe';
 import { PlayersService } from './players.service';
@@ -60,7 +66,6 @@ export class PlayersController {
     if (scrapingOffset < -12 || scrapingOffset > 11) throw new BadRequestException('ScrapingOffset < -12 or > 11.');
 
     const player = await this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
-    const playerHasOffset = player?.scrapingOffsets?.includes(scrapingOffset);
 
     response.setHeader(
       'Cache-Control', // Set cache control to 15 minutes (900 seconds) or time until the minimum refresh time has passed
@@ -71,6 +76,54 @@ export class PlayersController {
       if (!player) throw new NotFoundException(`Player '${username}' not found`);
       return player; // Skip refresh if requested
     }
+
+    return this.refreshIfNeeded(response, username, scrapingOffset, includeLatestHiscoreEntry, player);
+  }
+
+  @Post(':username/lookup')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Record a visitor's lookup of a player, refreshing (or starting to track) them first if needed (ignored for bots)",
+  })
+  @ApiParam({ name: 'username' })
+  @ApiQuery({ name: 'scrapingOffset', required: false, type: Number })
+  @ApiQuery({ name: 'includeLatestHiscoreEntry', required: false, type: Boolean })
+  async recordLookup(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+    @Param('username', ParseUsernamePipe) username: string,
+    @Query('scrapingOffset', new DefaultValuePipe(0), ParseIntPipe) scrapingOffset: number,
+    @Query('includeLatestHiscoreEntry', new DefaultValuePipe(false), ParseBoolPipe) includeLatestHiscoreEntry: boolean,
+  ) {
+    if (isNaN(scrapingOffset)) throw new BadRequestException('Invalid scraping offset');
+    if (scrapingOffset < -12 || scrapingOffset > 11) throw new BadRequestException('ScrapingOffset < -12 or > 11.');
+
+    if (isBotRequest(request)) {
+      response.status(HttpStatus.NO_CONTENT);
+      return;
+    }
+
+    const player = await this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
+    const result = await this.refreshIfNeeded(response, username, scrapingOffset, includeLatestHiscoreEntry, player);
+
+    await this.playersService.recordLookup(username); // Only reached when the player is stored
+
+    return result;
+  }
+
+  /**
+   * Refreshes the player when it's unknown, lacks `scrapingOffset` or is stale, and returns it. Throws 404 when the
+   * player isn't on the hiscores, and 503 when the hiscores can't be reached for an unknown player.
+   */
+  private async refreshIfNeeded(
+    response: Response,
+    username: string,
+    scrapingOffset: number,
+    includeLatestHiscoreEntry: boolean,
+    player: Player | null,
+  ) {
+    const playerHasOffset = player?.scrapingOffsets?.includes(scrapingOffset);
 
     if (
       !player || // Player does not exist

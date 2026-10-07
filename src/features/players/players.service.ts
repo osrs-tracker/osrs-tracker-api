@@ -53,6 +53,7 @@ export class PlayersService {
           status: 1,
           type: 1,
           scrapingOffsets: 1,
+          pausedScrapingOffsets: 1, // Still tracked (they have a history), resumed by the next successful refresh
           hiscoreEntries: includeLatestHiscoreEntry ? { $elemMatch: { scrapingOffset } } : undefined,
           // Date of the oldest stored entry for this offset (entries are stored newest first). The clean-hiscores Lambda
           // removes entries older than MAX_AGE_IN_DAYS, so this is where the history starts, not when tracking started.
@@ -97,13 +98,7 @@ export class PlayersService {
   ): Promise<HiscoreEntry[] | null> {
     const username = PlayerUtils.normalizeUsername(_username);
 
-    await this.collection.createIndex({ username: 1 }, { unique: true });
-
-    await this.collection.updateOne(
-      { username: username },
-      { $set: { lastHiscoreFetch: new Date() } },
-      { hint: { username: 1 } },
-    );
+    await this.recordLookup(username);
 
     // Retrieve the player's hiscores
     const player = await this.collection
@@ -132,6 +127,19 @@ export class PlayersService {
       .next();
 
     return player?.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? null;
+  }
+
+  /** Records a visitor's lookup for the recent players list. Doesn't create unknown players. */
+  async recordLookup(_username: string): Promise<void> {
+    const username = PlayerUtils.normalizeUsername(_username);
+
+    await this.collection.createIndex({ username: 1 }, { unique: true });
+
+    await this.collection.updateOne(
+      { username: username },
+      { $set: { lastHiscoreFetch: new Date() } },
+      { hint: { username: 1 } },
+    );
   }
 
   /**

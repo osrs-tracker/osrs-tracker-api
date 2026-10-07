@@ -4,14 +4,19 @@ import {
   DefaultValuePipe,
   Get,
   Header,
+  HttpCode,
   HttpException,
   HttpStatus,
   NotFoundException,
   Param,
   ParseIntPipe,
+  Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
+import { isBotRequest } from '../../common/bot/is-bot-request';
 import { ItemsService } from './items.service';
 
 @ApiTags('items')
@@ -41,6 +46,18 @@ export class ItemsController {
     if (!item) throw new NotFoundException(`Item with ID "${id}" not found`);
 
     return item;
+  }
+
+  @Post(':id/lookup')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Record a visitor's lookup of an item (ignored for bots)" })
+  @ApiParam({ name: 'id', description: 'Item ID' })
+  async recordLookup(@Req() request: Request, @Param('id', new DefaultValuePipe(0), ParseIntPipe) id: number) {
+    if (isNaN(id) || id <= 0) throw new BadRequestException(`Invalid item ID "${id}"`);
+
+    if (isBotRequest(request)) return;
+
+    await this.itemsService.recordLookup(id);
   }
 
   @Get('search/:query')

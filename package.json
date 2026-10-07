@@ -39,6 +39,7 @@
     "date-fns": "^4.4.0",
     "express-prom-bundle": "^8.0.0",
     "fast-xml-parser": "^5.10.1",
+    "isbot": "^5.2.2",
     "lru-cache": "^11.5.3",
     "mongodb": "^7.5.0",
     "morgan": "^1.11.0",
