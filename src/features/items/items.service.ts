@@ -40,6 +40,11 @@ export class ItemsService {
     ) as Promise<Item | null>;
   }
 
+  /** Records a visitor's lookup for the recent items list. Doesn't create unknown items. */
+  async recordLookup(id: number): Promise<void> {
+    await this.collection.updateOne({ id: id }, { $set: { lastFetch: new Date() } }, { hint: { id: 1 } });
+  }
+
   searchItems(query: string): Promise<Item[]> {
     return this.collection
       .find<Item>(

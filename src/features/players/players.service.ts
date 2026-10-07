@@ -97,13 +97,7 @@ export class PlayersService {
   ): Promise<HiscoreEntry[] | null> {
     const username = PlayerUtils.normalizeUsername(_username);
 
-    await this.collection.createIndex({ username: 1 }, { unique: true });
-
-    await this.collection.updateOne(
-      { username: username },
-      { $set: { lastHiscoreFetch: new Date() } },
-      { hint: { username: 1 } },
-    );
+    await this.recordLookup(username);
 
     // Retrieve the player's hiscores
     const player = await this.collection
@@ -132,6 +126,19 @@ export class PlayersService {
       .next();
 
     return player?.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? null;
+  }
+
+  /** Records a visitor's lookup for the recent players list. Doesn't create unknown players. */
+  async recordLookup(_username: string): Promise<void> {
+    const username = PlayerUtils.normalizeUsername(_username);
+
+    await this.collection.createIndex({ username: 1 }, { unique: true });
+
+    await this.collection.updateOne(
+      { username: username },
+      { $set: { lastHiscoreFetch: new Date() } },
+      { hint: { username: 1 } },
+    );
   }
 
   /**
