@@ -1,5 +1,10 @@
 ## 2026/10/07
 
+- The item and player GETs are read-only, so crawlers no longer change the recent lookups or start tracking players.
+  `GET /items/:id` and `GET /players/:username/hiscores` stop recording the lookup. `GET /players/:username` returns a
+  stored player as stored, without refreshing it, and an unknown player as a live preview from the hiscores that isn't
+  stored (`scrapingOffsets: []`, `trackedSince: null`, `Cache-Control: max-age=0, must-revalidate`); not found is still
+  a 404 and a hiscores outage a 503. The browser records lookups and starts tracking through the POST lookup endpoints.
 - New `POST /items/:id/lookup` and `POST /players/:username/lookup?scrapingOffset=N` for the web app to call from the
   browser, so the recent lookups lists and player tracking follow visitors instead of crawlers. The item one sets
   `lastFetch` (204). The player one does what `GET /players/:username` does (refresh or start tracking when needed, same

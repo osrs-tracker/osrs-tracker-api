@@ -65,19 +65,28 @@ export class PlayersController {
     if (isNaN(scrapingOffset)) throw new BadRequestException('Invalid scraping offset');
     if (scrapingOffset < -12 || scrapingOffset > 11) throw new BadRequestException('ScrapingOffset < -12 or > 11.');
 
+    // Read-only: refreshing, starting to track and recording the lookup happen in the browser's POST lookup.
     const player = await this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
 
-    response.setHeader(
-      'Cache-Control', // Set cache control to 15 minutes (900 seconds) or time until the minimum refresh time has passed
-      `max-age=${Math.max(0, Math.min(900, differenceInSeconds(addHours(player?.lastModified ?? new Date(), PLAYER_CONFIG.minPlayerRefreshTime), new Date())))}`,
-    );
-
-    if (skipRefresh) {
-      if (!player) throw new NotFoundException(`Player '${username}' not found`);
-      return player; // Skip refresh if requested
+    if (player) {
+      response.setHeader(
+        'Cache-Control', // Set cache control to 15 minutes (900 seconds) or time until the minimum refresh time has passed
+        `max-age=${Math.max(0, Math.min(900, differenceInSeconds(addHours(player.lastModified, PLAYER_CONFIG.minPlayerRefreshTime), new Date())))}`,
+      );
+      return player;
     }
 
-    return this.refreshIfNeeded(response, username, scrapingOffset, includeLatestHiscoreEntry, player);
+    // Not stored: preview the player live from the hiscores, without storing it.
+    response.setHeader('Cache-Control', 'max-age=0, must-revalidate');
+
+    if (skipRefresh) throw new NotFoundException(`Player '${username}' not found`);
+
+    const preview = await this.playersService.previewPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
+    if (preview.status === 'notFound') throw new NotFoundException(`Player '${username}' not found`);
+    if (preview.status !== 'found')
+      throw new ServiceUnavailableException(`The hiscores can't be reached, try again later.`);
+
+    return preview.player;
   }
 
   @Post(':username/lookup')

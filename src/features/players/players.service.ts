@@ -53,6 +53,7 @@ export class PlayersService {
           status: 1,
           type: 1,
           scrapingOffsets: 1,
+          pausedScrapingOffsets: 1, // Still tracked (they have a history), resumed by the next successful refresh
           hiscoreEntries: includeLatestHiscoreEntry ? { $elemMatch: { scrapingOffset } } : undefined,
           // Date of the oldest stored entry for this offset (entries are stored newest first). The clean-hiscores Lambda
           // removes entries older than MAX_AGE_IN_DAYS, so this is where the history starts, not when tracking started.
@@ -97,7 +98,7 @@ export class PlayersService {
   ): Promise<HiscoreEntry[] | null> {
     const username = PlayerUtils.normalizeUsername(_username);
 
-    await this.recordLookup(username);
+    await this.collection.createIndex({ username: 1 }, { unique: true });
 
     // Retrieve the player's hiscores
     const player = await this.collection
@@ -187,6 +188,40 @@ export class PlayersService {
       ...player,
       hiscoreEntries: player.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? [],
     }));
+  }
+
+  /**
+   * Builds a live preview of a player that isn't stored, straight from the hiscores, without storing anything. Shaped
+   * like `getPlayer`, with no `scrapingOffsets` and no `trackedSince`.
+   *
+   * @returns `notFound` when the player isn't on the normal hiscores, `failed` when the hiscores couldn't be reached.
+   */
+  async previewPlayer(
+    username: string,
+    scrapingOffset: number,
+    includeLatestHiscoreEntry: boolean,
+  ): Promise<{ status: 'found'; player: Player } | { status: 'notFound' | 'failed' }> {
+    const result = await this.determinePlayerStatusAndType(username);
+
+    if (result.status !== 'found') return result;
+
+    const { player, partialHiscoreEntry } = result;
+
+    return {
+      status: 'found',
+      player: {
+        ...player,
+        scrapingOffsets: [],
+        trackedSince: null,
+        ...(includeLatestHiscoreEntry
+          ? {
+              hiscoreEntries: [
+                { scrapingOffset, sourceString: 'LEGACY', date: player.lastModified, ...partialHiscoreEntry },
+              ],
+            }
+          : {}),
+      },
+    };
   }
 
   /**
