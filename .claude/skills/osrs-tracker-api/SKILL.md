@@ -121,7 +121,8 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 - Dependabot PRs (`.github/dependabot.yml`) carry no `CHANGELOG.md` entry, and merging one deploys. After merging,
   commit the entry straight to `main` (docs only, no redeploy): one entry under that day's "Behind the scenes"
   ("Dependency updates: …", naming notable bumps), extended for further ones that day. Base image PRs bump the digest in
-  both `FROM` lines.
+  both `FROM` lines. npm majors are ignored in the config: upgrade them by hand from an issue, together with whatever
+  must move with them (e.g. NestJS 12 needs TypeScript 6).
 - GPG "Inappropriate ioctl for device": ask the user to run `echo test | gpg --clearsign > /dev/null` in their terminal.
 - If `gh pr edit` fails on a Projects (classic) error:
   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>`.

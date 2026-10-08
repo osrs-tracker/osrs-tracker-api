@@ -10,16 +10,13 @@ updates:
       prefix: chore
       include: scope
     groups:
-      # A dependency goes into the first group it matches; majors outside a group get a PR each
       minor-and-patch:
         update-types: [minor, patch]
-      # The @nestjs packages only work at the same major, so their upgrade has to be one PR
-      nestjs-major:
-        patterns: ['@nestjs/*']
-        update-types: [major]
     ignore:
-      # Matches the Node major in the Dockerfile and CI; bump it together with them
-      - dependency-name: '@types/node'
+      # No major PRs: a major needs migration work (code changes, peer dependencies moving together, e.g. NestJS 12
+      # needing TypeScript 6) that a version bump can't do. Majors are done by hand from an issue. Also covers
+      # @types/node, which follows the Node major in the Dockerfile and CI.
+      - dependency-name: '*'
         update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
