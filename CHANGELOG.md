@@ -32,6 +32,11 @@
   also rejected when `activities` isn't a list, and a failure's log line says why (status, timeout or network error).
   New players' first hiscore entry, and the preview of an unknown player, no longer include the `name` the hiscores echo
   back, matching the entries the Lambda stores.
+- Looking up players asks Jagex far less: the normal hiscores come first, so a name that isn't on them (or a hiscores
+  outage) costs 1 request instead of 4, at the cost of one extra round trip for players that are. Concurrent lookups of
+  one name share their requests, each pod sends at most 8 hiscore requests at once (the rest wait their turn), and a
+  preview of an unknown name remembers for 60s that it isn't on the hiscores, so crawlers repeating it don't reach
+  Jagex. The POST lookup always asks again. Status codes and `Cache-Control` stay the same.
 
 ### News
 
