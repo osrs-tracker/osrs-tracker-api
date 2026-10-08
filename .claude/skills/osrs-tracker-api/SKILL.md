@@ -57,6 +57,8 @@ Set it deliberately on every GET. The web app's SSR transfer cache **drops `no-s
 responses**, making the UI flash back to skeletons on hydration — never use them.
 
 - Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/news/image` 604800).
+- Routes that fetch Jagex live (`/news`, `/news/image`) set it with `res.setHeader` after the fetch succeeds, not with
+  `@Header` (which also applies to errors), so caches don't keep a 503.
 - GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR.
 - `/items/:id`, `/players/:username/hiscores` and the recent-items/players lists: `max-age=0, must-revalidate` so
   they're always fresh.

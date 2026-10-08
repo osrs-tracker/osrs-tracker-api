@@ -1,13 +1,4 @@
-import {
-  BadRequestException,
-  Controller,
-  DefaultValuePipe,
-  Get,
-  Header,
-  ParseIntPipe,
-  Query,
-  Res,
-} from '@nestjs/common';
+import { BadRequestException, Controller, DefaultValuePipe, Get, ParseIntPipe, Query, Res } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { NewsService } from './news.service';
@@ -18,13 +9,19 @@ export class NewsController {
   constructor(private readonly newsService: NewsService) {}
 
   @Get()
-  @Header('Cache-Control', 'public, max-age=300')
   @ApiOperation({ summary: 'Get recent news articles' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  getRecentNews(@Query('limit', new DefaultValuePipe(4), ParseIntPipe) limit: number) {
+  async getRecentNews(
+    @Res({ passthrough: true }) res: Response,
+    @Query('limit', new DefaultValuePipe(4), ParseIntPipe) limit: number,
+  ) {
     if (limit < 1 || limit > 50) throw new BadRequestException('Limit must be between 1 and 50.');
 
-    return this.newsService.getRecentNews(limit);
+    const news = await this.newsService.getRecentNews(limit);
+
+    // Set only on success (not with @Header), so caches don't keep a 503 for 5 minutes while Jagex is down
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return news;
   }
 
   @Get('image')
@@ -46,7 +43,7 @@ export class NewsController {
     const webp = await this.newsService.getImageAsWebp(parsedUrl.href);
 
     // Set only on success (not with @Header), so browsers don't cache a rejected URL or failed fetch for a week
-    res.setHeader('Cache-Control', 'max-age=604800');
+    res.setHeader('Cache-Control', 'public, max-age=604800');
     res.setHeader('Content-Type', 'image/webp');
     return res.send(webp);
   }
