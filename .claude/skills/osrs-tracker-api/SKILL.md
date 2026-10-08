@@ -2,9 +2,9 @@
 name: osrs-tracker-api
 description: >-
   Repo-specific rules for the osrs-tracker-api NestJS/MongoDB service: Cache-Control rules for the web app's SSR
-  transfer cache, Mongo pipeline-update pitfalls, the player pause/resume contract, production testing, and the Docker →
-  Kubernetes deploy. Use when adding or changing endpoints, Cache-Control headers or player/item writes, testing against
-  production data, or building, deploying, committing, pushing, releasing or shipping this repo.
+  transfer cache, Mongo pipeline-update pitfalls, the player pause/resume contract, production testing, and the GitHub
+  Actions → Flux deploy. Use when adding or changing endpoints, Cache-Control headers or player/item writes, testing
+  against production data, or building, deploying, committing, pushing, releasing or shipping this repo.
 ---
 
 # osrs-tracker-api
@@ -35,8 +35,8 @@ The Lambda pauses players whose hiscores keep 404ing (`pausedScrapingOffsets`, `
 `hiscoreNotFoundCount`). In `refreshPlayerInfo`:
 
 - Success: resume in the same update — merge `pausedScrapingOffsets` into `scrapingOffsets`, unset the three fields.
-- Not found (404/400 on the normal table) or failed (any other status, network error, timeout, or any of the four
-  tables failing): write nothing and leave them alone. **Never** count 404s here; the Lambda owns that bookkeeping.
+- Not found (404/400 on the normal table) or failed (any other status, network error, timeout, or any of the four tables
+  failing): write nothing and leave them alone. **Never** count 404s here; the Lambda owns that bookkeeping.
 - `POST /players/:username/lookup` answers 404 only for not found. Failed returns the stored player with
   `refreshFailed: true`, or 503 when the player isn't stored.
 - GETs never write: `GET /players/:username` returns a stored player as stored (stale or not, never refreshed), and an
@@ -66,18 +66,28 @@ state and restore it afterwards.
 
 ## Deploy
 
-1. Verify (in a release, passing CI counts).
-2. `npm run docker:build && npm run docker:push`, then put the digest in the `image:` line of `osrs-tracker-api.yaml`.
-   If `docker` is missing or the engine is down, start Docker Desktop from Windows:
-   `"/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe" desktop start`
-3. Confirm the live image matches the yaml, so you don't roll back someone else's deploy:
-   `kubectl -n osrs-tracker get deploy osrs-tracker-api -o jsonpath='{.spec.template.spec.containers[0].image}'`
-4. `kubectl diff -f osrs-tracker-api.yaml` — expect only the digest (plus `generation`).
-5. `kubectl apply -f osrs-tracker-api.yaml && kubectl -n osrs-tracker rollout status deploy/osrs-tracker-api --timeout=300s`
-6. Smoke test `https://osrs-tracker-api.freekmencke.com`: `curl -s -D - -o /dev/null` the changed routes (status,
-   `cache-control`) and `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m`.
-7. If the web app's rendering changes, check those pages in the browser (see the web skill); cached pages may lag up to
+**Deploying is merging to `main`.** Never build, push or `kubectl apply` by hand: Flux in the cluster (set up in
+`../home-cluster`, `cluster/osrs-tracker/flux.yaml`) applies `osrs-tracker-api.yaml` from `main` and reverts manual
+changes within 10 minutes.
+
+1. When `CI` passes on a push to `main` whose `build` job ran, `.github/workflows/deploy.yml` builds the image, pushes
+   it to Docker Hub as `freekmencke/osrs-tracker-api:latest` and `:<commit sha>`, and commits the digest to the `image:`
+   line as `chore(deploy): deploy sha256:<first 8>` (pushed with the `DEPLOY_KEY` deploy key, which bypasses the PR
+   rule). Pushes without source or image changes (docs, the digest commits) skip `build` and so don't deploy.
+2. Flux applies that commit within a minute and reports the rollout as the `Flux / deploy` commit status (failures also
+   reach Discord). The workflow waits up to 10 minutes for it, then checks that `/news` and `/items` on
+   `https://osrs-tracker-api.freekmencke.com` answer 200.
+3. Follow it with `gh run watch` on the `Deploy` run, then smoke test the changed routes yourself:
+   `curl -s -D - -o /dev/null` (status, `cache-control`), and
+   `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m` (reading the cluster is fine).
+4. If the web app's rendering changes, check those pages in the browser (see the web skill); cached pages may lag up to
    5 minutes.
+
+- **Retry** a failed deploy (Docker Hub or Flux hiccup) by re-running the failed `Deploy` run; a later docs-only push
+  won't redeploy.
+- **Roll back** by reverting the digest commit on `main` (`git revert <sha> && git push`, admin bypass): Flux applies
+  the previous digest, and the revert itself doesn't trigger a build. Fix or revert the code too, or the next merge
+  deploys it again.
 
 ## Release ("release it", "ship it")
 
@@ -85,17 +95,16 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 
 1. Commit on a `<type>/<short-name>` branch, push, `gh pr create --base main`.
 2. Review `gh pr diff` for bugs and leftovers while the `conventions-reviewer` agent checks the PR; fix both and push.
-3. In the background, Docker build/push alongside `gh pr checks <n> --watch`.
-4. Once CI passes, deploy (steps 2–7).
-5. Commit the digest, push, and add the digest and check results to the PR description.
-6. When checks pass: `gh pr merge <n> --merge`, switch to `main`, pull, `git branch -d <branch>`, `git fetch --prune`.
+3. `gh pr checks <n> --watch`. When checks pass: `gh pr merge <n> --merge`, switch to `main`, pull,
+   `git branch -d <branch>`, `git fetch --prune`.
+4. Watch the deploy and smoke test (Deploy steps 3–4), then pull again for the digest commit.
 
 ## Commit and push
 
 - Doc-only changes go straight to `main`. Otherwise, outside a release, **ask every time**: `main` or a PR. The admin
-  account bypasses `main`'s PR rule; after a direct push, `gh run watch --exit-status`.
-- Deploying from a PR branch runs unmerged code: say so, and don't deploy from `main` until it's merged.
-- Conventional commits. Commit and push in the same session as a deploy, so prod never runs code that isn't on GitHub.
+  account bypasses `main`'s PR rule; after a direct push, `gh run watch --exit-status`. A direct push to `main` with
+  source changes deploys it.
+- Conventional commits. `chore(deploy)` is reserved for the Deploy workflow's digest commits (it skips them).
 - **Every change gets a `CHANGELOG.md` entry** under `## YYYY/MM/DD`, newest first. Busy days get `###` subtitles (by
   area, "Behind the scenes" last); extend an existing entry rather than add a near-duplicate, and don't repeat the
   subtitle in its entries.
