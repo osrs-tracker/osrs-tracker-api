@@ -14,10 +14,7 @@ export default defineConfig(
   ...tseslint.configs.stylistic,
   {
     languageOptions: {
-      globals: {
-        ...globals.node,
-        ...globals.jest,
-      },
+      globals: globals.node,
       sourceType: 'commonjs',
       parserOptions: {
         projectService: true,
@@ -27,8 +24,7 @@ export default defineConfig(
   },
   {
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-floating-promises': 'warn',
+      '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-unsafe-argument': 'warn',
     },
   },
