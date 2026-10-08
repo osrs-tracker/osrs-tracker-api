@@ -3,6 +3,9 @@ name: CI
 on:
   push:
     branches: ['main']
+    # Digest commits (and rollbacks) only change the manifest; skipping CI for them also skips the Deploy run it would
+    # trigger. Not on pull_request: required checks that never report would block the PR.
+    paths-ignore: ['osrs-tracker-api.yaml']
   pull_request:
     branches: ['main']
 
