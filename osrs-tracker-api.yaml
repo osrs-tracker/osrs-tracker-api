@@ -40,6 +40,14 @@ spec:
           ports:
             - containerPort: 3000
             - containerPort: 9090
+          # Peak working set was 84Mi (Oct 2026, very low traffic); requests and limit leave room for growth, the 50MB
+          # image cache and sharp's off-heap buffers. No CPU limit, so bursts aren't throttled.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
           lifecycle:
             # Keep serving until Traefik has dropped the terminating pod, otherwise in-flight requests get a 502/504
             preStop:
