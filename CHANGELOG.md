@@ -8,6 +8,11 @@
   once they're likely up, 2s after starting, so redeploys no longer fill the cluster with `Unhealthy` probe events.
 - The API pods reserve 50m CPU and 128Mi memory and are capped at 512Mi, so they're no longer the first to be evicted
   when the node runs low on memory, and a runaway image conversion can't take the node's memory with it.
+- A missing or invalid setting stops the API at startup with one error listing every problem (e.g.
+  `OSRS_API_BASE_URL is required.`), instead of starting and then failing every hiscore fetch, or retrying MongoDB for
+  minutes before the real error. Each MongoDB connect attempt now gives up after 10s (the driver waited 30s), and the
+  startup probe allows 4.5 min instead of 3, so a pod waiting for cluster DNS after a node reboot is no longer restarted
+  before its last retry.
 
 ### Logging
 
@@ -86,6 +91,9 @@
   longer brings webpack, so it and its plugins are dev dependencies now. The build skips Nest's optional imports under
   their new ESM names and Swagger's optional `@fastify/static`. Dependabot doesn't propose TypeScript 6.1 until
   `typescript-eslint` supports it.
+- Settings are read once, validated, through Nest's `ConfigService` (`src/config/env.ts`) instead of `process.env` in
+  six files. `.env` is loaded once instead of twice, and CORS no longer depends on which module happens to load it
+  first.
 - Dependency updates: `eslint` 10.12.0 and `typescript-eslint` 8.71.1 (lint tooling only).
 - Claude's pre-push lint check checks the worktree being pushed.
 - Small cleanups: a log line's missing quote, the player refresh interval as a named constant

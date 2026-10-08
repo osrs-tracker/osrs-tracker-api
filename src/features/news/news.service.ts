@@ -6,12 +6,14 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OsrsNewsItem } from '@osrs-tracker/models';
 import { XMLParser } from 'fast-xml-parser';
 import { Agent } from 'https';
 import { LRUCache } from 'lru-cache';
 import fetch from 'node-fetch';
 import sharp from 'sharp';
+import { Env } from '../../config/env';
 
 @Injectable()
 export class NewsService {
@@ -50,6 +52,7 @@ export class NewsService {
   constructor(
     @Inject('AGENT') private readonly agent: Agent,
     @Inject('XML_PARSER') private readonly xmlParser: XMLParser,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   async getRecentNews(limit: number): Promise<OsrsNewsItem[]> {
@@ -103,10 +106,13 @@ export class NewsService {
   }
 
   private async fetchNews(): Promise<OsrsNewsItem[]> {
-    const response = await fetch(process.env.OSRS_API_BASE_URL + '/m=news/latest_news.rss?oldschool=true', {
-      agent: this.agent,
-      signal: AbortSignal.timeout(this.NEWS_FETCH_TIMEOUT_MS),
-    });
+    const response = await fetch(
+      this.config.get('OSRS_API_BASE_URL', { infer: true }) + '/m=news/latest_news.rss?oldschool=true',
+      {
+        agent: this.agent,
+        signal: AbortSignal.timeout(this.NEWS_FETCH_TIMEOUT_MS),
+      },
+    );
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     return this.parseOSRSNewsRSS(await response.text());

@@ -13,7 +13,15 @@ import { CACHE_CONTROL } from './common/http/cache-control';
  * transfer cache drops those), and never writes to the database.
  */
 
-const { fakeFetch } = vi.hoisted(() => ({ fakeFetch: vi.fn<(url: string) => Promise<Response>>() }));
+const { fakeFetch } = vi.hoisted(() => {
+  // Before AppModule is imported: `ConfigModule.forRoot` validates the environment then. These win over a local `.env`.
+  vi.stubEnv('MONGODB_URI', 'mongodb://fake');
+  vi.stubEnv('MONGODB_USERNAME', 'fake');
+  vi.stubEnv('MONGODB_PASSWORD', 'fake');
+  vi.stubEnv('MONGODB_DATABASE', 'fake');
+  vi.stubEnv('OSRS_API_BASE_URL', 'https://secure.runescape.com');
+  return { fakeFetch: vi.fn<(url: string) => Promise<Response>>() };
+});
 vi.mock('node-fetch', () => ({ default: fakeFetch }));
 // No request log lines in the test output
 vi.mock('morgan', () => ({ default: () => (_req: unknown, _res: unknown, next: () => void) => next() }));
@@ -139,10 +147,10 @@ let png: Buffer;
 
 /** Fake Jagex: the news feed, the CDN and the hiscores. Anything else fails, so the test never reaches the network. */
 async function fakeJagex(url: string): Promise<Response> {
-  if (url.includes('/m=news/latest_news.rss')) return new Response(RSS);
+  if (url.startsWith('https://secure.runescape.com/m=news/latest_news.rss')) return new Response(RSS);
   if (url.startsWith('https://cdn.runescape.com/'))
     return new Response(new Uint8Array(png), { headers: { 'content-type': 'image/png' } });
-  if (url.includes('/index_lite.json'))
+  if (url.startsWith('https://secure.runescape.com/m=hiscore_oldschool') && url.includes('/index_lite.json'))
     return fakes.hiscores === 'found' ? Response.json(HISCORE) : new Response('', { status: 503 });
   throw new Error(`Unexpected fetch: ${url}`);
 }

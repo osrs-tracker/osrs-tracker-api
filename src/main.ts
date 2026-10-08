@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { Request } from 'express';
 import { SwaggerModule } from '@nestjs/swagger';
@@ -6,11 +7,14 @@ import { AppMetricsModule } from './app-metrics.module';
 import { AppModule } from './app.module';
 import { JSONLogger } from './common/logger/JsonLogger';
 import { routeLabel } from './common/route/route-label';
-import { CORS_CONFIG } from './config/cors';
+import { corsOptions } from './config/cors';
+import { Env } from './config/env';
 import { SWAGGER_CONFIG } from './config/swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: CORS_CONFIG, logger: new JSONLogger() });
+  const app = await NestFactory.create(AppModule, { logger: new JSONLogger() });
+  const config = app.get<ConfigService<Env, true>>(ConfigService);
+  app.enableCors(corsOptions(config.get('CORS_ORIGIN', { infer: true })));
   // Exit with process.exit() once closed: by default Nest re-sends the signal to itself, which the kernel ignores for
   // PID 1 (node in the container), so the pod would hang until the kubelet SIGKILLs it at the grace period
   app.enableShutdownHooks(undefined, { useProcessExit: true });
@@ -33,11 +37,14 @@ async function bootstrap() {
     }),
   );
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (config.get('NODE_ENV', { infer: true }) !== 'production') {
     SwaggerModule.setup('swagger', app, () => SwaggerModule.createDocument(app, SWAGGER_CONFIG));
   }
 
-  await Promise.all([app.listen(process.env.PORT || 3000), appMetrics.listen(process.env.METRICS_PORT || 9090)]);
+  await Promise.all([
+    app.listen(config.get('PORT', { infer: true })),
+    appMetrics.listen(config.get('METRICS_PORT', { infer: true })),
+  ]);
 }
 
 void bootstrap();
