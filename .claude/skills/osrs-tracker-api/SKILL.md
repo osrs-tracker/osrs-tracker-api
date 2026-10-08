@@ -10,8 +10,8 @@ description: >-
 # osrs-tracker-api
 
 NestJS + MongoDB Atlas (native driver), deployed as a Docker image to Kubernetes. Main consumer: the Angular SSR app in
-`../osrs-tracker-web`. The `conventions-reviewer` agent reviews diffs against this file at runtime, so keep code rules
-here, not in the agent.
+`../osrs-tracker-web`. The `conventions-reviewer` agent reviews diffs against this file and `CLAUDE.md` at runtime, so
+keep code rules here, not in the agent.
 
 ## Setup gotchas
 
