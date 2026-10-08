@@ -52,6 +52,15 @@ Validate query and route params in pipes, not with checks in the handler: `Parse
 add `DefaultValuePipe` + `ParseIntPipe` + a range check, or an `isNaN` check after a parse pipe. Keep existing status
 codes and messages: the web may show them. A new pipe gets a spec.
 
+## Swagger docs
+
+Every route documents each status it answers with `@ApiOkResponse`/`@ApiNoContentResponse`/`@Api…Response` and a
+one-line description naming the `@osrs-tracker/models` type (they're interfaces, so no schema) and its `Cache-Control`
+from `CACHE_CONTROL` (`${CACHE_CONTROL.X}` in a template, never a copied value). Document integer query params with
+`ApiIntRangeQuery(name, options)` (`common/swagger/`) given the same options object as the param's `ParseIntRangePipe`,
+and `scrapingOffset` with `ApiScrapingOffsetQuery` (next to its pipe), so ranges and defaults can't drift. A change to a
+route's statuses or header changes its decorators in the same diff.
+
 ## Mongo pipeline updates
 
 Wrap player data and user input in `$literal` (strings starting with `$` read as field paths). Prepend `hiscoreEntries`
