@@ -1,5 +1,10 @@
 module.exports = (options, webpack) => {
-  const lazyImports = ['@nestjs/microservices/microservices-module', '@nestjs/websockets/socket-module'];
+  // Optional packages Nest and Swagger import lazily and tolerate missing (Swagger only loads @fastify/static on Fastify)
+  const lazyImports = [
+    '@nestjs/microservices/microservices-module.js',
+    '@nestjs/websockets/socket-module.js',
+    '@fastify/static',
+  ];
 
   return {
     ...options,

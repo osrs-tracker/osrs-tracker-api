@@ -46,8 +46,8 @@ npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && n
 
 ## Built with
 
-NestJS, MongoDB and Node 24, deployed with Docker on Kubernetes. Merging to `main` deploys it: GitHub Actions builds the
-image and commits its digest to `osrs-tracker-api.yaml`, and Flux applies it to the cluster.
+NestJS 12, TypeScript 6, MongoDB and Node 24, deployed with Docker on Kubernetes. Merging to `main` deploys it: GitHub
+Actions builds the image and commits its digest to `osrs-tracker-api.yaml`, and Flux applies it to the cluster.
 
 ## Development
 

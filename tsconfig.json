@@ -16,6 +16,7 @@
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
     "noFallthroughCasesInSwitch": false,
-    "tsBuildInfoFile": null
+    "tsBuildInfoFile": null,
+    "types": ["node"]
   }
 }
