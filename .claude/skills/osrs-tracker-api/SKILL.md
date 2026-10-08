@@ -27,8 +27,10 @@ keep code rules here, not in the agent.
   API Gateway proxy to `https://secure.runescape.com` that passes Jagex's headers through).
 - Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert).
 - `npm run build` bundles `node_modules` into `dist/` with webpack (only `sharp` is external; the image ships just
-  `dist/`). An optional package a dependency imports lazily and tolerates missing fails the build with "Can't resolve":
-  add it to `lazyImports` in `webpack.config.js`, under the exact specifier (Nest 12's ESM imports end in `.js`).
+  `dist/`). Nest CLI 12 only peers webpack and its plugins, so they're direct dev dependencies: a worktree finds the
+  main checkout's `node_modules` too, so check a build-tool change with `npm ci` in a copy outside the repo, like CI. An
+  optional package a dependency imports lazily and tolerates missing fails the build with "Can't resolve": add it to
+  `lazyImports` in `webpack.config.js`, under the exact specifier (Nest 12's ESM imports end in `.js`).
 - TypeScript 6 only loads the `@types` packages listed in `tsconfig.json`'s `types` (`node`); add one there when its
   globals are needed. It resolves packages through `exports`, so a package that lists `types` after `require` gets its
   CJS typings (`@osrs-tracker/models` before 0.10.1).
