@@ -3,6 +3,10 @@
 - Request logs no longer report a client that disconnects before the response as an error. These lines are logged at
   `warn` with `aborted: true` and no `status`, and `responseTime` is the time until the connection closed instead of
   `undefinedms`. Other requests are logged as before.
+- Behind the scenes: merging to `main` deploys the API automatically. GitHub Actions builds and pushes the image and
+  commits its digest to `osrs-tracker-api.yaml`, which the cluster applies on its own, then checks that the deploy
+  succeeded and the API answers. Pushes that don't change the code or the image (documentation, for example) don't
+  deploy, and rolling back is reverting the digest commit.
 
 ## 2026/10/07
 
