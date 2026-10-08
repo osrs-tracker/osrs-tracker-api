@@ -1,3 +1,9 @@
+## 2026/10/08
+
+- Request logs no longer report a client that disconnects before the response as an error. These lines are logged at
+  `warn` with `aborted: true` and no `status`, and `responseTime` is the time until the connection closed instead of
+  `undefinedms`. Other requests are logged as before.
+
 ## 2026/10/07
 
 - The item and player GETs are read-only, so crawlers no longer change the recent lookups or start tracking players.
@@ -8,8 +14,8 @@
 - New `POST /items/:id/lookup` and `POST /players/:username/lookup?scrapingOffset=N` for the web app to call from the
   browser, so the recent lookups lists and player tracking follow visitors instead of crawlers. The item one sets
   `lastFetch` (204). The player one does what `GET /players/:username` does (refresh or start tracking when needed, same
-  404/503/`refreshFailed` responses) and also sets `lastHiscoreFetch`. Bots (detected with `isbot`) and requests
-  without a user agent get a 204 and write nothing. The GETs still write until the web app uses the POSTs.
+  404/503/`refreshFailed` responses) and also sets `lastHiscoreFetch`. Bots (detected with `isbot`) and requests without
+  a user agent get a 204 and write nothing. The GETs still write until the web app uses the POSTs.
 - `GET /players/:username` (and the new lookup POST) return `pausedScrapingOffsets` for players whose tracking the
   hiscores-scraper paused, so the web app can still show their history.
 - `GET /players/:username` no longer answers 404 for a stored player when the hiscores are down. 404 means Jagex itself
