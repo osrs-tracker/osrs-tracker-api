@@ -75,8 +75,9 @@ changes within 10 minutes.
    `osrs-tracker-api.yaml` (digest commits, rollbacks) don't run CI at all. Changes under `.github/` count as source:
    merging them rebuilds and redeploys the same code.
 2. Flux applies that commit within a minute and reports the rollout as the `Flux / sync` commit status (failures also
-   reach Discord). The workflow waits up to 10 minutes for it, then checks that `/news` and `/items` on
-   `https://osrs-tracker-api.freekmencke.com` answer 200.
+   reach Discord). The workflow waits up to 10 minutes for it, then smoke tests
+   `https://osrs-tracker-api.freekmencke.com`: `/items` and `/items/4151` answer 200, an unknown route 404 (not `/news`,
+   which fetches Jagex live).
 3. **Merging is the end of the job: don't wait for or watch the `CD` run.** It smoke tests on its own, and a failure
    shows as a failed `CD` run (named after the commit it deploys) and a failed `Flux / sync` status, and reaches
    Discord. Only when the user asks, follow it with `gh run watch` and smoke test the changed routes:
@@ -103,8 +104,8 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 
 ## Commit and push
 
-- `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push,
-  `gh run watch --exit-status`. A direct push to `main` with source changes deploys it.
+- `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push, watch its **CI**
+  run (`gh run watch --exit-status`), not CD. A direct push to `main` with source changes deploys it.
 - Conventional commits. `chore(deploy)` is reserved for the CD workflow's digest commits (it skips them).
 - `CHANGELOG.md`: newest day first. Busy days get `###` subtitles (by area, "Behind the scenes" last); extend an
   existing entry rather than add a near-duplicate, and don't repeat the subtitle in its entries.
