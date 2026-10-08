@@ -15,16 +15,40 @@ import {
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Player } from '@osrs-tracker/models';
 import { Request, Response } from 'express';
 import { isBotRequest } from '../../common/bot/is-bot-request';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
-import { ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
-import { ParseScrapingOffsetPipe } from './parse-scraping-offset.pipe';
+import { ParseIntRangeOptions, ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
+import { ApiIntRangeQuery } from '../../common/swagger/api-int-range-query';
+import { ApiScrapingOffsetQuery, ParseScrapingOffsetPipe } from './parse-scraping-offset.pipe';
 import { ParseUsernamePipe } from './parse-username.pipe';
-import { needsRefresh, playerMaxAgeSeconds } from './player.policy';
+import { needsRefresh, PLAYER_MAX_AGE_SECONDS, playerMaxAgeSeconds } from './player.policy';
 import { PlayersService } from './players.service';
+
+const LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 5 };
+const SIZE: ParseIntRangeOptions = { min: 1, max: 100, default: 7 };
+const SKIP: ParseIntRangeOptions = { min: 0, default: 0 };
+
+const USERNAME_PARAM = ApiParam({ name: 'username', description: 'OSRS display name, case-insensitive' });
+const INCLUDE_LATEST_HISCORE_ENTRY_QUERY = ApiQuery({
+  name: 'includeLatestHiscoreEntry',
+  required: false,
+  type: Boolean,
+  description: 'Include `hiscoreEntries` with the newest entry for `scrapingOffset` (empty when there is none).',
+});
+const BAD_REQUEST = ApiBadRequestResponse({ description: 'Invalid username or query param.' });
 
 @ApiTags('players')
 @Controller('players')
@@ -36,21 +60,50 @@ export class PlayersController {
   @Get('')
   @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
   @ApiOperation({ summary: 'Get the last fetched players' })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'scrapingOffset', required: false, type: Number })
+  @ApiIntRangeQuery('limit', LIMIT)
+  @ApiScrapingOffsetQuery({ optional: true })
+  @ApiOkResponse({
+    description:
+      'The most recently looked up `Player`s, newest first, each with `hiscoreEntries` holding at most its newest ' +
+      `entry (for \`scrapingOffset\` when given). \`Cache-Control: ${CACHE_CONTROL.REVALIDATE}\` on every response.`,
+  })
+  @ApiBadRequestResponse({ description: '`limit` or `scrapingOffset` out of range.' })
   getRecentPlayers(
-    @Query('limit', new ParseIntRangePipe({ min: 1, max: 50, default: 5 })) limit: number,
+    @Query('limit', new ParseIntRangePipe(LIMIT)) limit: number,
     @Query('scrapingOffset', new ParseScrapingOffsetPipe({ optional: true })) scrapingOffset?: number,
   ) {
     return this.playersService.getLastFetchedPlayers(limit, scrapingOffset);
   }
 
   @Get(':username')
-  @ApiOperation({ summary: 'Get a player by username' })
-  @ApiParam({ name: 'username' })
-  @ApiQuery({ name: 'scrapingOffset', required: false, type: Number })
-  @ApiQuery({ name: 'includeLatestHiscoreEntry', required: false, type: Boolean })
-  @ApiQuery({ name: 'skipRefresh', required: false, type: Boolean })
+  @ApiOperation({
+    summary: 'Get a player by username',
+    description: 'Read-only: never refreshes or stores the player (the browser does that with `POST .../lookup`).',
+  })
+  @USERNAME_PARAM
+  @ApiScrapingOffsetQuery()
+  @INCLUDE_LATEST_HISCORE_ENTRY_QUERY
+  @ApiQuery({
+    name: 'skipRefresh',
+    required: false,
+    type: Boolean,
+    description: "Answer 404 for a player that isn't stored instead of previewing it from the hiscores.",
+  })
+  @ApiOkResponse({
+    description:
+      'A stored `Player` as stored (stale or not), with `trackedSince` (date of its oldest entry for ' +
+      '`scrapingOffset`, or `null`), and `Cache-Control: max-age=N` with N from 0 to ' +
+      `${PLAYER_MAX_AGE_SECONDS}: the time left until it may be refreshed. A player that isn't stored is a live preview ` +
+      'from the hiscores, not stored: `scrapingOffsets: []`, `trackedSince: null`, and ' +
+      `\`Cache-Control: ${CACHE_CONTROL.REVALIDATE}\`.`,
+  })
+  @BAD_REQUEST
+  @ApiNotFoundResponse({
+    description: `Not stored and not on the hiscores (or \`skipRefresh\`). \`Cache-Control: ${CACHE_CONTROL.REVALIDATE}\`.`,
+  })
+  @ApiServiceUnavailableResponse({
+    description: `Not stored and the hiscores can't be reached. \`Cache-Control: ${CACHE_CONTROL.REVALIDATE}\`.`,
+  })
   async getByUsername(
     @Res({ passthrough: true }) response: Response,
     @Param('username', ParseUsernamePipe) username: string,
@@ -85,9 +138,21 @@ export class PlayersController {
     summary:
       "Record a visitor's lookup of a player, refreshing (or starting to track) them first if needed (ignored for bots)",
   })
-  @ApiParam({ name: 'username' })
-  @ApiQuery({ name: 'scrapingOffset', required: false, type: Number })
-  @ApiQuery({ name: 'includeLatestHiscoreEntry', required: false, type: Boolean })
+  @USERNAME_PARAM
+  @ApiScrapingOffsetQuery()
+  @INCLUDE_LATEST_HISCORE_ENTRY_QUERY
+  @ApiOkResponse({
+    description:
+      'The `Player`, refreshed first when unknown, not tracked for `scrapingOffset` yet or stale ' +
+      `(then \`Cache-Control: ${CACHE_CONTROL.PLAYER_REFRESHED}\`). When a stored player couldn't be refreshed: the ` +
+      `stored player with \`refreshFailed: true\` and \`Cache-Control: ${CACHE_CONTROL.PLAYER_REFRESH_FAILED}\`.`,
+  })
+  @ApiNoContentResponse({ description: 'A bot: nothing is looked up or recorded.' })
+  @BAD_REQUEST
+  @ApiNotFoundResponse({ description: 'Not on the hiscores.' })
+  @ApiServiceUnavailableResponse({
+    description: `Not stored and the hiscores can't be reached. \`Cache-Control: ${CACHE_CONTROL.REVALIDATE}\`.`,
+  })
   async recordLookup(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
@@ -152,15 +217,21 @@ export class PlayersController {
   @Get(':username/hiscores')
   @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
   @ApiOperation({ summary: "Get a player's hiscores by username" })
-  @ApiParam({ name: 'username' })
-  @ApiQuery({ name: 'scrapingOffset', required: false, type: Number })
-  @ApiQuery({ name: 'size', required: false, type: Number })
-  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @USERNAME_PARAM
+  @ApiScrapingOffsetQuery()
+  @ApiIntRangeQuery('size', SIZE, 'Page size.')
+  @ApiIntRangeQuery('skip', SKIP, 'Entries to skip.')
+  @ApiOkResponse({
+    description:
+      "A page of the player's `HiscoreEntry`s for `scrapingOffset`, newest first; an empty body for a player that " +
+      `isn't stored. \`Cache-Control: ${CACHE_CONTROL.REVALIDATE}\` on every response.`,
+  })
+  @BAD_REQUEST
   getHiscoresByUsername(
     @Param('username', ParseUsernamePipe) username: string,
     @Query('scrapingOffset', new ParseScrapingOffsetPipe()) scrapingOffset: number,
-    @Query('size', new ParseIntRangePipe({ min: 1, max: 100, default: 7 })) size: number,
-    @Query('skip', new ParseIntRangePipe({ min: 0, default: 0 })) skip: number,
+    @Query('size', new ParseIntRangePipe(SIZE)) size: number,
+    @Query('skip', new ParseIntRangePipe(SKIP)) skip: number,
   ) {
     return this.playersService.getPlayerHiscores(username, scrapingOffset, size, skip);
   }

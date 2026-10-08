@@ -93,6 +93,10 @@
   anywhere in a string in `src/`.
 - Query and route param validation (`limit`, `size`, `skip`, `scrapingOffset` and item IDs) lives in two shared, tested
   pipes instead of checks repeated in every handler. Status codes and error messages are unchanged.
+- The Swagger docs (`/swagger`, local only) now list every route's responses: each status it can answer (including `204`
+  for bots and empty searches, `404` vs `503` for players, and the unknown player's preview), with its `Cache-Control`,
+  taken from the same constants the routes send. `limit`, `size`, `skip`, `scrapingOffset` and item IDs show their range
+  and default, read from the validation pipes' options so the docs can't drift from the checks.
 - Upgraded to NestJS 12 (`@nestjs/*` 12, `@nestjs/config` 12, `@nestjs/swagger` 12) and TypeScript 6.0; responses, logs
   and graceful shutdown are unchanged. Swagger 12 brings the patched `js-yaml` itself, so the `overrides` entry for it
   is gone. `@osrs-tracker/models` 0.10.1 lists its types first in `exports`, which TypeScript 6 needs, and

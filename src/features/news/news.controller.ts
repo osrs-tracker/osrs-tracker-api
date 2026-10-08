@@ -1,9 +1,22 @@
 import { BadRequestException, Controller, Get, Query, Res } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadGatewayResponse,
+  ApiBadRequestResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProduces,
+  ApiQuery,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Response } from 'express';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
-import { ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
+import { ParseIntRangeOptions, ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
+import { ApiIntRangeQuery } from '../../common/swagger/api-int-range-query';
 import { NewsService } from './news.service';
+
+const LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 4 };
 
 @ApiTags('news')
 @Controller('news')
@@ -12,10 +25,19 @@ export class NewsController {
 
   @Get()
   @ApiOperation({ summary: 'Get recent news articles' })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiIntRangeQuery('limit', LIMIT)
+  @ApiOkResponse({
+    description:
+      "The newest `OsrsNewsItem`s from Jagex's RSS feed (cached for 5 minutes, served stale while Jagex fails). " +
+      `\`Cache-Control: ${CACHE_CONTROL.NEWS}\`.`,
+  })
+  @ApiBadRequestResponse({ description: '`limit` out of range.' })
+  @ApiServiceUnavailableResponse({
+    description: "Jagex's feed can't be fetched and nothing is cached. No `Cache-Control`.",
+  })
   async getRecentNews(
     @Res({ passthrough: true }) res: Response,
-    @Query('limit', new ParseIntRangePipe({ min: 1, max: 50, default: 4 })) limit: number,
+    @Query('limit', new ParseIntRangePipe(LIMIT)) limit: number,
   ) {
     const news = await this.newsService.getRecentNews(limit);
 
@@ -26,7 +48,26 @@ export class NewsController {
 
   @Get('image')
   @ApiOperation({ summary: 'Get image as WebP' })
-  @ApiQuery({ name: 'url', required: true, type: String })
+  @ApiQuery({
+    name: 'url',
+    required: true,
+    type: String,
+    description: 'Image URL on `https://cdn.runescape.com/`, no query or hash',
+  })
+  @ApiProduces('image/webp')
+  @ApiOkResponse({
+    description: `The image converted to WebP. \`Cache-Control: ${CACHE_CONTROL.NEWS_IMAGE}\`.`,
+    schema: { type: 'string', format: 'binary' },
+  })
+  @ApiBadRequestResponse({ description: 'Missing, too long (over 512 characters) or not a plain CDN URL.' })
+  @ApiNotFoundResponse({ description: 'The CDN has no such image.' })
+  @ApiBadGatewayResponse({
+    description: "The CDN answers another error or something that isn't an image, or the image can't be converted.",
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      "The CDN can't be reached, times out, redirects or sends an image that's too large. Errors have no `Cache-Control`.",
+  })
   async getImageAsWebp(@Res() res: Response, @Query('url') url: string) {
     const OSRS_CDN_ORIGIN = 'https://cdn.runescape.com';
 
