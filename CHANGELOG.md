@@ -63,6 +63,11 @@
 - Stricter checks: TypeScript runs in `strict` mode and ESLint fails on floating promises and flags `any` (the code
   already passed both). Removed unused dev dependencies (`@swc/cli`, `@swc/core`, `ts-node`, `tsconfig-paths`,
   `source-map-support`), which also clears the only `npm audit` finding, and leftover lint globs and Jest globals.
+- Unit tests with Vitest (`npm test`, also run in CI) for the rules that protect player data and the web app's caching:
+  the stored player's `max-age`, when a lookup refreshes a player, the refresh update that resumes paused players, the
+  combat level, type and status calculations, and username validation. The first three moved out of the players
+  controller and service into `player.policy.ts`, and every `Cache-Control` value is a named constant; responses are
+  unchanged.
 - Dependency updates: `eslint` 10.12.0 and `typescript-eslint` 8.71.1 (lint tooling only).
 - Claude's pre-push lint check checks the worktree being pushed.
 - Small cleanups: a log line's missing quote, the player refresh interval as a named constant

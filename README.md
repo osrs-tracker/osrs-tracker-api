@@ -37,10 +37,10 @@ Kubernetes probes and `/metrics` for Prometheus; it isn't exposed publicly.
 
 ## Checks
 
-There are no tests. Before committing, run the type check, lint, formatting check and build:
+Before committing, run the type check, lint, formatting check, build and unit tests (Vitest, `src/**/*.spec.ts`):
 
 ```bash
-npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build
+npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build && npm test
 ```
 
 ## Built with

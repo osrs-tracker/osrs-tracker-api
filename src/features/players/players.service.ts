@@ -4,6 +4,7 @@ import { HiscoreEntry, Player, PlayerType } from '@osrs-tracker/models';
 import { Agent } from 'https';
 import { Collection, Db } from 'mongodb';
 import fetch from 'node-fetch';
+import { buildRefreshUpdate } from './player.policy';
 import { PlayerUtils } from './player.utils';
 
 type PartialHiscoreEntry = Pick<HiscoreEntry, 'skills' | 'activities'>;
@@ -228,32 +229,9 @@ export class PlayersService {
       ...partialHiscoreEntry,
     };
 
-    // Aggregation pipeline update, values are wrapped in $literal so strings starting with '$' aren't field paths.
     const { upsertedCount, modifiedCount } = await this.collection.updateOne(
       { username: player.username },
-      [
-        {
-          $set: {
-            ...Object.fromEntries(Object.entries(player).map(([key, value]) => [key, { $literal: value }])),
-            scrapingOffsets: {
-              $setUnion: [
-                { $ifNull: ['$scrapingOffsets', []] },
-                { $ifNull: ['$pausedScrapingOffsets', []] },
-                [scrapingOffset],
-              ],
-            },
-            ...(initialScrape
-              ? {
-                  // Prepend, entries are stored newest first.
-                  hiscoreEntries: {
-                    $concatArrays: [[{ $literal: hiscoreEntry }], { $ifNull: ['$hiscoreEntries', []] }],
-                  },
-                }
-              : {}),
-          },
-        },
-        { $unset: ['pausedScrapingOffsets', 'hiscoreNotFoundSince', 'hiscoreNotFoundCount'] },
-      ],
+      buildRefreshUpdate(player, hiscoreEntry, scrapingOffset, initialScrape),
       {
         upsert: true,
         hint: { username: 1 },

@@ -9,7 +9,7 @@ this file.
 
 ## Commands
 
-- Verify: `npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build` (no tests).
+- Verify: `npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build && npm test`.
 - Dev server: `npm run start:dev` on port 3000, Swagger at `/swagger`. `.env` points at production data.
 - Worktrees in `.claude/worktrees/` use the main checkout's `node_modules` (found in a parent folder); run `npm ci` in
   one only when its `package.json` changes. Other sessions share port 3000: check `ss -ltn | grep :3000` before
@@ -25,9 +25,10 @@ this file.
 
 ## Where things live
 
-- `src/features/<feature>/` (items, news, players): controller, service and module per feature.
-- `src/common/` shared providers, injected by string token (Mongo, HTTP agent, XML parser), plus bot detection and route
-  labels; `src/middleware/` request logging and robots.
+- `src/features/<feature>/` (items, news, players): controller, service and module per feature; the player refresh and
+  `max-age` rules in `players/player.policy.ts`. Specs (`*.spec.ts`) sit next to the code.
+- `src/common/` shared providers, injected by string token (Mongo, HTTP agent, XML parser), plus bot detection, route
+  labels and the `Cache-Control` values (`http/cache-control.ts`); `src/middleware/` request logging and robots.
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.
 - `osrs-tracker-api.yaml` the Kubernetes manifest Flux applies; `.github/workflows/` `CI` (`nodejs.yml`) and `CD`
   (`deploy.yml`).

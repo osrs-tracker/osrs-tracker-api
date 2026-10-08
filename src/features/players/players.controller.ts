@@ -18,12 +18,12 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { addHours, differenceInHours, differenceInSeconds } from 'date-fns';
 import { Player } from '@osrs-tracker/models';
 import { Request, Response } from 'express';
 import { isBotRequest } from '../../common/bot/is-bot-request';
-import { MIN_PLAYER_REFRESH_HOURS } from './player.config';
+import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ParseUsernamePipe } from './parse-username.pipe';
+import { needsRefresh, playerMaxAgeSeconds } from './player.policy';
 import { PlayersService } from './players.service';
 
 @ApiTags('players')
@@ -34,7 +34,7 @@ export class PlayersController {
   constructor(private readonly playersService: PlayersService) {}
 
   @Get('')
-  @Header('Cache-Control', 'max-age=0, must-revalidate')
+  @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
   @ApiOperation({ summary: 'Get the last fetched players' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'scrapingOffset', required: false, type: Number })
@@ -69,15 +69,12 @@ export class PlayersController {
     const player = await this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
 
     if (player) {
-      response.setHeader(
-        'Cache-Control', // Set cache control to 15 minutes (900 seconds) or time until the minimum refresh time has passed
-        `max-age=${Math.max(0, Math.min(900, differenceInSeconds(addHours(player.lastModified, MIN_PLAYER_REFRESH_HOURS), new Date())))}`,
-      );
+      response.setHeader('Cache-Control', `max-age=${playerMaxAgeSeconds(player.lastModified, new Date())}`);
       return player;
     }
 
     // Not stored: preview the player live from the hiscores, without storing it.
-    response.setHeader('Cache-Control', 'max-age=0, must-revalidate');
+    response.setHeader('Cache-Control', CACHE_CONTROL.REVALIDATE);
 
     if (skipRefresh) throw new NotFoundException(`Player '${username}' not found`);
 
@@ -132,32 +129,30 @@ export class PlayersController {
     includeLatestHiscoreEntry: boolean,
     player: Player | null,
   ) {
-    const playerHasOffset = player?.scrapingOffsets?.includes(scrapingOffset);
-
-    if (
-      !player || // Player does not exist
-      !playerHasOffset || // Player does not have the requested scraping offset
-      differenceInHours(new Date(), player.lastModified) >= MIN_PLAYER_REFRESH_HOURS // Player is older than the refresh time
-    ) {
+    if (needsRefresh(player, scrapingOffset, new Date())) {
       this.logger.log(`Player '${username}' not found for offset '${scrapingOffset}' or outdated. Refreshing...`);
 
-      const result = await this.playersService.refreshPlayerInfo(username, scrapingOffset, !playerHasOffset);
+      const result = await this.playersService.refreshPlayerInfo(
+        username,
+        scrapingOffset,
+        !player?.scrapingOffsets?.includes(scrapingOffset), // Start tracking this offset with an initial entry
+      );
       if (result === 'notFound') throw new NotFoundException(`Player '${username}' not found`);
 
       if (result === 'failed') {
         if (!player) {
-          response.setHeader('Cache-Control', 'max-age=0, must-revalidate'); // Don't cache the outage
+          response.setHeader('Cache-Control', CACHE_CONTROL.REVALIDATE); // Don't cache the outage
           throw new ServiceUnavailableException(`The hiscores can't be reached, try again later.`);
         }
 
         this.logger.warn(`Couldn't refresh player '${username}', returning the stored player.`);
-        response.setHeader('Cache-Control', 'max-age=60'); // Retry the refresh soon
+        response.setHeader('Cache-Control', CACHE_CONTROL.PLAYER_REFRESH_FAILED);
         return { ...player, refreshFailed: true };
       }
 
       this.logger.log(`Player '${username}' refreshed successfully.`);
 
-      response.setHeader('Cache-Control', 'max-age=900'); // Set cache control to 900 seconds (15 minutes)
+      response.setHeader('Cache-Control', CACHE_CONTROL.PLAYER_REFRESHED);
       return this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry); // Retry fetching the player
     }
 
@@ -165,7 +160,7 @@ export class PlayersController {
   }
 
   @Get(':username/hiscores')
-  @Header('Cache-Control', 'max-age=0, must-revalidate')
+  @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
   @ApiOperation({ summary: "Get a player's hiscores by username" })
   @ApiParam({ name: 'username' })
   @ApiQuery({ name: 'scrapingOffset', required: false, type: Number })
