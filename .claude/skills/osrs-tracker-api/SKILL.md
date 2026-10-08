@@ -19,9 +19,10 @@ keep code rules here, not in the agent.
 - `src/common/` providers are injected by string token, exported as constants from their provider file
   (`MONGODB_DATABASE`, `MONGO_CLIENT`, `AGENT`, `XML_PARSER`): use the constant in `provide`, `@Inject` and
   `overrideProvider`, never the string. Outgoing requests use `fetch` from `undici` with `AGENT` (an `undici` `Agent`)
-  as `dispatcher` and an `AbortSignal.timeout`. `MongoModule` is global and closes the client on shutdown (bounded to
-  5s); new indexes go in `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy`
-  stays liveness only and never checks Mongo.
+  as `dispatcher` and a timeout: an `AbortSignal.timeout` (news feed 10s, images 20s), or for hiscores the shared
+  client's own (10s). `MongoModule` is global and closes the client on shutdown (bounded to 5s); new indexes go in
+  `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy` stays liveness only and
+  never checks Mongo.
 - The `players` and `items` collections, their fields, writers and index owners are described in osrs-tracker-aws's
   [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new or changed index or
   stored field also needs an update there: open an issue in osrs-tracker-aws.
@@ -46,8 +47,9 @@ keep code rules here, not in the agent.
 - TypeScript 6 only loads the `@types` packages listed in `tsconfig.json`'s `types` (`node`); add one there when its
   globals are needed. It resolves packages through `exports`, so a package that lists `types` after `require` gets its
   CJS typings (`@osrs-tracker/models` before 0.10.1).
-- `@osrs-tracker/models` is published from osrs-tracker-aws; right after a publish, bump with `--prefer-online`
-  (dist-tags lag).
+- `@osrs-tracker/models` (the stored shapes) and `@osrs-tracker/hiscores` (the hiscore client, also used by
+  process-players) are published from osrs-tracker-aws: a change to either is an issue there. Right after a publish,
+  bump with `--prefer-online` (dist-tags lag).
 - Request logs (`logger.middleware.ts`, JSON to Loki): 5xx `error`, 4xx `warn`, else `info`. A client that disconnects
   before the response is `warn` with `aborted: true` and no `status`; keep that shape, osrs-tracker-web logs the same.
 
@@ -125,22 +127,25 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   `src/app.e2e.spec.ts`, which boots `AppModule` with the Mongo and agent providers overridden by a fake database that
   records every collection call, and `undici`'s `fetch` mocked as a fake Jagex (no network). Vite's transformer emits
   Nest's decorator metadata from `tsconfig.json`, so no SWC plugin is needed.
-- Covered: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's pause/resume,
-  `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status (`PlayerUtils`; a hiscore without
-  the combat skills counts as failed, `hasCombatSkills`), the validation pipes `ParseUsernamePipe`,
-  `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip` and IDs), the hiscore
-  fan-out limits (`players.service.spec.ts` with `@osrs-tracker/hiscores` mocked: normal table first, shared in-flight
-  lookups, the preview's not-found cache, the concurrency cap; `Semaphore` in `common/concurrency/`), and per GET route
-  its `Cache-Control` and that it never writes, and that shutdown closes the Mongo client (`app.e2e.spec.ts`; a route's
-  header or a new GET route means changing its `CASES`). Changing one of those means changing its spec.
+- Covered: the env validation (`validateEnv`, `config/env.spec.ts`), the stored player's `max-age`, when a lookup
+  refreshes (`needsRefresh`), the refresh update's pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`),
+  combat level, type and status (`PlayerUtils`; a hiscore without the combat skills counts as failed,
+  `hasCombatSkills`), the validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe`
+  (`common/pipes/`, for `limit`, `size`, `skip` and IDs), the hiscore fan-out limits (`players.service.spec.ts` with
+  `@osrs-tracker/hiscores` mocked: normal table first, shared in-flight lookups, the preview's not-found cache, the
+  concurrency cap; `Semaphore` in `common/concurrency/`), and per GET route its `Cache-Control` and that it never
+  writes, and that shutdown closes the Mongo client (`app.e2e.spec.ts`; a route's header or a new GET route means
+  changing its `CASES`). Changing one of those means changing its spec.
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.
 
 ## Production testing
 
-Verify with the command in `CLAUDE.md`. For production testing, run locally with **ToxSick** as the test player: ask
-before writing to it, record its state and restore it afterwards.
+Verify with the command in `CLAUDE.md`. There is no development database, by choice (a local MongoDB was declined, #53):
+a local run uses production data, so stick to GETs, which never write. When a change needs a write (a POST lookup), use
+**ToxSick** as the test player: ask before writing to it, record its state and restore it afterwards. Automated tests
+never need a database: they run on fakes (Tests).
 
 ## Deploy
 

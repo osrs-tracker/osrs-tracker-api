@@ -132,7 +132,11 @@
 - README: fixed the license badge link, setup now starts from `.env.example` and warns that `.env` points at production
   data, and it describes the metrics/health server on port 9090 and the checks to run before committing. Added a short
   summary of the history before 2026/10/02 at the end of this changelog. The `Dockerfile` health check comment now names
-  the right file for `/healthy` (`src/app-metrics.controller.ts`, not `server.ts`).
+  the right file for `/healthy` (`src/app-metrics.controller.ts`, not `server.ts`). After the technical debt roadmap
+  (#37), `CLAUDE.md`, the README, the project skill and the conventions reviewer were checked against the code:
+  `CLAUDE.md` maps the new places (`src/config/`, `player.config.ts`, the `Semaphore`, the build and test config); the
+  skill covers `validateEnv`'s tests, the hiscore client's own timeout, both `@osrs-tracker` packages and that there's
+  no development database by choice; the reviewer also checks the Swagger and test rules.
 - Shared providers (database, HTTP agent, XML parser) are injected by exported constants instead of repeated strings, so
   a typo fails the build instead of startup.
 

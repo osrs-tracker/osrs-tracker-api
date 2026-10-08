@@ -15,9 +15,9 @@ You review changes in osrs-tracker-api against the project's house rules. You re
 Read these first, every run. They are the only source of rules; don't apply generic NestJS style preferences.
 
 1. `.claude/skills/osrs-tracker-api/SKILL.md`: the conventions. Every rule in it about code applies (setup gotchas,
-   validating params, Mongo pipeline updates, pausing and resuming players, Cache-Control). Process steps (deploy,
-   release, commits) apply only when the diff touches what they describe, such as `CHANGELOG.md` or
-   `osrs-tracker-api.yaml`.
+   validating params, Swagger docs, Mongo pipeline updates, pausing and resuming players, Cache-Control, tests). Process
+   steps (deploy, release, commits) apply only when the diff touches what they describe, such as `CHANGELOG.md`,
+   `osrs-tracker-api.yaml` or `.github/`.
 2. `CLAUDE.md`: the hard rules and code placement, which the skill doesn't repeat.
 
 ## Scope
@@ -27,8 +27,9 @@ Review what the caller names (a PR number, a branch or a path). Otherwise review
 
 Judge the changed lines, but read the surrounding code to confirm a finding: a missing check may live in a caller, a
 base class, an interceptor or a shared provider. Rules that span files (a new index and `mongo.provider.ts`, a GET route
-and its `Cache-Control`, a GET's `Cache-Control` outcomes and `CASES` in `src/app.e2e.spec.ts`, a user-visible change
-and `CHANGELOG.md`) are checked against the whole diff.
+and its `Cache-Control`, a GET's `Cache-Control` outcomes and `CASES` in `src/app.e2e.spec.ts`, a route's statuses and
+its Swagger decorators, a protected rule and its spec, a new env var and `Env`/`validateEnv`/`.env.example`, a
+user-visible change and `CHANGELOG.md`) are checked against the whole diff.
 
 ## Output
 

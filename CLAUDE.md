@@ -4,8 +4,8 @@ NestJS + MongoDB Atlas (native driver) API, deployed to Kubernetes at https://os
 consumer: the Angular SSR app in `../osrs-tracker-web`; `../osrs-tracker-aws` Lambdas also write to the same database.
 
 **Load the `osrs-tracker-api` skill before writing, reviewing, running, deploying or committing anything here.** It
-holds the Cache-Control, Mongo and player pause/resume rules, plus deploy and release steps. Keep detail there, not in
-this file.
+holds the Cache-Control, param validation, Swagger, Mongo, player pause/resume and test rules, plus deploy and release
+steps. Keep detail there, not in this file.
 
 ## Commands
 
@@ -28,13 +28,18 @@ this file.
 ## Where things live
 
 - `src/features/<feature>/` (items, news, players): controller, service and module per feature; the player refresh and
-  `max-age` rules in `players/player.policy.ts`, param pipes in `parse-*.pipe.ts`. Specs (`*.spec.ts`) sit next to the
-  code; `src/app.e2e.spec.ts` boots the app on fakes and lists every GET route's `Cache-Control`.
-- `src/common/` shared providers, injected by string token (Mongo, HTTP agent, XML parser), plus bot detection, route
-  labels, the `Cache-Control` values (`http/cache-control.ts`), `ParseIntRangePipe` (`pipes/`) and its Swagger
-  counterpart `ApiIntRangeQuery` (`swagger/`); `src/middleware/` request logging and robots.
+  `max-age` rules in `players/player.policy.ts`, its intervals and Jagex limits in `players/player.config.ts`, param
+  pipes in `parse-*.pipe.ts`. Specs (`*.spec.ts`) sit next to the code; `src/app.e2e.spec.ts` boots the app on fakes and
+  lists every GET route's `Cache-Control`.
+- `src/common/` shared providers, injected by the token constant exported from their provider file (Mongo, the `undici`
+  HTTP agent, XML parser), plus bot detection, route labels, the `Cache-Control` values (`http/cache-control.ts`),
+  `ParseIntRangePipe` (`pipes/`) and its Swagger counterpart `ApiIntRangeQuery` (`swagger/`), and the `Semaphore`
+  capping Jagex requests (`concurrency/`); `src/middleware/` request logging and robots.
+- `src/config/`: the env, validated at startup (`env.ts`, read through `ConfigService`), CORS and the Swagger document.
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.
-- `osrs-tracker-api.yaml` the Kubernetes manifest Flux applies; `.github/workflows/` `CI` (`nodejs.yml`) and `CD`
-  (`deploy.yml`).
+- Build and runtime: `rspack.config.js` (bundling), `Dockerfile` (image, `sharp` beside the bundle), `vitest.config.mjs`
+  (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies); `.github/workflows/` `CI` (`nodejs.yml`) and
+  `CD` (`deploy.yml`), `.github/dependabot.yml`.
 - `.claude/agents/conventions-reviewer.md` reviews diffs against the skill and this file;
-  `.claude/hooks/pre-push-check.sh` lints and prettier-checks the pushed checkout before every `git push`.
+  `.claude/hooks/pre-push-check.sh` lints and prettier-checks the pushed checkout before every `git push`, and
+  `.claude/settings.json` runs Prettier on every file Claude edits.

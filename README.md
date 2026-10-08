@@ -22,8 +22,9 @@ everything is stored in MongoDB. Which fields and indexes each of them owns is d
 ## Running it locally
 
 Copy `.env.example` to `.env` and fill in the MongoDB credentials (`MONGODB_URI`, `MONGODB_USERNAME`,
-`MONGODB_PASSWORD`). It also lists the optional settings (`CORS_ORIGIN`, `PORT`, `METRICS_PORT`, `NODE_ENV`). The API
-won't start while a required one is missing or a value is invalid; the error lists them all. Then run:
+`MONGODB_PASSWORD`); the database name and the OSRS API URL come prefilled. It also lists the optional settings
+(`CORS_ORIGIN`, `PORT`, `METRICS_PORT`, `NODE_ENV`). The API won't start while a required one is missing or a value is
+invalid; the error lists them all. Then run:
 
 ```bash
 npm ci
@@ -47,8 +48,9 @@ npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && n
 
 ## Built with
 
-NestJS 12, TypeScript 6, MongoDB and Node 24, deployed with Docker on Kubernetes. Merging to `main` deploys it: GitHub
-Actions builds the image and commits its digest to `osrs-tracker-api.yaml`, and Flux applies it to the cluster.
+NestJS 12, TypeScript 6, MongoDB and Node 24, bundled with rspack and tested with Vitest, deployed with Docker on
+Kubernetes. Merging to `main` deploys it: GitHub Actions builds the image and commits its digest to
+`osrs-tracker-api.yaml`, and Flux applies it to the cluster.
 
 ## Development
 
