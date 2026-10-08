@@ -30,6 +30,12 @@
   first push after a deploy: CI compares with the last commit it checked, skipping the deploy's digest commits. Pushes
   that only change `osrs-tracker-api.yaml` (deploy digests and rollbacks) don't run CI at all, so they don't start a CD
   run that skips.
+- Dependabot opens weekly update PRs: npm minor and patch updates grouped into one PR, majors separately (the `@nestjs`
+  packages together), GitHub Actions grouped, and the `node:24-alpine` base image, now pinned by digest so a rebuilt
+  image (Node patches, Alpine fixes) gets a PR. Node majors stay manual.
+- Stricter checks: TypeScript runs in `strict` mode and ESLint fails on floating promises and flags `any` (the code
+  already passed both). Removed unused dev dependencies (`@swc/cli`, `@swc/core`, `ts-node`, `tsconfig-paths`,
+  `source-map-support`), which also clears the only `npm audit` finding, and leftover lint globs and Jest globals.
 - Claude's pre-push lint check checks the worktree being pushed.
 - Project skill: when adding a changelog entry, reread the whole day, add subtitles once it's busy and merge entries
   about the same feature. Regrouped this day and 2026/10/07 that way.

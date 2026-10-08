@@ -1,0 +1,46 @@
+# Weekly update PRs. CI runs on them like on any PR; merging one deploys (it changes package*.json, Dockerfile or
+# .github/). Add their CHANGELOG.md entry when merging (see the osrs-tracker-api skill).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # A dependency goes into the first group it matches; majors outside a group get a PR each
+      minor-and-patch:
+        update-types: [minor, patch]
+      # The @nestjs packages only work at the same major, so their upgrade has to be one PR
+      nestjs-major:
+        patterns: ['@nestjs/*']
+        update-types: [major]
+    ignore:
+      # Matches the Node major in the Dockerfile and CI; bump it together with them
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directories: [/, /.github/actions/*]
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  # The base image is pinned by digest, so this opens a PR when node:24-alpine is rebuilt (Node patches, Alpine fixes)
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # Node majors also need CI's setup-node, engines and @types/node bumped: do them by hand
+      - dependency-name: node
+        update-types: [version-update:semver-major]

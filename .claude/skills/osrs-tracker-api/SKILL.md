@@ -110,6 +110,10 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 - `CHANGELOG.md`: newest day first. Busy days get `###` subtitles (by area, "Behind the scenes" last); extend an
   existing entry rather than add a near-duplicate, and don't repeat the subtitle in its entries. When adding an entry,
   reread the whole day: add subtitles once it's busy, and merge entries about the same feature.
+- Dependabot PRs (`.github/dependabot.yml`) carry no `CHANGELOG.md` entry, and merging one deploys. After merging,
+  commit the entry straight to `main` (docs only, no redeploy): one entry under that day's "Behind the scenes"
+  ("Dependency updates: …", naming notable bumps), extended for further ones that day. Base image PRs bump the digest in
+  both `FROM` lines.
 - GPG "Inappropriate ioctl for device": ask the user to run `echo test | gpg --clearsign > /dev/null` in their terminal.
 - If `gh pr edit` fails on a Projects (classic) error:
   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>`.
