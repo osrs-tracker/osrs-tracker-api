@@ -31,8 +31,9 @@ keep code rules here, not in the agent.
   runs when `AppModule` is imported) and in the cluster.
 - Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert).
 - `npm run build` bundles `node_modules` into `dist/` with webpack (only `sharp` is external; the image ships just
-  `dist/`). Nest CLI 12 only peers webpack and its plugins, so they're direct dev dependencies: a worktree finds the
-  main checkout's `node_modules` too, so check a build-tool change with `npm ci` in a copy outside the repo, like CI. An
+  `dist/` plus `sharp`, which the `Dockerfile` installs at the exact version `package.json` pins: keep it exact, with no
+  `^`). Nest CLI 12 only peers webpack and its plugins, so they're direct dev dependencies: a worktree finds the main
+  checkout's `node_modules` too, so check a build-tool change with `npm ci` in a copy outside the repo, like CI. An
   optional package a dependency imports lazily and tolerates missing fails the build with "Can't resolve": add it to
   `lazyImports` in `webpack.config.js`, under the exact specifier (Nest 12's ESM imports end in `.js`).
 - TypeScript 6 only loads the `@types` packages listed in `tsconfig.json`'s `types` (`node`); add one there when its
@@ -171,7 +172,8 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 ## Commit and push
 
 - PRs need the `build`, `lint` and `test` checks (the `main` ruleset); `build` and `test` report as skipped when CI
-  finds no source changes, which still passes.
+  finds no source changes, which still passes. `build` also builds the image and checks that `sharp` converts in it, so
+  a `Dockerfile` change is tested on the PR (CD only builds after merging, and there is no Docker locally).
 - `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push, watch its **CI**
   run (`gh run watch --exit-status`), not CD. A direct push to `main` with source changes deploys it. From a worktree,
   push with `git push origin HEAD:main`.
@@ -182,9 +184,11 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 - Dependabot PRs (`.github/dependabot.yml`) carry no `CHANGELOG.md` entry, and merging one deploys. After merging,
   commit the entry straight to `main` (docs only, no redeploy): one entry under that day's "Behind the scenes"
   ("Dependency updates: …", naming notable bumps), extended for further ones that day. Base image PRs bump the digest in
-  both `FROM` lines. npm majors are ignored in the config: upgrade them by hand from an issue, together with whatever
-  must move with them (e.g. NestJS 12 needed TypeScript 6). TypeScript `>=6.1` is ignored too, until `typescript-eslint`
-  allows it (its peer range is `<6.1.0`): drop that ignore when it does.
+  both `FROM` lines. Actions are pinned to commit SHAs with a `# vX.Y.Z` comment, which the actions PRs bump together:
+  pin a new action the same way (`gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`), never by tag. npm majors are
+  ignored in the config: upgrade them by hand from an issue, together with whatever must move with them (e.g. NestJS 12
+  needed TypeScript 6). TypeScript `>=6.1` is ignored too, until `typescript-eslint` allows it (its peer range is
+  `<6.1.0`): drop that ignore when it does.
 - GPG "Inappropriate ioctl for device": ask the user to run `echo test | gpg --clearsign > /dev/null` in their terminal.
 - If `gh pr edit` fails on a Projects (classic) error:
   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>`.

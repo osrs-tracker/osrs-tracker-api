@@ -24,7 +24,7 @@ jobs:
       code: ${{ steps.diff.outputs.code }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - id: diff
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-deps
       - run: npm run lint:ci
       - run: npm run prettier:ci
@@ -90,9 +90,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-deps
       - run: npm run build
+      # CD builds the image only after merging; build it here too, so a broken Dockerfile fails the PR, and check that
+      # the image's sharp (installed apart from the bundle) loads and converts as the node user
+      - name: Build the image
+        run: docker build -t osrs-tracker-api:ci .
+      - name: Check sharp in the image
+        run: |
+          docker run --rm --entrypoint node osrs-tracker-api:ci -e '
+            if (require("os").userInfo().username !== "node") throw new Error("not running as node");
+            const sharp = require("sharp");
+            sharp({ create: { width: 2, height: 2, channels: 3, background: "red" } }).webp().toBuffer()
+              .then((b) => console.log(`sharp ${sharp.versions.sharp} converted to ${b.length} bytes of webp`));'
 
   test:
     needs: changes
@@ -100,6 +111,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-deps
       - run: npm test

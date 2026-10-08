@@ -20,11 +20,12 @@ RUN npm run build
 # Stage 2: Setup production environment
 FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS production
 
-
 WORKDIR /app
 
-# Install runtime dependencies for Sharp
-RUN npm install --cpu=x64 --os=linux --libc=musl sharp@0.35.5
+# webpack keeps sharp external (webpack.config.js): install the version package.json pins
+COPY package.json /tmp/
+RUN npm install --cpu=x64 --os=linux --libc=musl sharp@$(node -p "require('/tmp/package.json').dependencies.sharp") \
+  && rm /tmp/package.json
 
 # Copy built application from the build stage
 COPY --from=build /app/dist .

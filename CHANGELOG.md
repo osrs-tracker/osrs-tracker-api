@@ -70,7 +70,12 @@
   run that skips.
 - Dependabot opens weekly update PRs: npm minor and patch updates grouped into one PR, GitHub Actions grouped, and the
   `node:24-alpine` base image, now pinned by digest so a rebuilt image (Node patches, Alpine fixes) gets a PR. npm and
-  Node majors aren't proposed: they need migration work, so they're done by hand from an issue.
+  Node majors aren't proposed: they need migration work, so they're done by hand from an issue. The GitHub Actions are
+  pinned to commit SHAs (with the version as a comment), so a moved tag can't change what runs with the Docker Hub
+  credentials and the deploy key; Dependabot's actions PRs bump the SHAs.
+- The image installs the `sharp` version `package.json` pins (now exactly 0.35.5) instead of a version written in the
+  `Dockerfile`, so a Dependabot `sharp` update reaches the image. CI now builds the image on every code change and
+  checks that its `sharp` converts an image, so a broken `Dockerfile` fails the PR instead of the deploy.
 - Stricter checks: TypeScript runs in `strict` mode and ESLint fails on floating promises and flags `any` (the code
   already passed both). Removed unused dev dependencies (`@swc/cli`, `@swc/core`, `ts-node`, `tsconfig-paths`,
   `source-map-support`), which also clears the only `npm audit` finding, and leftover lint globs and Jest globals.
