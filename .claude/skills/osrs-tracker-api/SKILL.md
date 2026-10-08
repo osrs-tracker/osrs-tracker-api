@@ -2,9 +2,10 @@
 name: osrs-tracker-api
 description: >-
   Repo-specific rules for the osrs-tracker-api NestJS/MongoDB service: Cache-Control rules for the web app's SSR
-  transfer cache, Mongo pipeline-update pitfalls, the player pause/resume contract, production testing, and the GitHub
-  Actions → Flux deploy. Use when adding or changing endpoints, Cache-Control headers or player/item writes, testing
-  against production data, or building, deploying, committing, pushing, releasing or shipping this repo.
+  transfer cache, Mongo pipeline-update pitfalls, the player pause/resume contract, unit tests (Vitest), production
+  testing, and the GitHub Actions → Flux deploy. Use when adding or changing endpoints, Cache-Control headers or
+  player/item writes, writing or running tests, testing against production data, or building, deploying, committing,
+  pushing, releasing or shipping this repo.
 ---
 
 # osrs-tracker-api
@@ -80,7 +81,8 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   `ParseUsernamePipe`. Changing one of those means changing its spec.
 - Not covered: which `Cache-Control` each route sends and that GETs never write (the `conventions-reviewer` agent checks
   them), and anything against a real database.
-- In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'.
+- In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
+  CI's `changes` job, like `src/`, so changing it runs build and test.
 
 ## Production testing
 
@@ -129,6 +131,8 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 
 ## Commit and push
 
+- PRs need the `build`, `lint` and `test` checks (the `main` ruleset); `build` and `test` report as skipped when CI
+  finds no source changes, which still passes.
 - `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push, watch its **CI**
   run (`gh run watch --exit-status`), not CD. A direct push to `main` with source changes deploys it.
 - Conventional commits. `chore(deploy)` is reserved for the CD workflow's digest commits (it skips them).
