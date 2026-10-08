@@ -22,6 +22,8 @@ export class NewsController {
   @ApiOperation({ summary: 'Get recent news articles' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getRecentNews(@Query('limit', new DefaultValuePipe(4), ParseIntPipe) limit: number) {
+    if (limit < 1 || limit > 50) throw new BadRequestException('Limit must be between 1 and 50.');
+
     return this.newsService.getRecentNews(limit);
   }
 

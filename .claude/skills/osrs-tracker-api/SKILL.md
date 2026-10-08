@@ -16,7 +16,11 @@ keep code rules here, not in the agent.
 ## Setup gotchas
 
 - `src/common/` providers are injected by string token (`'MONGODB_DATABASE'`, `'MONGO_CLIENT'`, `'AGENT'`,
-  `'XML_PARSER'`). `MongoModule` is global; new indexes go in `mongo.provider.ts`.
+  `'XML_PARSER'`). `MongoModule` is global; new indexes go in `mongo.provider.ts`, the only place the API creates
+  indexes (never per request).
+- The `players` and `items` collections, their fields, writers and index owners are described in osrs-tracker-aws's
+  [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new or changed index or
+  stored field also needs an update there: open an issue in osrs-tracker-aws.
 - Env: `.env.example` lists the vars, `.env` holds local values (points at prod). In the cluster they come from the
   `aws-mongodb-credentials` secret, with the `env:` block in `osrs-tracker-api.yaml` overriding `OSRS_API_BASE_URL` (an
   API Gateway proxy to `https://secure.runescape.com` that passes Jagex's headers through).
@@ -33,10 +37,12 @@ with `$concatArrays` (stored newest first), merge offsets with `$setUnion`, keep
 
 ## Pausing and resuming players
 
-The Lambda pauses players whose hiscores keep 404ing (`pausedScrapingOffsets`, `hiscoreNotFoundSince`,
-`hiscoreNotFoundCount`). In `refreshPlayerInfo`:
+The full contract with the `process-players` Lambda (which pauses players whose hiscores keep 404ing) is in
+[`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). The API's side, in
+`refreshPlayerInfo`:
 
-- Success: resume in the same update — merge `pausedScrapingOffsets` into `scrapingOffsets`, unset the three fields.
+- Success: resume in the same update — merge `pausedScrapingOffsets` into `scrapingOffsets`, unset it,
+  `hiscoreNotFoundSince` and `hiscoreNotFoundCount`.
 - Not found (404/400 on the normal table) or failed (any other status, network error, timeout, or any of the four tables
   failing): write nothing and leave them alone. **Never** count 404s here; the Lambda owns that bookkeeping.
 - `POST /players/:username/lookup` answers 404 only for not found. Failed returns the stored player with

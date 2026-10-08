@@ -16,6 +16,7 @@ type HiscoreResult = { status: 'found'; hiscore: PartialHiscoreEntry } | { statu
 
 export type RefreshResult = 'refreshed' | 'notFound' | 'failed';
 
+/** Usernames passed in are expected normalized, as `ParseUsernamePipe` returns them. */
 @Injectable()
 export class PlayersService {
   private readonly COLLECTION_NAME = 'players';
@@ -32,14 +33,10 @@ export class PlayersService {
   ) {}
 
   async getPlayer(
-    _username: string,
+    username: string,
     scrapingOffset: number,
     includeLatestHiscoreEntry: boolean,
   ): Promise<Player | null> {
-    const username = PlayerUtils.normalizeUsername(_username);
-
-    await this.collection.createIndex({ username: 1 }, { unique: true });
-
     const player = await this.collection.findOne<Player>(
       { username: username },
       {
@@ -54,7 +51,7 @@ export class PlayersService {
           type: 1,
           scrapingOffsets: 1,
           pausedScrapingOffsets: 1, // Still tracked (they have a history), resumed by the next successful refresh
-          hiscoreEntries: includeLatestHiscoreEntry ? { $elemMatch: { scrapingOffset } } : undefined,
+          ...(includeLatestHiscoreEntry ? { hiscoreEntries: { $elemMatch: { scrapingOffset } } } : {}),
           // Date of the oldest stored entry for this offset (entries are stored newest first). The clean-hiscores Lambda
           // removes entries older than MAX_AGE_IN_DAYS, so this is where the history starts, not when tracking started.
           trackedSince: {
@@ -86,15 +83,11 @@ export class PlayersService {
   }
 
   async getPlayerHiscores(
-    _username: string,
+    username: string,
     scrapingOffset: number,
     size: number,
     skip: number,
   ): Promise<HiscoreEntry[] | null> {
-    const username = PlayerUtils.normalizeUsername(_username);
-
-    await this.collection.createIndex({ username: 1 }, { unique: true });
-
     // Retrieve the player's hiscores
     const player = await this.collection
       .aggregate<Player>([
@@ -125,11 +118,7 @@ export class PlayersService {
   }
 
   /** Records a visitor's lookup for the recent players list. Doesn't create unknown players. */
-  async recordLookup(_username: string): Promise<void> {
-    const username = PlayerUtils.normalizeUsername(_username);
-
-    await this.collection.createIndex({ username: 1 }, { unique: true });
-
+  async recordLookup(username: string): Promise<void> {
     await this.collection.updateOne(
       { username: username },
       { $set: { lastHiscoreFetch: new Date() } },
@@ -230,9 +219,7 @@ export class PlayersService {
    * @param initialScrape If true, will also add an initial `hiscoreEntry` for this `scrapingOffset`.
    * @returns `notFound` when the player isn't on the normal hiscores, `failed` when the hiscores couldn't be reached.
    */
-  async refreshPlayerInfo(_username: string, scrapingOffset: number, initialScrape: boolean): Promise<RefreshResult> {
-    const username = PlayerUtils.normalizeUsername(_username);
-
+  async refreshPlayerInfo(username: string, scrapingOffset: number, initialScrape: boolean): Promise<RefreshResult> {
     // Never upsert a name that isn't a valid OSRS name (e.g. a double URL-encoded one that the hiscores still resolve).
     if (!PlayerUtils.isValidUsername(username)) throw new Error(`Refusing to store invalid username '${username}'`);
 
@@ -290,12 +277,10 @@ export class PlayersService {
    * since a missing table would otherwise look like the player not being on it and change their type.
    */
   private async determinePlayerStatusAndType(
-    _username: string,
+    username: string,
   ): Promise<
     { status: 'found'; player: Player; partialHiscoreEntry: PartialHiscoreEntry } | { status: 'notFound' | 'failed' }
   > {
-    const username = PlayerUtils.normalizeUsername(_username);
-
     const results = await Promise.all([
       this.getHiscore(username, PlayerType.Normal),
       this.getHiscore(username, PlayerType.Ironman),
