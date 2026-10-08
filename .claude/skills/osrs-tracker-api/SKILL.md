@@ -58,7 +58,9 @@ The full contract with the `process-players` Lambda (which pauses players whose 
 Set it deliberately on every GET. The web app's SSR transfer cache **drops `no-store`, `no-cache` and `private`
 responses**, making the UI flash back to skeletons on hydration — never use them. Values come from `CACHE_CONTROL` in
 `src/common/http/cache-control.ts`; add new ones there, not as inline strings (only the stored player's dynamic
-`max-age` is built in place).
+`max-age` is built in place). Enforced in CI: ESLint's `no-restricted-syntax` (`eslint.config.mjs`) rejects the three
+banned words in any string in `src/`, and `src/app.e2e.spec.ts` requests every GET route and checks its exact
+`Cache-Control` and that it doesn't write. A new GET route fails that spec until it gets a case in its `CASES`.
 
 - Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/news/image` 604800).
 - Routes that fetch Jagex live (`/news`, `/news/image`) set it with `res.setHeader` after the fetch succeeds, not with
@@ -75,12 +77,15 @@ Vitest, only for complex or important logic, never for coverage. Break the prote
 fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
 
 - Specs sit next to the code as `src/**/*.spec.ts` and import from `vitest`. They don't need Nest, Express or Mongo:
-  move a rule into a pure function first (like `player.policy.ts`), then test that.
+  move a rule into a pure function first (like `player.policy.ts`), then test that. The exception is
+  `src/app.e2e.spec.ts`, which boots `AppModule` with the Mongo and agent providers overridden by a fake database that
+  records every collection call, and `node-fetch` mocked as a fake Jagex (no network). Vite's transformer emits Nest's
+  decorator metadata from `tsconfig.json`, so no SWC plugin is needed.
 - Covered: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's pause/resume,
   `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status (`PlayerUtils`) and
-  `ParseUsernamePipe`. Changing one of those means changing its spec.
-- Not covered: which `Cache-Control` each route sends and that GETs never write (the `conventions-reviewer` agent checks
-  them), and anything against a real database.
+  `ParseUsernamePipe`, and per GET route its `Cache-Control` and that it never writes (`app.e2e.spec.ts`; a route's
+  header or a new GET route means changing its `CASES`). Changing one of those means changing its spec.
+- Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.
 

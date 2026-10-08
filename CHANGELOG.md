@@ -67,7 +67,9 @@
   web app's caching: the stored player's `max-age`, when a lookup refreshes a player, the refresh update that resumes
   paused players, the combat level, type and status calculations, and username validation. The first three moved out of
   the players controller and service into `player.policy.ts`, and every `Cache-Control` value is a named constant;
-  responses are unchanged.
+  responses are unchanged. A test also boots the whole API against a fake database and fake Jagex and requests every GET
+  route: each must send its expected `Cache-Control` and must not write to the database, and a new GET route fails it
+  until it's added there. ESLint rejects `no-store`, `no-cache` and `private` anywhere in a string in `src/`.
 - Dependency updates: `eslint` 10.12.0 and `typescript-eslint` 8.71.1 (lint tooling only).
 - Claude's pre-push lint check checks the worktree being pushed.
 - Small cleanups: a log line's missing quote, the player refresh interval as a named constant
