@@ -47,6 +47,11 @@
 - A hiscore response from Jagex that is missing skills now counts as a failed lookup (503, or the stored player with
   `refreshFailed: true`) instead of an error (500), and can no longer store a wrong combat level.
 
+### Items
+
+- `GET /items/search/:query` answers `200 []` when nothing matches, instead of a `204` with no body (thrown as an error,
+  which dropped its message). It's still `public, max-age=3600`. The web app already treats both as no results.
+
 ### News
 
 - `GET /news?limit=N` only accepts 1 to 50, like the other lists, and answers 400 otherwise (`limit=-1` used to return
@@ -94,9 +99,9 @@
 - Query and route param validation (`limit`, `size`, `skip`, `scrapingOffset` and item IDs) lives in two shared, tested
   pipes instead of checks repeated in every handler. Status codes and error messages are unchanged.
 - The Swagger docs (`/swagger`, local only) now list every route's responses: each status it can answer (including `204`
-  for bots and empty searches, `404` vs `503` for players, and the unknown player's preview), with its `Cache-Control`,
-  taken from the same constants the routes send. `limit`, `size`, `skip`, `scrapingOffset` and item IDs show their range
-  and default, read from the validation pipes' options so the docs can't drift from the checks.
+  for bots, `404` vs `503` for players, and the unknown player's preview), with its `Cache-Control`, taken from the same
+  constants the routes send. `limit`, `size`, `skip`, `scrapingOffset` and item IDs show their range and default, read
+  from the validation pipes' options so the docs can't drift from the checks.
 - Upgraded to NestJS 12 (`@nestjs/*` 12, `@nestjs/config` 12, `@nestjs/swagger` 12) and TypeScript 6.0; responses, logs
   and graceful shutdown are unchanged. Swagger 12 brings the patched `js-yaml` itself, so the `overrides` entry for it
   is gone. `@osrs-tracker/models` 0.10.1 lists its types first in `exports`, which TypeScript 6 needs, and
@@ -108,6 +113,9 @@
   the bundle is 6.1 MB instead of 6.7 MB. Responses, Swagger's document, logs and graceful shutdown are unchanged. The
   build still fails on type errors, CI's only type check, and now also fails if the type checker is missing instead of
   silently skipping it. `npm run start:dev` still compiles with `tsc`.
+- Outgoing requests (hiscores, the news feed and news images) use `undici`'s `fetch` instead of `node-fetch`, which
+  hasn't had a release since 2023. Keep-alive and the limit of 50 connections per host stay, and so do the timeouts. The
+  10 MB news image limit now counts the bytes as they arrive and stops the download as soon as an image goes over it.
 - Settings are read once, validated, through Nest's `ConfigService` (`src/config/env.ts`) instead of `process.env` in
   six files. `.env` is loaded once instead of twice, and CORS no longer depends on which module happens to load it
   first.
