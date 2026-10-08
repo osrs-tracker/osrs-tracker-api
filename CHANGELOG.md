@@ -51,8 +51,9 @@
   they deploy) builds and pushes the image and commits its digest to `osrs-tracker-api.yaml` as `github-actions[bot]`
   (the committer email had the wrong user ID). The cluster applies it on its own, and the workflow then checks that the
   deploy succeeded and smoke tests routes the API serves itself (`/items`, `/items/4151`, a 404), so a Jagex outage
-  doesn't fail a good deploy. Rolling back is reverting the digest commit. Images are only built and pushed this way:
-  the `docker:build` and `docker:push` scripts are gone.
+  doesn't fail a good deploy. A deploy no longer reports failure when another push lands on `main` before the cluster
+  applies it. Rolling back is reverting the digest commit. Images are only built and pushed this way: the `docker:build`
+  and `docker:push` scripts are gone.
 - Pushes that don't change the code or the image (documentation, for example) don't rebuild or redeploy, including the
   first push after a deploy: CI compares with the last commit it checked, skipping the deploy's digest commits. Pushes
   that only change `osrs-tracker-api.yaml` (deploy digests and rollbacks) don't run CI at all, so they don't start a CD
