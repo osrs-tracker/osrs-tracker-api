@@ -65,6 +65,9 @@ The full contract with the `process-players` Lambda (which pauses players whose 
   failing): write nothing and leave them alone. **Never** count 404s here; the Lambda owns that bookkeeping.
 - `POST /players/:username/lookup` answers 404 only for not found. Failed returns the stored player with
   `refreshFailed: true`, or 503 when the player isn't stored.
+- Hiscore lookups go through `determinePlayerStatusAndType`, which asks the normal table first, shares lookups in flight
+  per name and caps requests to Jagex per pod (`player.config.ts`); only previews read the not-found cache. Don't add a
+  path to Jagex around it: the proxy is shared with process-players.
 - GETs never write: `GET /players/:username` returns a stored player as stored (stale or not, never refreshed), and an
   unknown player as a live preview from `determinePlayerStatusAndType` that isn't stored (`scrapingOffsets: []`,
   `trackedSince: null`), 404 only for not found and 503 when the hiscores fail. `skipRefresh` skips the preview (404).
@@ -104,8 +107,10 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
 - Covered: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's pause/resume,
   `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status (`PlayerUtils`), the validation
   pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`,
-  `skip` and IDs), and per GET route its `Cache-Control` and that it never writes (`app.e2e.spec.ts`; a route's header
-  or a new GET route means changing its `CASES`). Changing one of those means changing its spec.
+  `skip` and IDs), the hiscore fan-out limits (`players.service.spec.ts` with `@osrs-tracker/hiscores` mocked: normal
+  table first, shared in-flight lookups, the preview's not-found cache, the concurrency cap; `Semaphore` in
+  `common/concurrency/`), and per GET route its `Cache-Control` and that it never writes (`app.e2e.spec.ts`; a route's
+  header or a new GET route means changing its `CASES`). Changing one of those means changing its spec.
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.

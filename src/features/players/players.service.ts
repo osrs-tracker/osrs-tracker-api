@@ -2,8 +2,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { getHiscore, HiscoreResult } from '@osrs-tracker/hiscores';
 import { HiscoreEntry, Player, PlayerType } from '@osrs-tracker/models';
 import { Agent } from 'https';
+import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
 import fetch from 'node-fetch';
+import { Semaphore } from '../../common/concurrency/semaphore';
+import { MAX_CONCURRENT_HISCORE_REQUESTS, NOT_FOUND_CACHE_MAX, NOT_FOUND_CACHE_TTL_MS } from './player.config';
 import { buildRefreshUpdate } from './player.policy';
 import { PlayerUtils } from './player.utils';
 
@@ -11,11 +14,24 @@ type PartialHiscoreEntry = Pick<HiscoreEntry, 'skills' | 'activities'>;
 
 export type RefreshResult = 'refreshed' | 'notFound' | 'failed';
 
+type PlayerStatusAndType =
+  { status: 'found'; player: Player; partialHiscoreEntry: PartialHiscoreEntry } | { status: 'notFound' | 'failed' };
+
 /** Usernames passed in are expected normalized, as `ParseUsernamePipe` returns them. */
 @Injectable()
 export class PlayersService {
   private readonly COLLECTION_NAME = 'players';
   private readonly logger = new Logger(PlayersService.name);
+
+  /** Caps the requests to Jagex, so a burst of lookups can't get the proxy (shared with process-players) throttled. */
+  private readonly hiscoreRequests = new Semaphore(MAX_CONCURRENT_HISCORE_REQUESTS);
+  /** Hiscore lookups in flight by username, shared by concurrent previews and refreshes of one name. */
+  private readonly pendingLookups = new Map<string, Promise<PlayerStatusAndType>>();
+  /** Names recently not on the hiscores, so repeated previews (crawlers, SSR) don't ask Jagex again. */
+  private readonly notFoundNames = new LRUCache<string, true>({
+    max: NOT_FOUND_CACHE_MAX,
+    ttl: NOT_FOUND_CACHE_TTL_MS,
+  });
 
   get collection(): Collection<Player> {
     return this.db.collection(this.COLLECTION_NAME);
@@ -179,8 +195,11 @@ export class PlayersService {
     scrapingOffset: number,
     includeLatestHiscoreEntry: boolean,
   ): Promise<{ status: 'found'; player: Player } | { status: 'notFound' | 'failed' }> {
+    if (this.notFoundNames.has(username)) return { status: 'notFound' };
+
     const result = await this.determinePlayerStatusAndType(username);
 
+    if (result.status === 'notFound') this.notFoundNames.set(username, true);
     if (result.status !== 'found') return result;
 
     const { player, partialHiscoreEntry } = result;
@@ -243,55 +262,64 @@ export class PlayersService {
     return 'refreshed';
   }
 
+  /** Shares the lookup of `username` with any already in flight, so concurrent requests for one name ask Jagex once. */
+  private determinePlayerStatusAndType(username: string): Promise<PlayerStatusAndType> {
+    let pending = this.pendingLookups.get(username);
+    if (!pending) {
+      pending = this.fetchPlayerStatusAndType(username).finally(() => this.pendingLookups.delete(username));
+      this.pendingLookups.set(username, pending);
+    }
+    return pending;
+  }
+
   /**
-   * Determines the player's type and status from the four hiscore tables. Fails when any table couldn't be reached,
+   * Determines the player's type and status from the four hiscore tables: the normal table first, which settles
+   * `notFound` and `failed` in one request, then the three ironman tables. Fails when any table couldn't be reached,
    * since a missing table would otherwise look like the player not being on it and change their type.
    */
-  private async determinePlayerStatusAndType(
-    username: string,
-  ): Promise<
-    { status: 'found'; player: Player; partialHiscoreEntry: PartialHiscoreEntry } | { status: 'notFound' | 'failed' }
-  > {
+  private async fetchPlayerStatusAndType(username: string): Promise<PlayerStatusAndType> {
+    const normalResult = await this.getHiscore(username, PlayerType.Normal);
+    if (normalResult.status !== 'found') return { status: normalResult.status };
+
     const results = await Promise.all([
-      this.getHiscore(username, PlayerType.Normal),
       this.getHiscore(username, PlayerType.Ironman),
       this.getHiscore(username, PlayerType.Ultimate),
       this.getHiscore(username, PlayerType.Hardcore),
     ]);
 
-    if (results[0].status === 'notFound') return { status: 'notFound' };
     if (results.some((result) => result.status === 'failed')) return { status: 'failed' };
 
-    const [normal, ironman, ultimate, hardcore] = results.map((result) =>
-      result.status === 'found' ? result.hiscore : null,
-    );
+    const normal = normalResult.hiscore;
+    const [ironman, ultimate, hardcore] = results.map((result) => (result.status === 'found' ? result.hiscore : null));
 
     return {
       status: 'found',
       player: {
         username,
-        combatLevel: PlayerUtils.getCombatLevel(normal!.skills),
+        combatLevel: PlayerUtils.getCombatLevel(normal.skills),
         type: PlayerUtils.determineType(ironman, ultimate, hardcore),
         status: PlayerUtils.determineStatus(normal, ironman, ultimate),
         diedAsHardcore: PlayerUtils.getTotalXp(hardcore) < PlayerUtils.getTotalXp(ironman),
         lastModified: new Date(),
       } as Player,
       // Only what the model stores, like process-players (the hiscores JSON also echoes the queried `name`).
-      partialHiscoreEntry: { skills: normal!.skills, activities: normal!.activities },
+      partialHiscoreEntry: { skills: normal.skills, activities: normal.activities },
     };
   }
 
   /**
    * Fetches one hiscore table with the shared client from `@osrs-tracker/hiscores` (see its `HiscoreResult`), through
-   * the shared agent, and logs why it failed.
+   * the shared agent and within the concurrency cap, and logs why it failed.
    */
   private async getHiscore(username: string, type: PlayerType): Promise<HiscoreResult> {
-    const result = await getHiscore({
-      baseUrl: process.env.OSRS_API_BASE_URL!,
-      username,
-      table: PlayerUtils.getHiscoreTable(type),
-      fetch: (url, init) => fetch(url, { ...init, agent: this.agent }),
-    });
+    const result = await this.hiscoreRequests.run(() =>
+      getHiscore({
+        baseUrl: process.env.OSRS_API_BASE_URL!,
+        username,
+        table: PlayerUtils.getHiscoreTable(type),
+        fetch: (url, init) => fetch(url, { ...init, agent: this.agent }),
+      }),
+    );
 
     if (result.status === 'failed') this.logger.warn(`Hiscores (${type}) failed for '${username}': ${result.reason}`);
 
