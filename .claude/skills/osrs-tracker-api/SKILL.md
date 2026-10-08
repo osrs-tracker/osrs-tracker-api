@@ -57,14 +57,10 @@ responses**, making the UI flash back to skeletons on hydration — never use th
 - `/players/:username`: stored players get a dynamic `max-age`, clamped to `[0, 900]` and capped at the time until the
   refresh window; the preview of an unknown player and the 503 get `max-age=0, must-revalidate`.
 
-## Verify
+## Production testing
 
-```bash
-npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build
-```
-
-No tests. For production testing, run locally with **ToxSick** as the test player: ask before writing to it, record its
-state and restore it afterwards.
+Verify with the command in `CLAUDE.md`; there are no tests. For production testing, run locally with **ToxSick** as the
+test player: ask before writing to it, record its state and restore it afterwards.
 
 ## Deploy
 
@@ -106,14 +102,11 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 
 ## Commit and push
 
-- Doc-only changes go straight to `main`. Otherwise, outside a release, **ask every time**: `main` or a PR. The admin
-  account bypasses `main`'s PR rule; after a direct push, `gh run watch --exit-status`. A direct push to `main` with
-  source changes deploys it.
+- `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push,
+  `gh run watch --exit-status`. A direct push to `main` with source changes deploys it.
 - Conventional commits. `chore(deploy)` is reserved for the CD workflow's digest commits (it skips them).
-- **Every change gets a `CHANGELOG.md` entry** under `## YYYY/MM/DD`, newest first. Busy days get `###` subtitles (by
-  area, "Behind the scenes" last); extend an existing entry rather than add a near-duplicate, and don't repeat the
-  subtitle in its entries.
+- `CHANGELOG.md`: newest day first. Busy days get `###` subtitles (by area, "Behind the scenes" last); extend an
+  existing entry rather than add a near-duplicate, and don't repeat the subtitle in its entries.
 - GPG "Inappropriate ioctl for device": ask the user to run `echo test | gpg --clearsign > /dev/null` in their terminal.
-  Never `--no-gpg-sign`.
 - If `gh pr edit` fails on a Projects (classic) error:
   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>`.
