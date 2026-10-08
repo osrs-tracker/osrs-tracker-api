@@ -3,7 +3,7 @@ name: CD
 run-name: ${{ github.event.workflow_run.display_title }}
 
 # Builds and pushes the image, then commits its digest to `osrs-tracker-api.yaml` on main. Flux in the cluster applies
-# that commit and reports the rollout as the `Flux / deploy` commit status. Nothing here has cluster access.
+# that commit and reports the rollout as the `Flux / sync` commit status. Nothing here has cluster access.
 on:
   workflow_run:
     workflows: ['CI']
@@ -147,15 +147,15 @@ jobs:
           deadline=$((SECONDS + 600))
           while :; do
             status=$(gh api "repos/$REPO/commits/$COMMIT/status" \
-              --jq '[.statuses[] | select(.context == "Flux / deploy") | "\(.state) \(.description)"] | first // ""' \
+              --jq '[.statuses[] | select(.context == "Flux / sync") | "\(.state) \(.description)"] | first // ""' \
               || true)
-            echo "Flux / deploy on $COMMIT: ${status:-no status yet}"
+            echo "Flux / sync on $COMMIT: ${status:-no status yet}"
             case "${status%% *}" in
               success) exit 0 ;;
               failure | error) echo "::error::Flux failed to deploy $COMMIT: $status"; exit 1 ;;
             esac
             if [ "$SECONDS" -ge "$deadline" ]; then
-              echo "::error::No successful Flux / deploy status on $COMMIT after 10 minutes"
+              echo "::error::No successful Flux / sync status on $COMMIT after 10 minutes"
               exit 1
             fi
             sleep 15

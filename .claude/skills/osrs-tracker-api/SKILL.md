@@ -74,7 +74,7 @@ changes within 10 minutes.
    it to Docker Hub as `freekmencke/osrs-tracker-api:latest` and `:<commit sha>`, and commits the digest to the `image:`
    line as `chore(deploy): deploy sha256:<first 8>` (pushed with the `DEPLOY_KEY` deploy key, which bypasses the PR
    rule). Pushes without source or image changes (docs, the digest commits) skip `build` and so don't deploy.
-2. Flux applies that commit within a minute and reports the rollout as the `Flux / deploy` commit status (failures also
+2. Flux applies that commit within a minute and reports the rollout as the `Flux / sync` commit status (failures also
    reach Discord). The workflow waits up to 10 minutes for it, then checks that `/news` and `/items` on
    `https://osrs-tracker-api.freekmencke.com` answer 200.
 3. Follow it with `gh run watch` on the `CD` run, then smoke test the changed routes yourself:
