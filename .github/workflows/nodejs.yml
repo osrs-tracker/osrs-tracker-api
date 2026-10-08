@@ -4,7 +4,8 @@ on:
   push:
     branches: ['main']
     # Digest commits (and rollbacks) only change the manifest; skipping CI for them also skips the CD run it would
-    # trigger. Not on pull_request: required checks that never report would block the PR.
+    # trigger. Not on pull_request: required checks that never report would block the PR. Keep in step with the
+    # manifest pattern in the changes job.
     paths-ignore: ['osrs-tracker-api.yaml']
   pull_request:
     branches: ['main']
@@ -37,6 +38,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
+          # Digest commits get no CI run (paths-ignore above), so they have no results to compare with. Step back past
+          # them to the last commit that went through CI, or the next push would rebuild (and redeploy) even for docs.
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ -n "$BEFORE" ]; then
+            for _ in 1 2 3 4 5; do
+              only=$(git diff --name-only "$BEFORE^" "$BEFORE" 2>/dev/null) || break
+              printf '%s\n' "$only" | grep -q -v -E '^osrs-tracker-api\.yaml$' && break
+              echo "$BEFORE only changes the manifest (no CI run), comparing with its parent."
+              BEFORE=$(git rev-parse "$BEFORE^")
+            done
+          fi
           if [ -z "$BEFORE" ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ] \
             || ! files=$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null); then
             echo "No previous commit to compare with, running everything."
