@@ -1,8 +1,10 @@
 import { FactoryProvider } from '@nestjs/common';
 import { Agent } from 'https';
 
+export const AGENT = 'AGENT';
+
 export const agentProvider: FactoryProvider = {
-  provide: 'AGENT',
+  provide: AGENT,
   useFactory: () =>
     new Agent({
       keepAlive: true,

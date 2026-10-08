@@ -1,6 +1,15 @@
 import { HiscoreTable } from '@osrs-tracker/hiscores';
 import { HiscoreEntry, HiscoreSkill, PlayerStatus, PlayerType } from '@osrs-tracker/models';
 
+/**
+ * Total xp of a player who isn't on a table: higher than any real total, so a missing table never compares as less.
+ * `determineStatus` (de-ironed, de-ultimated) and `diedAsHardcore` rely on that to only compare tables the player is on.
+ */
+export const NOT_ON_TABLE_XP = Number.MAX_SAFE_INTEGER;
+
+/** Overall plus the seven combat skills `getCombatLevel` reads by position. */
+export const MIN_HISCORE_SKILLS = 8;
+
 export class PlayerUtils {
   /** OSRS display names: 1-12 letters, numbers, spaces, hyphens and underscores (after normalizing to lowercase). */
   private static readonly USERNAME_REGEX = /^[a-z0-9 _-]{1,12}$/;
@@ -27,7 +36,7 @@ export class PlayerUtils {
     }
   }
 
-  /** Calculates the combat level from the skills. */
+  /** Calculates the combat level from the skills (`hasCombatSkills` must hold). */
   static getCombatLevel(skills: HiscoreSkill[]): number {
     // default to level 1 when not found (-1)
     const attack = Math.max(1, skills[1].level);
@@ -44,6 +53,14 @@ export class PlayerUtils {
     const mage = 0.325 * (Math.floor(magic / 2) + magic);
 
     return Math.floor(base + Math.max(melee, range, mage));
+  }
+
+  /** Whether a hiscore has overall and the combat skills with a numeric level, as `getCombatLevel` reads them. */
+  static hasCombatSkills(skills: Pick<HiscoreSkill, 'level'>[]): boolean {
+    return (
+      skills.length >= MIN_HISCORE_SKILLS &&
+      skills.slice(0, MIN_HISCORE_SKILLS).every((skill) => typeof skill?.level === 'number')
+    );
   }
 
   /** Determines the original playerType from the tables the player is on. Only works when the player has enough xp to appear in the hiscores. */
@@ -69,8 +86,8 @@ export class PlayerUtils {
     return PlayerStatus.Default;
   }
 
-  /** Total xp of a hiscore entry, so we can compare hiscores. */
+  /** Total xp of a hiscore entry, so we can compare hiscores; `NOT_ON_TABLE_XP` when the player isn't on the table. */
   static getTotalXp(hiscoreEntry: Partial<HiscoreEntry> | null): number {
-    return hiscoreEntry?.skills?.[0]?.xp ?? Number.MAX_SAFE_INTEGER;
+    return hiscoreEntry?.skills?.[0]?.xp ?? NOT_ON_TABLE_XP;
   }
 }

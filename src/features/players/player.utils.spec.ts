@@ -1,6 +1,6 @@
 import { HiscoreEntry, HiscoreSkill, PlayerStatus, PlayerType } from '@osrs-tracker/models';
 import { describe, expect, it } from 'vitest';
-import { PlayerUtils } from './player.utils';
+import { NOT_ON_TABLE_XP, PlayerUtils } from './player.utils';
 
 /** Overall, then attack, defence, strength, hitpoints, ranged, prayer, magic; -1 is "not ranked". */
 const skills = (overallXp: number, ...levels: number[]): HiscoreSkill[] => [
@@ -20,6 +20,19 @@ describe('PlayerUtils.getCombatLevel', () => {
 
   it('counts unranked skills (-1) as level 1', () => {
     expect(PlayerUtils.getCombatLevel(skills(0, -1, -1, -1, 10, -1, -1, -1))).toBe(3);
+  });
+});
+
+describe('PlayerUtils.hasCombatSkills', () => {
+  it('needs overall and the seven combat skills, each with a numeric level', () => {
+    expect(PlayerUtils.hasCombatSkills(skills(0, 1, 1, 1, 10, 1, 1, 1))).toBe(true);
+    expect(PlayerUtils.hasCombatSkills(skills(0, -1, -1, -1, 10, -1, -1, -1))).toBe(true);
+    expect(PlayerUtils.hasCombatSkills(skills(0, 1, 1, 1, 10, 1, 1))).toBe(false);
+    expect(PlayerUtils.hasCombatSkills([])).toBe(false);
+
+    const noLevel = skills(0, 1, 1, 1, 10, 1, 1, 1);
+    delete (noLevel[7] as Partial<HiscoreSkill>).level;
+    expect(PlayerUtils.hasCombatSkills(noLevel)).toBe(false);
   });
 });
 
@@ -49,9 +62,9 @@ describe('PlayerUtils.determineStatus', () => {
 });
 
 describe('PlayerUtils.getTotalXp', () => {
-  it("is MAX_SAFE_INTEGER when the player isn't on the table, so it never compares as less", () => {
-    expect(PlayerUtils.getTotalXp(null)).toBe(Number.MAX_SAFE_INTEGER);
-    expect(PlayerUtils.getTotalXp({})).toBe(Number.MAX_SAFE_INTEGER);
+  it("is NOT_ON_TABLE_XP when the player isn't on the table, so it never compares as less", () => {
+    expect(PlayerUtils.getTotalXp(null)).toBe(NOT_ON_TABLE_XP);
+    expect(PlayerUtils.getTotalXp({})).toBe(NOT_ON_TABLE_XP);
     expect(PlayerUtils.getTotalXp(entry(1234))).toBe(1234);
   });
 });

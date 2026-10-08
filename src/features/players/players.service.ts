@@ -6,7 +6,9 @@ import { Agent } from 'https';
 import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
 import fetch from 'node-fetch';
+import { AGENT } from '../../common/agent/agent.provider';
 import { Semaphore } from '../../common/concurrency/semaphore';
+import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { Env } from '../../config/env';
 import { MAX_CONCURRENT_HISCORE_REQUESTS, NOT_FOUND_CACHE_MAX, NOT_FOUND_CACHE_TTL_MS } from './player.config';
 import { buildRefreshUpdate } from './player.policy';
@@ -40,8 +42,8 @@ export class PlayersService {
   }
 
   constructor(
-    @Inject('AGENT') private readonly agent: Agent,
-    @Inject('MONGODB_DATABASE') private readonly db: Db,
+    @Inject(AGENT) private readonly agent: Agent,
+    @Inject(MONGODB_DATABASE) private readonly db: Db,
     private readonly config: ConfigService<Env, true>,
   ) {}
 
@@ -324,8 +326,15 @@ export class PlayersService {
       }),
     );
 
-    if (result.status === 'failed') this.logger.warn(`Hiscores (${type}) failed for '${username}': ${result.reason}`);
+    // The package only checks that `skills` is an array: a truncated hiscore would break the combat level (500) or store
+    // a wrong one, so it counts as failed like any other bad response
+    const checked: HiscoreResult =
+      result.status === 'found' && !PlayerUtils.hasCombatSkills(result.hiscore.skills)
+        ? { status: 'failed', reason: `${result.hiscore.skills.length} skills, missing combat skills` }
+        : result;
 
-    return result;
+    if (checked.status === 'failed') this.logger.warn(`Hiscores (${type}) failed for '${username}': ${checked.reason}`);
+
+    return checked;
   }
 }

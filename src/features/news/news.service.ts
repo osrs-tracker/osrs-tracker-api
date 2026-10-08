@@ -13,6 +13,8 @@ import { Agent } from 'https';
 import { LRUCache } from 'lru-cache';
 import fetch from 'node-fetch';
 import sharp from 'sharp';
+import { AGENT } from '../../common/agent/agent.provider';
+import { XML_PARSER } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
 
 @Injectable()
@@ -50,8 +52,8 @@ export class NewsService {
   private readonly pendingImages = new Map<string, Promise<Buffer>>();
 
   constructor(
-    @Inject('AGENT') private readonly agent: Agent,
-    @Inject('XML_PARSER') private readonly xmlParser: XMLParser,
+    @Inject(AGENT) private readonly agent: Agent,
+    @Inject(XML_PARSER) private readonly xmlParser: XMLParser,
     private readonly config: ConfigService<Env, true>,
   ) {}
 

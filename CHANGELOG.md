@@ -13,6 +13,8 @@
   minutes before the real error. Each MongoDB connect attempt now gives up after 10s (the driver waited 30s), and the
   startup probe allows 4.5 min instead of 3, so a pod waiting for cluster DNS after a node reboot is no longer restarted
   before its last retry.
+- A shutting-down pod closes its MongoDB connections once its requests are done (giving up after 5s) instead of dropping
+  them when the process exits.
 
 ### Logging
 
@@ -42,6 +44,8 @@
   one name share their requests, each pod sends at most 8 hiscore requests at once (the rest wait their turn), and a
   preview of an unknown name remembers for 60s that it isn't on the hiscores, so crawlers repeating it don't reach
   Jagex. The POST lookup always asks again. Status codes and `Cache-Control` stay the same.
+- A hiscore response from Jagex that is missing skills now counts as a failed lookup (503, or the stored player with
+  `refreshFailed: true`) instead of an error (500), and can no longer store a wrong combat level.
 
 ### News
 
@@ -113,6 +117,8 @@
   data, and it describes the metrics/health server on port 9090 and the checks to run before committing. Added a short
   summary of the history before 2026/10/02 at the end of this changelog. The `Dockerfile` health check comment now names
   the right file for `/healthy` (`src/app-metrics.controller.ts`, not `server.ts`).
+- Shared providers (database, HTTP agent, XML parser) are injected by exported constants instead of repeated strings, so
+  a typo fails the build instead of startup.
 
 ## 2026/10/07
 
