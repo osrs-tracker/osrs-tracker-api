@@ -1,0 +1,172 @@
+name: Deploy
+
+# Builds and pushes the image, then commits its digest to `osrs-tracker-api.yaml` on main. Flux in the cluster applies
+# that commit and reports the rollout as the `Flux / deploy` commit status. Nothing here has cluster access.
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: ['main']
+
+# Deploys run one at a time, so digest commits never race. A newer pending run replaces an older pending one.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  IMAGE: freekmencke/osrs-tracker-api
+  API_URL: https://osrs-tracker-api.freekmencke.com
+
+jobs:
+  # Only deploy when CI passed on a push to main and its build job ran. The build is skipped for pushes without source or
+  # image changes (docs, and the digest commits this workflow pushes), and those don't need a new image.
+  check:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      !startsWith(github.event.workflow_run.head_commit.message, 'chore(deploy)')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      deploy: ${{ steps.build.outputs.deploy }}
+
+    steps:
+      - id: build
+        name: Check that CI's build job ran
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          build=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" \
+            --jq '[.jobs[] | select(.name == "build") | .conclusion] | first // ""')
+          echo "CI build job: ${build:-not found}"
+          if [ "$build" = success ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No source or image changes, nothing to deploy."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs: check
+    if: needs.check.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: read
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
+
+    steps:
+      # The deploy key is the only way past main's PR rule; GITHUB_TOKEN can't push the digest commit
+      - name: Check out main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      # CI runs can finish out of order. Never replace a deploy of newer code with older code.
+      - id: guard
+        name: Check that newer code isn't deployed already
+        run: |
+          deployed=$(git log -1 --grep='^chore(deploy)' --format='%(trailers:key=Source-Commit,valueonly)' origin/main \
+            | tr -d '[:space:]')
+          echo "Deployed source: ${deployed:-unknown}"
+          if [ -n "$deployed" ] && [ "$deployed" != "$SHA" ] && git merge-base --is-ancestor "$SHA" "$deployed"; then
+            echo "$deployed is newer than $SHA and already deployed, skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out the commit CI tested
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          path: source
+          persist-credentials: false
+
+      - if: steps.guard.outputs.skip != 'true'
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - if: steps.guard.outputs.skip != 'true'
+        uses: docker/setup-buildx-action@v4
+
+      - id: image
+        if: steps.guard.outputs.skip != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: source
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ env.SHA }}
+
+      - id: commit
+        if: steps.guard.outputs.skip != 'true'
+        name: Commit the digest to main
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          case "$DIGEST" in sha256:*) ;; *) echo "::error::Unexpected digest '$DIGEST'"; exit 1 ;; esac
+          sed -i -E "s#^([[:space:]]*image: $IMAGE)@sha256:[0-9a-f]+\$#\1@$DIGEST#" osrs-tracker-api.yaml
+          if [ "$(grep -c "image: $IMAGE@$DIGEST\$" osrs-tracker-api.yaml)" != 1 ]; then
+            echo "::error::Couldn't set the image line in osrs-tracker-api.yaml"
+            exit 1
+          fi
+          if git diff --quiet; then
+            echo "$DIGEST is already deployed, nothing to commit."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898299+github-actions[bot]@users.noreply.github.com'
+          git commit -m "chore(deploy): deploy ${DIGEST:0:15}" -m "Source-Commit: $SHA" osrs-tracker-api.yaml
+          if ! git push origin HEAD:main; then
+            echo "main moved, rebasing and retrying once."
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Flux to deploy it
+        if: steps.commit.outputs.sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMIT: ${{ steps.commit.outputs.sha }}
+        run: |
+          deadline=$((SECONDS + 600))
+          while :; do
+            status=$(gh api "repos/$REPO/commits/$COMMIT/status" \
+              --jq '[.statuses[] | select(.context == "Flux / deploy") | "\(.state) \(.description)"] | first // ""' \
+              || true)
+            echo "Flux / deploy on $COMMIT: ${status:-no status yet}"
+            case "${status%% *}" in
+              success) exit 0 ;;
+              failure | error) echo "::error::Flux failed to deploy $COMMIT: $status"; exit 1 ;;
+            esac
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::No successful Flux / deploy status on $COMMIT after 10 minutes"
+              exit 1
+            fi
+            sleep 15
+          done
+
+      # /healthy is only served on the metrics port, so it's 404 publicly
+      - name: Smoke test
+        if: steps.commit.outputs.sha != ''
+        run: |
+          failed=0
+          for path in /news /items; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$API_URL$path" || true)
+            echo "GET $path: $code"
+            [ "$code" = 200 ] || failed=1
+          done
+          exit "$failed"
