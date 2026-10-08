@@ -14,6 +14,8 @@
   the wrong user ID).
 - Behind the scenes: removed the `docker:build` and `docker:push` scripts; images are only built and pushed by the CD
   workflow.
+- Behind the scenes: the first push after a deploy no longer rebuilds and redeploys the API when it only changes docs.
+  CI now compares with the last commit it checked, skipping the deploy's digest commits.
 
 ## 2026/10/07
 
