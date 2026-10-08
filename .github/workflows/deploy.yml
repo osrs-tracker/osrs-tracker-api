@@ -144,18 +144,35 @@ jobs:
           REPO: ${{ github.repository }}
           COMMIT: ${{ steps.commit.outputs.sha }}
         run: |
+          flux_status() {
+            gh api "repos/$REPO/commits/$1/status" \
+              --jq '[.statuses[] | select(.context == "Flux / sync") | "\(.state) \(.description)"] | first // ""' \
+              2>/dev/null || true
+          }
           deadline=$((SECONDS + 600))
           while :; do
-            status=$(gh api "repos/$REPO/commits/$COMMIT/status" \
-              --jq '[.statuses[] | select(.context == "Flux / sync") | "\(.state) \(.description)"] | first // ""' \
-              || true)
+            applied=$COMMIT
+            status=$(flux_status "$COMMIT")
             echo "Flux / sync on $COMMIT: ${status:-no status yet}"
+            # Flux applies main's tip and reports on it, so a push right after this one may get the status instead.
+            # Keep in step with osrs-tracker-web's deploy.yml, which does the same.
+            if [ -z "$status" ]; then
+              tip=$(gh api "repos/$REPO/commits/main" --jq .sha 2>/dev/null || true)
+              if [ -n "$tip" ] && [ "$tip" != "$COMMIT" ] \
+                && [ "$(gh api "repos/$REPO/compare/$COMMIT...$tip" --jq .status 2>/dev/null)" = ahead ]; then
+                status=$(flux_status "$tip")
+                if [ -n "$status" ]; then
+                  applied=$tip
+                  echo "main moved on to $tip, which contains $COMMIT. Flux / sync on it: $status"
+                fi
+              fi
+            fi
             case "${status%% *}" in
-              success) exit 0 ;;
-              failure | error) echo "::error::Flux failed to deploy $COMMIT: $status"; exit 1 ;;
+              success) echo "Flux deployed $COMMIT$([ "$applied" = "$COMMIT" ] || echo " with $applied")."; exit 0 ;;
+              failure | error) echo "::error::Flux failed to deploy $applied: $status"; exit 1 ;;
             esac
             if [ "$SECONDS" -ge "$deadline" ]; then
-              echo "::error::No successful Flux / sync status on $COMMIT after 10 minutes"
+              echo "::error::No successful Flux / sync status on $COMMIT or a newer main after 10 minutes"
               exit 1
             fi
             sleep 15

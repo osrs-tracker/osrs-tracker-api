@@ -128,7 +128,9 @@ changes within 10 minutes.
    `osrs-tracker-api.yaml` (digest commits, rollbacks) don't run CI at all. Changes under `.github/` count as source:
    merging them rebuilds and redeploys the same code.
 2. Flux applies that commit within a minute and reports the rollout as the `Flux / sync` commit status (failures also
-   reach Discord). The workflow waits up to 10 minutes for it, then smoke tests
+   reach Discord). Flux applies `main`'s tip, so a push right after the digest commit gets the status instead; the
+   workflow then takes it from `main`'s tip when that contains the digest commit (same logic as osrs-tracker-web's
+   `deploy.yml`: keep the two in step). It waits up to 10 minutes for it, then smoke tests
    `https://osrs-tracker-api.freekmencke.com`: `/items` and `/items/4151` answer 200, an unknown route 404 (not `/news`,
    which fetches Jagex live).
 3. **Merging is the end of the job: don't wait for or watch the `CD` run.** It smoke tests on its own, and a failure
