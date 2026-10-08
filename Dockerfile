@@ -43,6 +43,6 @@ USER node
 # Command to run the application
 CMD ["node", "main"]
 
-# Health check using the /healthy endpoint available in server.ts
+# Health check using the /healthy endpoint of the metrics server (src/app-metrics.controller.ts)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:9090/healthy || exit 1

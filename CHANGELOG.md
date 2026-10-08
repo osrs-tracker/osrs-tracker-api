@@ -32,7 +32,8 @@
   about the same feature. Regrouped this day and 2026/10/07 that way.
 - README: fixed the license badge link, setup now starts from `.env.example` and warns that `.env` points at production
   data, and it describes the metrics/health server on port 9090 and the checks to run before committing. Added a short
-  summary of the history before 2026/10/02 at the end of this changelog.
+  summary of the history before 2026/10/02 at the end of this changelog. The `Dockerfile` health check comment now names
+  the right file for `/healthy` (`src/app-metrics.controller.ts`, not `server.ts`).
 
 ## 2026/10/07
 
