@@ -7,6 +7,8 @@
   commits its digest to `osrs-tracker-api.yaml`, which the cluster applies on its own, then checks that the deploy
   succeeded and the API answers. Pushes that don't change the code or the image (documentation, for example) don't
   deploy, and rolling back is reverting the digest commit.
+- Behind the scenes: pushes that only change `osrs-tracker-api.yaml` (deploy digests and rollbacks) no longer run CI, so
+  they don't start a CD run that skips. The deploy workflow is now called `CD`, next to `CI`.
 
 ## 2026/10/07
 

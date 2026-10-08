@@ -1,4 +1,4 @@
-name: Deploy
+name: CD
 
 # Builds and pushes the image, then commits its digest to `osrs-tracker-api.yaml` on main. Flux in the cluster applies
 # that commit and reports the rollout as the `Flux / deploy` commit status. Nothing here has cluster access.

@@ -3,12 +3,15 @@ name: CI
 on:
   push:
     branches: ['main']
+    # Digest commits (and rollbacks) only change the manifest; skipping CI for them also skips the CD run it would
+    # trigger. Not on pull_request: required checks that never report would block the PR.
+    paths-ignore: ['osrs-tracker-api.yaml']
   pull_request:
     branches: ['main']
 
 jobs:
   # Build only runs when something it depends on changed since the previous push, so commits like a deploy digest or
-  # docs skip it. A skipped job still satisfies the required check; a workflow-level `paths` filter wouldn't. The Deploy
+  # docs skip it. A skipped job still satisfies the required check; a workflow-level `paths` filter wouldn't. The CD
   # workflow only deploys a push to main when build ran, so this list includes everything that goes into the image.
   changes:
     runs-on: ubuntu-latest
