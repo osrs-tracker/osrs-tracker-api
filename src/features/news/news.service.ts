@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  BadGatewayException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { OsrsNewsItem } from '@osrs-tracker/models';
 import { XMLParser } from 'fast-xml-parser';
 import { Agent } from 'https';
@@ -10,6 +17,11 @@ import sharp from 'sharp';
 export class NewsService {
   private readonly logger = new Logger(NewsService.name);
 
+  private readonly NEWS_FETCH_TIMEOUT_MS = 10_000;
+  private readonly NEWS_CACHE_TTL_MS = 300_000; // matches the `/news` Cache-Control max-age
+  private readonly NEWS_RETRY_MS = 60_000; // after a failed refresh, serve the stale copy this long before retrying
+
+  private readonly IMAGE_FETCH_TIMEOUT_MS = 20_000; // covers the body too, which can be up to MAX_IMAGE_BYTES
   private readonly MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
   private readonly MAX_IMAGE_PIXELS = 25_000_000; // e.g. 5000x5000
 
@@ -19,6 +31,11 @@ export class NewsService {
   private evictionsSinceWarning = 0;
   private lastEvictionWarning = 0;
 
+  /** The parsed feed, so `/news` doesn't fetch Jagex on every request (SSR calls the API directly, not via a cache). */
+  private newsCache?: { items: OsrsNewsItem[]; expiresAt: number };
+  /** The refresh in flight, shared by concurrent requests. */
+  private pendingNews?: Promise<OsrsNewsItem[]>;
+
   /** WebP images by URL, capped by total size so memory stays bounded whatever images are requested. */
   private readonly imageCache = new LRUCache<string, Buffer>({
     maxSize: this.IMAGE_CACHE_MAX_BYTES,
@@ -27,18 +44,16 @@ export class NewsService {
       if (reason === 'evict') this.warnImageCacheEviction(url);
     },
   });
+  /** Conversions in flight by URL, so concurrent requests for one image fetch and convert it once. */
+  private readonly pendingImages = new Map<string, Promise<Buffer>>();
 
   constructor(
     @Inject('AGENT') private readonly agent: Agent,
     @Inject('XML_PARSER') private readonly xmlParser: XMLParser,
   ) {}
 
-  async getRecentNews(limit: number) {
-    const rss = await fetch(process.env.OSRS_API_BASE_URL + '/m=news/latest_news.rss?oldschool=true', {
-      agent: this.agent,
-    }).then((res) => res.text());
-
-    const osrsNewsItems = this.parseOSRSNewsRSS(rss);
+  async getRecentNews(limit: number): Promise<OsrsNewsItem[]> {
+    const osrsNewsItems = await this.getNewsItems();
 
     return osrsNewsItems.slice(0, limit);
   }
@@ -53,24 +68,92 @@ export class NewsService {
     const cached = this.imageCache.get(url);
     if (cached) return cached;
 
-    // Fetch the image if not in cache. Redirects are refused so the request can't leave the CDN.
+    let pending = this.pendingImages.get(url);
+    if (!pending) {
+      pending = this.fetchImageAsWebp(url).finally(() => this.pendingImages.delete(url));
+      this.pendingImages.set(url, pending);
+    }
+    return pending;
+  }
+
+  private getNewsItems(): Promise<OsrsNewsItem[]> {
+    if (this.newsCache && Date.now() < this.newsCache.expiresAt) return Promise.resolve(this.newsCache.items);
+
+    this.pendingNews ??= this.refreshNews().finally(() => (this.pendingNews = undefined));
+    return this.pendingNews;
+  }
+
+  /** Fetches the feed into the cache. When Jagex fails, serves the stale copy if there is one, else answers 503. */
+  private async refreshNews(): Promise<OsrsNewsItem[]> {
+    try {
+      const items = await this.fetchNews();
+      this.newsCache = { items, expiresAt: Date.now() + this.NEWS_CACHE_TTL_MS };
+      return items;
+    } catch (error) {
+      const message = (error as Error).message;
+      if (!this.newsCache) {
+        this.logger.warn(`News feed request failed: ${message}`);
+        throw new ServiceUnavailableException('OSRS news is unavailable, try again later.');
+      }
+
+      this.logger.warn(`News feed request failed, serving the cached copy: ${message}`);
+      this.newsCache.expiresAt = Date.now() + this.NEWS_RETRY_MS;
+      return this.newsCache.items;
+    }
+  }
+
+  private async fetchNews(): Promise<OsrsNewsItem[]> {
+    const response = await fetch(process.env.OSRS_API_BASE_URL + '/m=news/latest_news.rss?oldschool=true', {
+      agent: this.agent,
+      signal: AbortSignal.timeout(this.NEWS_FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    return this.parseOSRSNewsRSS(await response.text());
+  }
+
+  private async fetchImageAsWebp(url: string): Promise<Buffer> {
+    // Redirects are refused so the request can't leave the CDN.
     this.logger.log(`Fetching image from URL: ${url}`);
-    const response = await fetch(url, { agent: this.agent, redirect: 'error', size: this.MAX_IMAGE_BYTES });
+    let imageBuffer: Buffer;
+    try {
+      const response = await fetch(url, {
+        agent: this.agent,
+        redirect: 'error',
+        size: this.MAX_IMAGE_BYTES,
+        signal: AbortSignal.timeout(this.IMAGE_FETCH_TIMEOUT_MS),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-    }
-    if (!response.headers.get('content-type')?.startsWith('image/')) {
-      throw new Error(`Failed to fetch image: unexpected content-type ${response.headers.get('content-type')}`);
-    }
+      if (response.status === 404) throw new NotFoundException('Image not found');
+      if (!response.ok) {
+        this.logger.warn(`Image request returned HTTP ${response.status} for ${url}`);
+        throw new BadGatewayException('Failed to fetch image');
+      }
+      if (!response.headers.get('content-type')?.startsWith('image/')) {
+        this.logger.warn(`Image request returned content-type ${response.headers.get('content-type')} for ${url}`);
+        throw new BadGatewayException('Failed to fetch image');
+      }
 
-    // Get image buffer, node-fetch rejects bodies larger than `size`
-    const imageBuffer = Buffer.from(await response.arrayBuffer());
+      // Get image buffer, node-fetch rejects bodies larger than `size`
+      imageBuffer = Buffer.from(await response.arrayBuffer());
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadGatewayException) throw error;
+
+      // Network errors, timeouts, redirects and bodies over the size limit
+      this.logger.warn(`Image request failed for ${url}: ${(error as Error).message}`);
+      throw new ServiceUnavailableException('Failed to fetch image');
+    }
 
     // Convert to WebP
-    const webpBuffer = await sharp(imageBuffer, { limitInputPixels: this.MAX_IMAGE_PIXELS })
-      .webp({ quality: 80 })
-      .toBuffer();
+    let webpBuffer: Buffer;
+    try {
+      webpBuffer = await sharp(imageBuffer, { limitInputPixels: this.MAX_IMAGE_PIXELS })
+        .webp({ quality: 80 })
+        .toBuffer();
+    } catch (error) {
+      this.logger.warn(`Image conversion failed for ${url}: ${(error as Error).message}`);
+      throw new BadGatewayException('Failed to convert image');
+    }
 
     // Store in cache, evicting the least recently used images when full
     this.imageCache.set(url, webpBuffer);
@@ -99,21 +182,29 @@ export class NewsService {
     this.lastEvictionWarning = now;
   }
 
-  private parseOSRSNewsRSS(rss: string) {
-    const parsedRss = this.xmlParser.parse(rss);
+  /** Throws when the feed isn't RSS (e.g. an error page), so the caller can fall back to the cached copy. */
+  private parseOSRSNewsRSS(rss: string): OsrsNewsItem[] {
+    const channel = this.xmlParser.parse(rss)?.rss?.channel;
+    if (!channel || typeof channel !== 'object') throw new Error('Unexpected news feed: no RSS channel');
 
-    const osrsNewsItems = parsedRss.rss.channel.item.map((val: OsrsNewsItem) => ({
-      title: val.title,
-      pubDate: new Date(val.pubDate),
-      category: val.category,
-      link: val.link,
-      description: val.description,
-      enclosure: {
-        url: val.enclosure.url,
-        type: val.enclosure.type,
-      },
-    }));
+    // fast-xml-parser gives an object instead of an array for a single item, and nothing for none
+    const items: RssItem[] = channel.item === undefined ? [] : [channel.item].flat();
 
-    return osrsNewsItems;
+    return items
+      .filter((val) => val?.title && val.link && val.enclosure?.url)
+      .map((val) => ({
+        title: val.title,
+        pubDate: new Date(val.pubDate),
+        category: val.category,
+        link: val.link,
+        description: val.description,
+        enclosure: {
+          url: val.enclosure.url,
+          type: val.enclosure.type,
+        },
+      }));
   }
 }
+
+/** An `<item>` as fast-xml-parser parses it: `pubDate` is still a string. */
+type RssItem = Omit<OsrsNewsItem, 'pubDate'> & { pubDate: string };

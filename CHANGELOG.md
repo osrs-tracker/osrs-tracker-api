@@ -32,6 +32,13 @@
 
 - `GET /news?limit=N` only accepts 1 to 50, like the other lists, and answers 400 otherwise (`limit=-1` used to return
   every item but the last).
+- `GET /news` keeps the feed in memory for 5 minutes instead of fetching it from Jagex on every request, and keeps
+  serving that copy when Jagex fails (retrying a minute later). Without one, a failing, hanging or malformed feed
+  answers 503 within 10s instead of a 500 or a request that never finishes, and a feed with a single post no longer
+  fails. Errors no longer carry the 5-minute `Cache-Control`, so a cache can't keep serving a failure.
+- `GET /news/image` gives up on the CDN after 20s (503), answers 404 for an image the CDN doesn't have and 502 for a
+  response that isn't a usable image, instead of a 500 for all of them. Concurrent requests for the same image fetch and
+  convert it once. Converted images are now `public, max-age=604800`, so shared caches may keep them too.
 
 ### Behind the scenes
 
