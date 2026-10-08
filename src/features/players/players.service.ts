@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { getHiscore, HiscoreResult } from '@osrs-tracker/hiscores';
 import { HiscoreEntry, Player, PlayerType } from '@osrs-tracker/models';
 import { Agent } from 'https';
 import { Collection, Db } from 'mongodb';
@@ -7,20 +8,12 @@ import { PlayerUtils } from './player.utils';
 
 type PartialHiscoreEntry = Pick<HiscoreEntry, 'skills' | 'activities'>;
 
-/**
- * - `found`: the player is on this hiscore table.
- * - `notFound`: HTTP 404 (or 400 for an invalid name), the player is not on this hiscore table.
- * - `failed`: any other status, a network error, a timeout or an unexpected body. Could be an outage.
- */
-type HiscoreResult = { status: 'found'; hiscore: PartialHiscoreEntry } | { status: 'notFound' } | { status: 'failed' };
-
 export type RefreshResult = 'refreshed' | 'notFound' | 'failed';
 
 /** Usernames passed in are expected normalized, as `ParseUsernamePipe` returns them. */
 @Injectable()
 export class PlayersService {
   private readonly COLLECTION_NAME = 'players';
-  private readonly HISCORE_FETCH_TIMEOUT_MS = 10_000;
   private readonly logger = new Logger(PlayersService.name);
 
   get collection(): Collection<Player> {
@@ -305,39 +298,25 @@ export class PlayersService {
         diedAsHardcore: PlayerUtils.getTotalXp(hardcore) < PlayerUtils.getTotalXp(ironman),
         lastModified: new Date(),
       } as Player,
-      partialHiscoreEntry: normal!,
+      // Only what the model stores, like process-players (the hiscores JSON also echoes the queried `name`).
+      partialHiscoreEntry: { skills: normal!.skills, activities: normal!.activities },
     };
   }
 
+  /**
+   * Fetches one hiscore table with the shared client from `@osrs-tracker/hiscores` (see its `HiscoreResult`), through
+   * the shared agent, and logs why it failed.
+   */
   private async getHiscore(username: string, type: PlayerType): Promise<HiscoreResult> {
-    const hiscoreUrl =
-      process.env.OSRS_API_BASE_URL +
-      `/m=${PlayerUtils.getHiscoreTable(type)}/index_lite.json?player=${encodeURIComponent(username)}`;
+    const result = await getHiscore({
+      baseUrl: process.env.OSRS_API_BASE_URL!,
+      username,
+      table: PlayerUtils.getHiscoreTable(type),
+      fetch: (url, init) => fetch(url, { ...init, agent: this.agent }),
+    });
 
-    try {
-      const response = await fetch(hiscoreUrl, {
-        agent: this.agent,
-        headers: { 'cache-control': 'no-cache' },
-        signal: AbortSignal.timeout(this.HISCORE_FETCH_TIMEOUT_MS),
-      });
+    if (result.status === 'failed') this.logger.warn(`Hiscores (${type}) failed for '${username}': ${result.reason}`);
 
-      if (response.status === 404 || response.status === 400) return { status: 'notFound' };
-
-      if (!response.ok) {
-        this.logger.warn(`Hiscores (${type}) returned HTTP ${response.status} for '${username}'`);
-        return { status: 'failed' };
-      }
-
-      const hiscore = (await response.json()) as PartialHiscoreEntry;
-      if (!Array.isArray(hiscore?.skills)) {
-        this.logger.warn(`Hiscores (${type}) returned an unexpected body for '${username}'`);
-        return { status: 'failed' };
-      }
-
-      return { status: 'found', hiscore };
-    } catch (error) {
-      this.logger.warn(`Hiscores (${type}) request failed for '${username}': ${(error as Error).message}`);
-      return { status: 'failed' };
-    }
+    return result;
   }
 }

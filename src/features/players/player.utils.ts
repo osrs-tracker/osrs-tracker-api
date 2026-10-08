@@ -1,3 +1,4 @@
+import { HiscoreTable } from '@osrs-tracker/hiscores';
 import { HiscoreEntry, HiscoreSkill, PlayerStatus, PlayerType } from '@osrs-tracker/models';
 
 export class PlayerUtils {
@@ -13,7 +14,7 @@ export class PlayerUtils {
   }
 
   /** Resolve correct hiscore table for `PlayerType`. */
-  static getHiscoreTable(type: PlayerType): string {
+  static getHiscoreTable(type: PlayerType): HiscoreTable {
     switch (type) {
       case PlayerType.Normal:
         return 'hiscore_oldschool';
