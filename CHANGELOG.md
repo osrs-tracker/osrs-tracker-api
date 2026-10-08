@@ -10,6 +10,8 @@
 - Behind the scenes: pushes that only change `osrs-tracker-api.yaml` (deploy digests and rollbacks) no longer run CI, so
   they don't start a CD run that skips. The deploy workflow is now called `CD`, next to `CI`, and its runs are named
   after the commit they deploy.
+- Behind the scenes: deploy digest commits are attributed to the `github-actions[bot]` account (the committer email had
+  the wrong user ID).
 
 ## 2026/10/07
 
