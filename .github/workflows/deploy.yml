@@ -161,14 +161,18 @@ jobs:
             sleep 15
           done
 
-      # /healthy is only served on the metrics port, so it's 404 publicly
+      # Only routes the API serves itself (Mongo, routing): /news fetches Jagex live, and a Jagex outage isn't a bad
+      # deploy. /healthy is only served on the metrics port, so it's 404 publicly.
       - name: Smoke test
         if: steps.commit.outputs.sha != ''
         run: |
           failed=0
-          for path in /news /items; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$API_URL$path" || true)
-            echo "GET $path: $code"
-            [ "$code" = 200 ] || failed=1
-          done
+          expect() {
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$API_URL$2" || true)
+            echo "GET $2: $code (expected $1)"
+            [ "$code" = "$1" ] || failed=1
+          }
+          expect 200 /items
+          expect 200 /items/4151
+          expect 404 /this-route-does-not-exist
           exit "$failed"

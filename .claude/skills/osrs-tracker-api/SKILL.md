@@ -103,8 +103,8 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 
 ## Commit and push
 
-- `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push,
-  `gh run watch --exit-status`. A direct push to `main` with source changes deploys it.
+- `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push, watch its **CI**
+  run (`gh run watch --exit-status`), not CD. A direct push to `main` with source changes deploys it.
 - Conventional commits. `chore(deploy)` is reserved for the CD workflow's digest commits (it skips them).
 - `CHANGELOG.md`: newest day first. Busy days get `###` subtitles (by area, "Behind the scenes" last); extend an
   existing entry rather than add a near-duplicate, and don't repeat the subtitle in its entries.

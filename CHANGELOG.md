@@ -16,6 +16,8 @@
   workflow.
 - Behind the scenes: the first push after a deploy no longer rebuilds and redeploys the API when it only changes docs.
   CI now compares with the last commit it checked, skipping the deploy's digest commits.
+- Behind the scenes: the deploy's smoke test only checks routes the API serves itself (`/items`, `/items/4151`, a 404),
+  so a Jagex outage no longer fails a good deploy.
 
 ## 2026/10/07
 
