@@ -31,6 +31,14 @@ keep code rules here, not in the agent.
 - Request logs (`logger.middleware.ts`, JSON to Loki): 5xx `error`, 4xx `warn`, else `info`. A client that disconnects
   before the response is `warn` with `aborted: true` and no `status`; keep that shape, osrs-tracker-web logs the same.
 
+## Validating params
+
+Validate query and route params in pipes, not with checks in the handler: `ParseUsernamePipe`,
+`ParseScrapingOffsetPipe`, and `new ParseIntRangePipe({ min, max?, default?, optional?, message? })` from
+`common/pipes/` for any other integer (its message is named after the param: `Limit must be between 1 and 50.`). Don't
+add `DefaultValuePipe` + `ParseIntPipe` + a range check, or an `isNaN` check after a parse pipe. Keep existing status
+codes and messages: the web may show them. A new pipe gets a spec.
+
 ## Mongo pipeline updates
 
 Wrap player data and user input in `$literal` (strings starting with `$` read as field paths). Prepend `hiscoreEntries`
