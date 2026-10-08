@@ -23,6 +23,8 @@ here, not in the agent.
 - Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert).
 - `@osrs-tracker/models` is published from osrs-tracker-aws; right after a publish, bump with `--prefer-online`
   (dist-tags lag).
+- Request logs (`logger.middleware.ts`, JSON to Loki): 5xx `error`, 4xx `warn`, else `info`. A client that disconnects
+  before the response is `warn` with `aborted: true` and no `status`; keep that shape, osrs-tracker-web logs the same.
 
 ## Mongo pipeline updates
 
@@ -73,12 +75,14 @@ changes within 10 minutes.
 1. When `CI` passes on a push to `main` whose `build` job ran, `.github/workflows/deploy.yml` builds the image, pushes
    it to Docker Hub as `freekmencke/osrs-tracker-api:latest` and `:<commit sha>`, and commits the digest to the `image:`
    line as `chore(deploy): deploy sha256:<first 8>` (pushed with the `DEPLOY_KEY` deploy key, which bypasses the PR
-   rule). Pushes without source or image changes (docs, the digest commits) skip `build` and so don't deploy.
+   rule). Pushes without source or image changes (docs) skip `build` and so don't deploy; pushes that only change
+   `osrs-tracker-api.yaml` (digest commits, rollbacks) don't run CI at all. Changes under `.github/` count as source:
+   merging them rebuilds and redeploys the same code.
 2. Flux applies that commit within a minute and reports the rollout as the `Flux / sync` commit status (failures also
    reach Discord). The workflow waits up to 10 minutes for it, then checks that `/news` and `/items` on
    `https://osrs-tracker-api.freekmencke.com` answer 200.
-3. Follow it with `gh run watch` on the `CD` run, then smoke test the changed routes yourself:
-   `curl -s -D - -o /dev/null` (status, `cache-control`), and
+3. Follow it with `gh run watch` on the `CD` run (named after the commit it deploys, like the `CI` run), then smoke test
+   the changed routes yourself: `curl -s -D - -o /dev/null` (status, `cache-control`), and
    `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m` (reading the cluster is fine).
 4. If the web app's rendering changes, check those pages in the browser (see the web skill); cached pages may lag up to
    5 minutes.
@@ -95,8 +99,9 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 
 1. Commit on a `<type>/<short-name>` branch, push, `gh pr create --base main`.
 2. Review `gh pr diff` for bugs and leftovers while the `conventions-reviewer` agent checks the PR; fix both and push.
-3. `gh pr checks <n> --watch`. When checks pass: `gh pr merge <n> --merge`, switch to `main`, pull,
-   `git branch -d <branch>`, `git fetch --prune`.
+3. `gh pr checks <n> --watch`. When checks pass: `gh pr merge <n> --merge --delete-branch` (it deploys; if Claude Code's
+   permission check blocks it, give the user the command and wait), switch to `main`, pull, `git branch -d <branch>`,
+   `git fetch --prune`.
 4. Watch the deploy and smoke test (Deploy steps 3–4), then pull again for the digest commit.
 
 ## Commit and push
