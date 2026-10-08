@@ -77,11 +77,12 @@ changes within 10 minutes.
 2. Flux applies that commit within a minute and reports the rollout as the `Flux / sync` commit status (failures also
    reach Discord). The workflow waits up to 10 minutes for it, then checks that `/news` and `/items` on
    `https://osrs-tracker-api.freekmencke.com` answer 200.
-3. Follow it with `gh run watch` on the `CD` run (named after the commit it deploys, like the `CI` run), then smoke test
-   the changed routes yourself: `curl -s -D - -o /dev/null` (status, `cache-control`), and
-   `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m` (reading the cluster is fine).
-4. If the web app's rendering changes, check those pages in the browser (see the web skill); cached pages may lag up to
-   5 minutes.
+3. **Merging is the end of the job: don't wait for or watch the `CD` run.** It smoke tests on its own, and a failure
+   shows as a failed `CD` run (named after the commit it deploys) and a failed `Flux / sync` status, and reaches
+   Discord. Only when the user asks, follow it with `gh run watch` and smoke test the changed routes:
+   `curl -s -D - -o /dev/null` (status, `cache-control`),
+   `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m` (reading the cluster is fine), and for web
+   rendering changes the pages in the browser (see the web skill; cached pages may lag up to 5 minutes).
 
 - **Retry** a failed deploy (Docker Hub or Flux hiccup) by re-running the failed `CD` run; a later docs-only push won't
   redeploy.
@@ -98,7 +99,7 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 3. `gh pr checks <n> --watch`. When checks pass: `gh pr merge <n> --merge --delete-branch` (it deploys; if Claude Code's
    permission check blocks it, give the user the command and wait), switch to `main`, pull, `git branch -d <branch>`,
    `git fetch --prune`.
-4. Watch the deploy and smoke test (Deploy steps 3–4), then pull again for the digest commit.
+4. Done: the deploy runs on its own (Deploy step 3). Pull `main` again later for the digest commit.
 
 ## Commit and push
 
