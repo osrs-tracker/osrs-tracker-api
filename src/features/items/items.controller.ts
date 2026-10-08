@@ -17,6 +17,7 @@ import {
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { isBotRequest } from '../../common/bot/is-bot-request';
+import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ItemsService } from './items.service';
 
 @ApiTags('items')
@@ -25,7 +26,7 @@ export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
 
   @Get()
-  @Header('Cache-Control', 'max-age=0, must-revalidate')
+  @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
   @ApiOperation({ summary: 'Get the last fetched items' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getRecentItems(@Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number) {
@@ -35,7 +36,7 @@ export class ItemsController {
   }
 
   @Get(':id')
-  @Header('Cache-Control', 'max-age=0, must-revalidate')
+  @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
   @ApiOperation({ summary: 'Get an item by ID' })
   @ApiParam({ name: 'id', description: 'Item ID' })
   async getById(@Param('id', new DefaultValuePipe(0), ParseIntPipe) id: number) {
@@ -61,7 +62,7 @@ export class ItemsController {
   }
 
   @Get('search/:query')
-  @Header('Cache-Control', 'public, max-age=3600')
+  @Header('Cache-Control', CACHE_CONTROL.ITEM_SEARCH)
   @ApiOperation({ summary: 'Search for items by name' })
   @ApiParam({ name: 'query', description: 'Search query' })
   async searchItems(@Param('query') query: string) {

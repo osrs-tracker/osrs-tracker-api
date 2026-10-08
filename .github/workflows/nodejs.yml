@@ -11,9 +11,10 @@ on:
     branches: ['main']
 
 jobs:
-  # Build only runs when something it depends on changed since the previous push, so commits like a deploy digest or
-  # docs skip it. A skipped job still satisfies the required check; a workflow-level `paths` filter wouldn't. The CD
-  # workflow only deploys a push to main when build ran, so this list includes everything that goes into the image.
+  # Build and test only run when something they depend on changed since the previous push, so commits like a deploy
+  # digest or docs skip them. A skipped job still satisfies the required check; a workflow-level `paths` filter wouldn't.
+  # The CD workflow only deploys a push to main when build ran, so this list includes everything that goes into the
+  # image.
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -56,20 +57,20 @@ jobs:
           fi
           printf 'Changed files:\n%s\n' "$files"
           if printf '%s\n' "$files" \
-            | grep -q -E '^(src/|\.github/|package(-lock)?\.json$|tsconfig[^/]*\.json$|nest-cli\.json$|webpack\.config\.js$|Dockerfile$|\.dockerignore$)'; then
+            | grep -q -E '^(src/|\.github/|package(-lock)?\.json$|tsconfig[^/]*\.json$|nest-cli\.json$|webpack\.config\.js$|vitest\.config\.mjs$|Dockerfile$|\.dockerignore$)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Skipping is only safe if build passed (or was safely skipped) on the commit compared with; otherwise a
-          # docs-only push after a failed build would turn the PR green
+          # Skipping is only safe if build and test passed (or were safely skipped) on the commit compared with;
+          # otherwise a docs-only push after a failed build would turn the PR green
           previous=$(gh api "repos/$REPO/commits/$BEFORE/check-runs?filter=latest&per_page=100" \
-            --jq '[.check_runs[] | select(.name == "build") | "\(.name)=\(.conclusion)"] | sort | join(" ")' \
+            --jq '[.check_runs[] | select(.name == "build" or .name == "test") | "\(.name)=\(.conclusion)"] | sort | join(" ")' \
             2>/dev/null) || true
-          if [ "$previous" = "build=success" ] || [ "$previous" = "build=skipped" ]; then
-            echo "No source or dependency changes and $BEFORE passed ($previous), skipping build."
+          if [ "$previous" = "build=success test=success" ] || [ "$previous" = "build=skipped test=skipped" ]; then
+            echo "No source or dependency changes and $BEFORE passed ($previous), skipping build and test."
             echo "code=false" >> "$GITHUB_OUTPUT"
           else
-            echo "No source or dependency changes, but $BEFORE didn't pass build (${previous:-no results}), running it."
+            echo "No source or dependency changes, but $BEFORE didn't pass build and test (${previous:-no results}), running them."
             echo "code=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -92,3 +93,13 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-deps
       - run: npm run build
+
+  test:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-deps
+      - run: npm test

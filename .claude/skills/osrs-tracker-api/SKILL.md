@@ -33,7 +33,8 @@ keep code rules here, not in the agent.
 ## Mongo pipeline updates
 
 Wrap player data and user input in `$literal` (strings starting with `$` read as field paths). Prepend `hiscoreEntries`
-with `$concatArrays` (stored newest first), merge offsets with `$setUnion`, keep `upsert`/`hint`.
+with `$concatArrays` (stored newest first), merge offsets with `$setUnion`, keep `upsert`/`hint`. The refresh update is
+built by `buildRefreshUpdate` in `players/player.policy.ts`, so it can be tested without Mongo.
 
 ## Pausing and resuming players
 
@@ -54,7 +55,9 @@ The full contract with the `process-players` Lambda (which pauses players whose 
 ## Cache-Control (important)
 
 Set it deliberately on every GET. The web app's SSR transfer cache **drops `no-store`, `no-cache` and `private`
-responses**, making the UI flash back to skeletons on hydration — never use them.
+responses**, making the UI flash back to skeletons on hydration — never use them. Values come from `CACHE_CONTROL` in
+`src/common/http/cache-control.ts`; add new ones there, not as inline strings (only the stored player's dynamic
+`max-age` is built in place).
 
 - Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/news/image` 604800).
 - Routes that fetch Jagex live (`/news`, `/news/image`) set it with `res.setHeader` after the fetch succeeds, not with
@@ -62,13 +65,27 @@ responses**, making the UI flash back to skeletons on hydration — never use th
 - GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR.
 - `/items/:id`, `/players/:username/hiscores` and the recent-items/players lists: `max-age=0, must-revalidate` so
   they're always fresh.
-- `/players/:username`: stored players get a dynamic `max-age`, clamped to `[0, 900]` and capped at the time until the
-  refresh window; the preview of an unknown player and the 503 get `max-age=0, must-revalidate`.
+- `/players/:username`: stored players get a dynamic `max-age` (`playerMaxAgeSeconds`), clamped to `[0, 900]` and capped
+  at the time until the refresh window; the preview of an unknown player and the 503 get `max-age=0, must-revalidate`.
+
+## Tests
+
+Vitest, only for complex or important logic, never for coverage. Break the protected code once to confirm the test
+fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
+
+- Specs sit next to the code as `src/**/*.spec.ts` and import from `vitest`. They don't need Nest, Express or Mongo:
+  move a rule into a pure function first (like `player.policy.ts`), then test that.
+- Covered: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's pause/resume,
+  `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status (`PlayerUtils`) and
+  `ParseUsernamePipe`. Changing one of those means changing its spec.
+- Not covered: which `Cache-Control` each route sends and that GETs never write (the `conventions-reviewer` agent checks
+  them), and anything against a real database.
+- In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'.
 
 ## Production testing
 
-Verify with the command in `CLAUDE.md`; there are no tests. For production testing, run locally with **ToxSick** as the
-test player: ask before writing to it, record its state and restore it afterwards.
+Verify with the command in `CLAUDE.md`. For production testing, run locally with **ToxSick** as the test player: ask
+before writing to it, record its state and restore it afterwards.
 
 ## Deploy
 

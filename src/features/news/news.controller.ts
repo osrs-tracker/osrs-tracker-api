@@ -1,6 +1,7 @@
 import { BadRequestException, Controller, DefaultValuePipe, Get, ParseIntPipe, Query, Res } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
+import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { NewsService } from './news.service';
 
 @ApiTags('news')
@@ -20,7 +21,7 @@ export class NewsController {
     const news = await this.newsService.getRecentNews(limit);
 
     // Set only on success (not with @Header), so caches don't keep a 503 for 5 minutes while Jagex is down
-    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.setHeader('Cache-Control', CACHE_CONTROL.NEWS);
     return news;
   }
 
@@ -43,7 +44,7 @@ export class NewsController {
     const webp = await this.newsService.getImageAsWebp(parsedUrl.href);
 
     // Set only on success (not with @Header), so browsers don't cache a rejected URL or failed fetch for a week
-    res.setHeader('Cache-Control', 'public, max-age=604800');
+    res.setHeader('Cache-Control', CACHE_CONTROL.NEWS_IMAGE);
     res.setHeader('Content-Type', 'image/webp');
     return res.send(webp);
   }
