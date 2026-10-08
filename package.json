@@ -30,13 +30,13 @@
     "lint:ci": "eslint \"src/**/*.ts\""
   },
   "dependencies": {
-    "@nestjs/common": "^11.1.28",
-    "@nestjs/config": "^4.0.4",
-    "@nestjs/core": "^11.1.28",
-    "@nestjs/platform-express": "^11.1.28",
-    "@nestjs/swagger": "^11.4.6",
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/config": "^12.0.1",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/platform-express": "^12.1.2",
+    "@nestjs/swagger": "^12.0.2",
     "@osrs-tracker/hiscores": "^3.1.1",
-    "@osrs-tracker/models": "^0.10.0",
+    "@osrs-tracker/models": "^0.10.1",
     "date-fns": "^4.4.0",
     "express-prom-bundle": "^8.0.0",
     "fast-xml-parser": "^5.10.1",
@@ -52,9 +52,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@nestjs/cli": "^11.0.24",
-    "@nestjs/schematics": "^11.1.0",
-    "@nestjs/testing": "^11.1.28",
+    "@nestjs/cli": "^12.0.8",
+    "@nestjs/schematics": "^12.0.6",
+    "@nestjs/testing": "^12.1.2",
     "@types/express": "^5.0.6",
     "@types/morgan": "^1.9.10",
     "@types/node": "^24.19.1",
@@ -63,16 +63,11 @@
     "globals": "^17.8.0",
     "prettier": "^3.9.6",
     "ts-loader": "^9.6.2",
-    "typescript": "^5.9.3",
+    "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3"
   },
   "allowScripts": {
     "@scarf/scarf@1.4.0": true
-  },
-  "overrides": {
-    "@nestjs/swagger": {
-      "js-yaml": "5.4.2"
-    }
   }
 }

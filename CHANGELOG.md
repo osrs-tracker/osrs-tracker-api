@@ -73,6 +73,12 @@
   anywhere in a string in `src/`.
 - Query and route param validation (`limit`, `size`, `skip`, `scrapingOffset` and item IDs) lives in two shared, tested
   pipes instead of checks repeated in every handler. Status codes and error messages are unchanged.
+- Upgraded to NestJS 12 (`@nestjs/*` 12, `@nestjs/config` 12, `@nestjs/swagger` 12) and TypeScript 6.0; responses, logs
+  and graceful shutdown are unchanged. Swagger 12 brings the patched `js-yaml` itself, so the `overrides` entry for it
+  is gone. `@osrs-tracker/models` 0.10.1 lists its types first in `exports`, which TypeScript 6 needs, and
+  `tsconfig.json` now names `node` in `types` (TypeScript 6 no longer loads every `@types` package). The webpack build
+  skips Nest's optional imports under their new ESM names, and Swagger's optional `@fastify/static`. Dependabot doesn't
+  propose TypeScript 6.1 until `typescript-eslint` supports it.
 - Dependency updates: `eslint` 10.12.0 and `typescript-eslint` 8.71.1 (lint tooling only).
 - Claude's pre-push lint check checks the worktree being pushed.
 - Small cleanups: a log line's missing quote, the player refresh interval as a named constant

@@ -26,6 +26,12 @@ keep code rules here, not in the agent.
   `aws-mongodb-credentials` secret, with the `env:` block in `osrs-tracker-api.yaml` overriding `OSRS_API_BASE_URL` (an
   API Gateway proxy to `https://secure.runescape.com` that passes Jagex's headers through).
 - Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert).
+- `npm run build` bundles `node_modules` into `dist/` with webpack (only `sharp` is external; the image ships just
+  `dist/`). An optional package a dependency imports lazily and tolerates missing fails the build with "Can't resolve":
+  add it to `lazyImports` in `webpack.config.js`, under the exact specifier (Nest 12's ESM imports end in `.js`).
+- TypeScript 6 only loads the `@types` packages listed in `tsconfig.json`'s `types` (`node`); add one there when its
+  globals are needed. It resolves packages through `exports`, so a package that lists `types` after `require` gets its
+  CJS typings (`@osrs-tracker/models` before 0.10.1).
 - `@osrs-tracker/models` is published from osrs-tracker-aws; right after a publish, bump with `--prefer-online`
   (dist-tags lag).
 - Request logs (`logger.middleware.ts`, JSON to Loki): 5xx `error`, 4xx `warn`, else `info`. A client that disconnects
@@ -164,7 +170,8 @@ Run end to end without asking; stop only on failure. Verify locally once before 
   commit the entry straight to `main` (docs only, no redeploy): one entry under that day's "Behind the scenes"
   ("Dependency updates: …", naming notable bumps), extended for further ones that day. Base image PRs bump the digest in
   both `FROM` lines. npm majors are ignored in the config: upgrade them by hand from an issue, together with whatever
-  must move with them (e.g. NestJS 12 needs TypeScript 6).
+  must move with them (e.g. NestJS 12 needed TypeScript 6). TypeScript `>=6.1` is ignored too, until `typescript-eslint`
+  allows it (its peer range is `<6.1.0`): drop that ignore when it does.
 - GPG "Inappropriate ioctl for device": ask the user to run `echo test | gpg --clearsign > /dev/null` in their terminal.
 - If `gh pr edit` fails on a Projects (classic) error:
   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>`.
