@@ -6,6 +6,8 @@
   finished its requests and waits 5s for Traefik to stop sending it traffic. Rollouts are also faster: an old pod exits
   as soon as its requests are done instead of hanging until it's killed 30s after shutdown starts. New pods are probed
   once they're likely up, 2s after starting, so redeploys no longer fill the cluster with `Unhealthy` probe events.
+- The API pods reserve 50m CPU and 128Mi memory and are capped at 512Mi, so they're no longer the first to be evicted
+  when the node runs low on memory, and a runaway image conversion can't take the node's memory with it.
 
 ### Logging
 
