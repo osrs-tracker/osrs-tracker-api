@@ -9,10 +9,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { OsrsNewsItem } from '@osrs-tracker/models';
 import { XMLParser } from 'fast-xml-parser';
-import { Agent } from 'https';
 import { LRUCache } from 'lru-cache';
-import fetch from 'node-fetch';
 import sharp from 'sharp';
+import { Agent, fetch, Response } from 'undici';
 import { AGENT } from '../../common/agent/agent.provider';
 import { XML_PARSER } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
@@ -111,7 +110,7 @@ export class NewsService {
     const response = await fetch(
       this.config.get('OSRS_API_BASE_URL', { infer: true }) + '/m=news/latest_news.rss?oldschool=true',
       {
-        agent: this.agent,
+        dispatcher: this.agent,
         signal: AbortSignal.timeout(this.NEWS_FETCH_TIMEOUT_MS),
       },
     );
@@ -126,9 +125,8 @@ export class NewsService {
     let imageBuffer: Buffer;
     try {
       const response = await fetch(url, {
-        agent: this.agent,
+        dispatcher: this.agent,
         redirect: 'error',
-        size: this.MAX_IMAGE_BYTES,
         signal: AbortSignal.timeout(this.IMAGE_FETCH_TIMEOUT_MS),
       });
 
@@ -142,8 +140,7 @@ export class NewsService {
         throw new BadGatewayException('Failed to fetch image');
       }
 
-      // Get image buffer, node-fetch rejects bodies larger than `size`
-      imageBuffer = Buffer.from(await response.arrayBuffer());
+      imageBuffer = await this.readBody(response, this.MAX_IMAGE_BYTES);
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadGatewayException) throw error;
 
@@ -167,6 +164,26 @@ export class NewsService {
     this.imageCache.set(url, webpBuffer);
 
     return webpBuffer;
+  }
+
+  /** Reads the body, rejecting it as soon as it's larger than `maxBytes` (whatever `content-length` says). */
+  private async readBody(response: Response, maxBytes: number): Promise<Buffer> {
+    const tooLarge = () => new Error(`Body larger than ${maxBytes} bytes`);
+    if (Number(response.headers.get('content-length')) > maxBytes) {
+      await response.body?.cancel();
+      throw tooLarge();
+    }
+
+    if (!response.body) return Buffer.alloc(0);
+
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
+      size += chunk.byteLength;
+      if (size > maxBytes) throw tooLarge(); // leaving the loop cancels the stream
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks, size);
   }
 
   /**

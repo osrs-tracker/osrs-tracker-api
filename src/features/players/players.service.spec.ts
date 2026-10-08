@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { getHiscore, HiscoreResult } from '@osrs-tracker/hiscores';
 import { Db } from 'mongodb';
-import { Agent } from 'https';
+import { Agent } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Env } from '../../config/env';
 import { MAX_CONCURRENT_HISCORE_REQUESTS } from './player.config';

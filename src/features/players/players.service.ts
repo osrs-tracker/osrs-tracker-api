@@ -2,10 +2,9 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getHiscore, HiscoreResult } from '@osrs-tracker/hiscores';
 import { HiscoreEntry, Player, PlayerType } from '@osrs-tracker/models';
-import { Agent } from 'https';
 import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
-import fetch from 'node-fetch';
+import { Agent, fetch } from 'undici';
 import { AGENT } from '../../common/agent/agent.provider';
 import { Semaphore } from '../../common/concurrency/semaphore';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
@@ -322,7 +321,7 @@ export class PlayersService {
         baseUrl: this.config.get('OSRS_API_BASE_URL', { infer: true }),
         username,
         table: PlayerUtils.getHiscoreTable(type),
-        fetch: (url, init) => fetch(url, { ...init, agent: this.agent }),
+        fetch: (url, init) => fetch(url, { ...init, dispatcher: this.agent }),
       }),
     );
 

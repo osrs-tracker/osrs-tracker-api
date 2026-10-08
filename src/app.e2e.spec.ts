@@ -24,7 +24,10 @@ const { fakeFetch } = vi.hoisted(() => {
   vi.stubEnv('OSRS_API_BASE_URL', 'https://secure.runescape.com');
   return { fakeFetch: vi.fn<(url: string) => Promise<Response>>() };
 });
-vi.mock('node-fetch', () => ({ default: fakeFetch }));
+vi.mock('undici', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('undici')>()),
+  fetch: fakeFetch,
+}));
 // No request log lines in the test output
 vi.mock('morgan', () => ({ default: () => (_req: unknown, _res: unknown, next: () => void) => next() }));
 
@@ -89,7 +92,8 @@ const CASES: Record<string, Case[]> = {
   '/items': [{ url: '/items', status: 200, cacheControl: CACHE_CONTROL.REVALIDATE }],
   '/items/:id': [{ url: '/items/4151', docs: [item], status: 200, cacheControl: CACHE_CONTROL.REVALIDATE }],
   '/items/search/:query': [
-    { url: '/items/search/whip', docs: [item], status: 200, cacheControl: CACHE_CONTROL.ITEM_SEARCH },
+    { name: 'found', url: '/items/search/whip', docs: [item], status: 200, cacheControl: CACHE_CONTROL.ITEM_SEARCH },
+    { name: 'none found', url: '/items/search/nothing', status: 200, cacheControl: CACHE_CONTROL.ITEM_SEARCH },
   ],
   '/news': [{ url: '/news', status: 200, cacheControl: CACHE_CONTROL.NEWS }],
   '/news/image': [

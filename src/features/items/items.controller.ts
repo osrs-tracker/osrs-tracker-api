@@ -4,7 +4,6 @@ import {
   Get,
   Header,
   HttpCode,
-  HttpException,
   HttpStatus,
   NotFoundException,
   Param,
@@ -89,19 +88,15 @@ export class ItemsController {
   @ApiParam({ name: 'query', description: 'Search query, at most 64 characters' })
   @ApiOkResponse({
     description:
-      'Up to 20 matching `Item`s, best match first, with only `id`, `icon`, `name` and the text `score`. ' +
+      'Up to 20 matching `Item`s, best match first, with only `id`, `icon`, `name` and the text `score`; `[]` when ' +
+      'none match. ' +
       `\`Cache-Control: ${CACHE_CONTROL.ITEM_SEARCH}\` on every response.`,
   })
-  @ApiNoContentResponse({ description: 'No item matches.' })
   @ApiBadRequestResponse({ description: 'Query longer than 64 characters.' })
   async searchItems(@Param('query') query: string) {
     if (!query) throw new BadRequestException('No search query provided');
     if (query.length > 64) throw new BadRequestException('Search query must be at 64 characters or less');
 
-    const items = await this.itemsService.searchItems(query);
-
-    if (items.length === 0) throw new HttpException(`No items found for query "${query}"`, HttpStatus.NO_CONTENT);
-
-    return items;
+    return this.itemsService.searchItems(query);
   }
 }
