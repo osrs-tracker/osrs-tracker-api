@@ -80,12 +80,7 @@ export class PlayersService {
       },
     );
 
-    if (includeLatestHiscoreEntry && player) {
-      return {
-        ...player,
-        hiscoreEntries: player.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? [],
-      };
-    }
+    if (includeLatestHiscoreEntry && player) return { ...player, hiscoreEntries: player.hiscoreEntries ?? [] };
 
     return player;
   }
@@ -126,7 +121,7 @@ export class PlayersService {
       ])
       .next();
 
-    return player?.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? null;
+    return player?.hiscoreEntries ?? null;
   }
 
   /** Records a visitor's lookup for the recent players list. Doesn't create unknown players. */
@@ -186,7 +181,7 @@ export class PlayersService {
 
     return players.map((player) => ({
       ...player,
-      hiscoreEntries: player.hiscoreEntries?.map((entry) => this.stripSourceStringFromHiscoreEntry(entry)) ?? [],
+      hiscoreEntries: player.hiscoreEntries ?? [],
     }));
   }
 
@@ -215,9 +210,7 @@ export class PlayersService {
         trackedSince: null,
         ...(includeLatestHiscoreEntry
           ? {
-              hiscoreEntries: [
-                { scrapingOffset, sourceString: 'LEGACY', date: player.lastModified, ...partialHiscoreEntry },
-              ],
+              hiscoreEntries: [{ scrapingOffset, date: player.lastModified, ...partialHiscoreEntry }],
             }
           : {}),
       },
@@ -251,7 +244,6 @@ export class PlayersService {
 
     const hiscoreEntry: HiscoreEntry = {
       scrapingOffset,
-      sourceString: 'LEGACY',
       date: new Date(),
       ...partialHiscoreEntry,
     };
@@ -362,16 +354,5 @@ export class PlayersService {
       this.logger.warn(`Hiscores (${type}) request failed for '${username}': ${(error as Error).message}`);
       return { status: 'failed' };
     }
-  }
-
-  /**
-   * @deprecated Remove this when we get rid of the sourceString field in the database.
-   * If the skills array is not empty, set sourceString to LEGACY, saves a lot of data.
-   */
-  private stripSourceStringFromHiscoreEntry(hiscoreEntry: HiscoreEntry): HiscoreEntry {
-    return {
-      ...hiscoreEntry,
-      sourceString: hiscoreEntry.skills?.length > 0 ? 'LEGACY' : hiscoreEntry.sourceString,
-    };
   }
 }
