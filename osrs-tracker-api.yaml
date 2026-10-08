@@ -40,24 +40,29 @@ spec:
           ports:
             - containerPort: 3000
             - containerPort: 9090
-          # /healthy only answers once MongoDB is connected, so allow 3 min for the connect retries in mongo.provider.ts
+          lifecycle:
+            # Keep serving until Traefik has dropped the terminating pod, otherwise in-flight requests get a 502/504
+            preStop:
+              sleep:
+                seconds: 5
+          # /healthy only answers once MongoDB is connected (about 1s after the container starts), so allow 3 min for the
+          # connect retries in mongo.provider.ts. Readiness and liveness only start once this has passed.
           startupProbe:
             httpGet:
               path: /healthy
               port: 9090
+            initialDelaySeconds: 2
             periodSeconds: 5
             failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /healthy
               port: 9090
-            initialDelaySeconds: 10
             periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /healthy
               port: 9090
-            initialDelaySeconds: 10
             periodSeconds: 5
 ---
 apiVersion: v1

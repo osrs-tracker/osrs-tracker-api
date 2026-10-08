@@ -16,8 +16,9 @@ async function bootstrap() {
   // Traefik is the only hop in front of the API and overwrites any client-sent X-Forwarded-For, so req.ip is the client
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
+  // No shutdown hooks here: /healthy keeps answering until the main app has drained and Nest exits the process, so the
+  // kubelet's probes don't get `connection refused` (Unhealthy events) while a terminating pod shuts down
   const appMetrics = await NestFactory.create(AppMetricsModule);
-  appMetrics.enableShutdownHooks();
 
   app.use(
     promBundle({
