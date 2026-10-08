@@ -36,6 +36,7 @@
 - Stricter checks: TypeScript runs in `strict` mode and ESLint fails on floating promises and flags `any` (the code
   already passed both). Removed unused dev dependencies (`@swc/cli`, `@swc/core`, `ts-node`, `tsconfig-paths`,
   `source-map-support`), which also clears the only `npm audit` finding, and leftover lint globs and Jest globals.
+- Dependency updates: `eslint` 10.12.0 and `typescript-eslint` 8.71.1 (lint tooling only).
 - Claude's pre-push lint check checks the worktree being pushed.
 - Project skill: when adding a changelog entry, reread the whole day, add subtitles once it's busy and merge entries
   about the same feature. Regrouped this day and 2026/10/07 that way.
