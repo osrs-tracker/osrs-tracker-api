@@ -28,6 +28,9 @@
 - Claude's pre-push lint check checks the worktree being pushed.
 - Project skill: when adding a changelog entry, reread the whole day, add subtitles once it's busy and merge entries
   about the same feature. Regrouped this day and 2026/10/07 that way.
+- README: fixed the license badge link, setup now starts from `.env.example` and warns that `.env` points at production
+  data, and it describes the metrics/health server on port 9090 and the checks to run before committing. Added a short
+  summary of the history before 2026/10/02 at the end of this changelog.
 
 ## 2026/10/07
 
@@ -113,3 +116,16 @@
 - dependency updates
 - Documented the external services (RuneScape API proxy, MongoDB Atlas, AWS Lambdas) in the project skill.
 - Expanded the README with an overview, how the API fits into OSRS Tracker and how to run it locally.
+
+## Before 2026/10/02
+
+Summarised from the commit history (2025/04/19 to 2026/09/23); this changelog started on 2026/10/02.
+
+- 2025/04: first version of the API: players with their hiscore history, items and item search, CI with lint and
+  Prettier checks, JSON logging and Prometheus metrics. Added `skipRefresh` to `GET /players/:username`, `Cache-Control`
+  headers on items and players, and the news endpoints with the `/news/image` proxy that converts images to WebP.
+- 2025/06: usernames are normalised so the same player isn't stored twice, and `X-Robots-Tag` headers keep the API out
+  of search engines.
+- 2025/11 to 2026/07: fixed status codes on player errors (including a 200 for a missing player with `skipRefresh`),
+  updated dependencies and fixed the bundling of the build and of `sharp`.
+- 2026/09/23: switched to Jagex's JSON hiscores and the new `@osrs-tracker/models`; `sourceString` became legacy.

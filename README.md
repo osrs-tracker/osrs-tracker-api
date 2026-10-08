@@ -1,4 +1,4 @@
-# OSRS Tracker API &middot; [![GitHub license](https://img.shields.io/github/license/osrs-tracker/osrs-tracker-api.svg)](https://github.com/osrs-tracker/osrs-tracker-api/blob/master/LICENSE) [![GitHub issues](https://img.shields.io/github/issues/osrs-tracker/osrs-tracker-api.svg)](https://github.com/osrs-tracker/osrs-tracker-api/issues) &middot; [![CI](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/nodejs.yml/badge.svg)](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/nodejs.yml) [![CD](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/deploy.yml)
+# OSRS Tracker API &middot; [![GitHub license](https://img.shields.io/github/license/osrs-tracker/osrs-tracker-api.svg)](https://github.com/osrs-tracker/osrs-tracker-api/blob/main/LICENSE) [![GitHub issues](https://img.shields.io/github/issues/osrs-tracker/osrs-tracker-api.svg)](https://github.com/osrs-tracker/osrs-tracker-api/issues) &middot; [![CI](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/nodejs.yml/badge.svg)](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/nodejs.yml) [![CD](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/deploy.yml)
 
 The API behind [OSRS Tracker](https://osrs-tracker.freekmencke.com). It looks up Old School RuneScape players, items and
 news, and stores player progress so the website can show how players gain XP over time.
@@ -20,15 +20,27 @@ everything is stored in MongoDB.
 
 ## Running it locally
 
-Create a `.env` file with `MONGODB_URI`, `MONGODB_USERNAME`, `MONGODB_PASSWORD`, `MONGODB_DATABASE` and
-`OSRS_API_BASE_URL`, then run:
+Copy `.env.example` to `.env` and fill in the MongoDB credentials (`MONGODB_URI`, `MONGODB_USERNAME`,
+`MONGODB_PASSWORD`). It also lists the optional settings (`CORS_ORIGIN`, `PORT`, `METRICS_PORT`, `NODE_ENV`). Then run:
 
 ```bash
 npm ci
 npm run start:dev
 ```
 
-The API runs on http://localhost:3000.
+**Careful:** there is no separate development database, so `.env` points at the **production** data. Looking up a player
+through the POST endpoints writes to it.
+
+The API runs on http://localhost:3000. A second server on port 9090 (`METRICS_PORT`) serves `/healthy` for the
+Kubernetes probes and `/metrics` for Prometheus; it isn't exposed publicly.
+
+## Checks
+
+There are no tests. Before committing, run the type check, lint, formatting check and build:
+
+```bash
+npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build
+```
 
 ## Built with
 
