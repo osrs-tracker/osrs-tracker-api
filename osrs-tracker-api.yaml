@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: osrs-tracker-api
-          image: freekmencke/osrs-tracker-api@sha256:7fe93b14835e8a2d5cc6045f0566cc236748e07d450fdbd54356bdf9a7034714
+          image: freekmencke/osrs-tracker-api@sha256:c1c1acbd3e2f07967164940af6b5527970d5a3fa752429a3b7bd96335e27bf9e
           imagePullPolicy: Always
           envFrom:
             - secretRef:
