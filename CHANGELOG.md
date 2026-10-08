@@ -1,30 +1,37 @@
 ## 2026/10/08
 
-- Behind the scenes: redeploys no longer fill the cluster with `Unhealthy` probe events. A shutting-down pod keeps
-  answering its health check until it has finished its requests, waits 5s for Traefik to stop sending it traffic (so
-  requests during a rollout don't get a 502), and new pods are probed once they're likely up, 2s after starting.
-  Rollouts are also faster: an old pod now exits as soon as its requests are done instead of hanging until it's killed
-  30s after shutdown starts.
+### Rollouts
+
+- Requests during a rollout no longer get a 502: a shutting-down pod keeps answering its health check until it has
+  finished its requests and waits 5s for Traefik to stop sending it traffic. Rollouts are also faster: an old pod exits
+  as soon as its requests are done instead of hanging until it's killed 30s after shutdown starts. New pods are probed
+  once they're likely up, 2s after starting, so redeploys no longer fill the cluster with `Unhealthy` probe events.
+
+### Logging
+
 - Request logs no longer report a client that disconnects before the response as an error. These lines are logged at
   `warn` with `aborted: true` and no `status`, and `responseTime` is the time until the connection closed instead of
   `undefinedms`. Other requests are logged as before.
-- Behind the scenes: merging to `main` deploys the API automatically. GitHub Actions builds and pushes the image and
-  commits its digest to `osrs-tracker-api.yaml`, which the cluster applies on its own, then checks that the deploy
-  succeeded and the API answers. Pushes that don't change the code or the image (documentation, for example) don't
-  deploy, and rolling back is reverting the digest commit.
-- Behind the scenes: pushes that only change `osrs-tracker-api.yaml` (deploy digests and rollbacks) no longer run CI, so
-  they don't start a CD run that skips. The deploy workflow is now called `CD`, next to `CI`, and its runs are named
-  after the commit they deploy.
-- Behind the scenes: deploy digest commits are attributed to the `github-actions[bot]` account (the committer email had
-  the wrong user ID).
-- Behind the scenes: removed the `docker:build` and `docker:push` scripts; images are only built and pushed by the CD
-  workflow.
-- Behind the scenes: the first push after a deploy no longer rebuilds and redeploys the API when it only changes docs.
-  CI now compares with the last commit it checked, skipping the deploy's digest commits.
-- Behind the scenes: the deploy's smoke test only checks routes the API serves itself (`/items`, `/items/4151`, a 404),
-  so a Jagex outage no longer fails a good deploy. Claude's pre-push lint check now checks the worktree being pushed.
+
+### Behind the scenes
+
+- Merging to `main` deploys the API automatically. The `CD` workflow (next to `CI`, with runs named after the commit
+  they deploy) builds and pushes the image and commits its digest to `osrs-tracker-api.yaml` as `github-actions[bot]`
+  (the committer email had the wrong user ID). The cluster applies it on its own, and the workflow then checks that the
+  deploy succeeded and smoke tests routes the API serves itself (`/items`, `/items/4151`, a 404), so a Jagex outage
+  doesn't fail a good deploy. Rolling back is reverting the digest commit. Images are only built and pushed this way:
+  the `docker:build` and `docker:push` scripts are gone.
+- Pushes that don't change the code or the image (documentation, for example) don't rebuild or redeploy, including the
+  first push after a deploy: CI compares with the last commit it checked, skipping the deploy's digest commits. Pushes
+  that only change `osrs-tracker-api.yaml` (deploy digests and rollbacks) don't run CI at all, so they don't start a CD
+  run that skips.
+- Claude's pre-push lint check checks the worktree being pushed.
+- Project skill: when adding a changelog entry, reread the whole day, add subtitles once it's busy and merge entries
+  about the same feature. Regrouped this day and 2026/10/07 that way.
 
 ## 2026/10/07
+
+### Read-only GETs and browser lookups
 
 - The item and player GETs are read-only, so crawlers no longer change the recent lookups or start tracking players.
   `GET /items/:id` and `GET /players/:username/hiscores` stop recording the lookup. `GET /players/:username` returns a
@@ -36,6 +43,9 @@
   `lastFetch` (204). The player one does what `GET /players/:username` does (refresh or start tracking when needed, same
   404/503/`refreshFailed` responses) and also sets `lastHiscoreFetch`. Bots (detected with `isbot`) and requests without
   a user agent get a 204 and write nothing. The GETs still write until the web app uses the POSTs.
+
+### Players
+
 - `GET /players/:username` (and the new lookup POST) return `pausedScrapingOffsets` for players whose tracking the
   hiscores-scraper paused, so the web app can still show their history.
 - `GET /players/:username` no longer answers 404 for a stored player when the hiscores are down. 404 means Jagex itself
@@ -48,9 +58,12 @@
   then 0.9.1, whose `lastHiscoreFetch` comment now says it is the last visitor lookup, not the last hiscores scrape.
 - `GET /players` accepts an optional `scrapingOffset` (-12 to 11) and then returns each player's newest hiscore entry
   for that offset, so the XP gained in the recent lookups is measured from the right point. Without it, nothing changes.
-- Behind the scenes: code changes are formatted automatically and checked for lint and formatting errors before they're
-  pushed, and reviewed against the project's conventions before release. The automatic build only runs when the code or
-  its dependencies change, not for deploys or documentation (unless the previous build didn't pass), and reuses the
+
+### Behind the scenes
+
+- Code changes are formatted automatically and checked for lint and formatting errors before they're pushed, and
+  reviewed against the project's conventions before release. The automatic build only runs when the code or its
+  dependencies change, not for deploys or documentation (unless the previous build didn't pass), and reuses the
   installed dependencies until they change.
 
 ## 2026/10/04

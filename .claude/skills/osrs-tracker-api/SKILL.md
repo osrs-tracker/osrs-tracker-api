@@ -108,7 +108,8 @@ Run end to end without asking; stop only on failure. Verify locally once before 
   run (`gh run watch --exit-status`), not CD. A direct push to `main` with source changes deploys it.
 - Conventional commits. `chore(deploy)` is reserved for the CD workflow's digest commits (it skips them).
 - `CHANGELOG.md`: newest day first. Busy days get `###` subtitles (by area, "Behind the scenes" last); extend an
-  existing entry rather than add a near-duplicate, and don't repeat the subtitle in its entries.
+  existing entry rather than add a near-duplicate, and don't repeat the subtitle in its entries. When adding an entry,
+  reread the whole day: add subtitles once it's busy, and merge entries about the same feature.
 - GPG "Inappropriate ioctl for device": ask the user to run `echo test | gpg --clearsign > /dev/null` in their terminal.
 - If `gh pr edit` fails on a Projects (classic) error:
   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>`.
