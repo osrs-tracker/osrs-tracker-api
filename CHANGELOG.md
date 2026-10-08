@@ -18,6 +18,12 @@
   real cause instead of crashing the logger with a `TypeError`. A failed shutdown now exits the way Nest intends. An
   error's stack trace is part of its JSON log line (`stack`) instead of being written to the output separately.
 
+### Players
+
+- Hiscore entries no longer have a `sourceString` (`@osrs-tracker/models` 0.10.0 removed it): the API stops writing
+  `'LEGACY'` into new entries and returns stored entries as they are, now that none has a real one left. Responses get
+  slightly smaller (24 bytes per entry).
+
 ### Behind the scenes
 
 - Merging to `main` deploys the API automatically. The `CD` workflow (next to `CI`, with runs named after the commit

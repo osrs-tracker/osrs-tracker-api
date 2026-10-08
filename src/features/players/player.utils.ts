@@ -26,7 +26,7 @@ export class PlayerUtils {
     }
   }
 
-  /** Transforms sourceString into combatLevel. */
+  /** Calculates the combat level from the skills. */
   static getCombatLevel(skills: HiscoreSkill[]): number {
     // default to level 1 when not found (-1)
     const attack = Math.max(1, skills[1].level);
@@ -45,7 +45,7 @@ export class PlayerUtils {
     return Math.floor(base + Math.max(melee, range, mage));
   }
 
-  /** Analyses sourceString to determine original playerType. Only works when the player has enough xp to appear in the hiscores. */
+  /** Determines the original playerType from the tables the player is on. Only works when the player has enough xp to appear in the hiscores. */
   static determineType(
     ironman: Partial<HiscoreEntry> | null,
     ultimate: Partial<HiscoreEntry> | null,
@@ -57,7 +57,7 @@ export class PlayerUtils {
     return PlayerType.Normal;
   }
 
-  /** Analyses sourceString to determine current playerStatus. Only works when the player has enough xp to appear in the hiscores. */
+  /** Determines the current playerStatus by comparing total xp across tables. Only works when the player has enough xp to appear in the hiscores. */
   static determineStatus(
     normal: Partial<HiscoreEntry> | null,
     ironman: Partial<HiscoreEntry> | null,
@@ -68,7 +68,7 @@ export class PlayerUtils {
     return PlayerStatus.Default;
   }
 
-  /** Transforms sourceString into totalXp, so we can use it to compare hiscores. */
+  /** Total xp of a hiscore entry, so we can compare hiscores. */
   static getTotalXp(hiscoreEntry: Partial<HiscoreEntry> | null): number {
     return hiscoreEntry?.skills?.[0]?.xp ?? Number.MAX_SAFE_INTEGER;
   }
