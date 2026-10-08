@@ -17,7 +17,7 @@
     "url": "github:osrs-tracker/osrs-tracker-api"
   },
   "scripts": {
-    "build": "NODE_ENV=production nest build -b webpack",
+    "build": "NODE_ENV=production nest build -b rspack",
     "prettier": "prettier --write \"src/**/*.ts\"",
     "prettier:ci": "prettier --check \"src/**/*.ts\"",
     "start": "nest start",
@@ -55,6 +55,7 @@
     "@nestjs/cli": "^12.0.8",
     "@nestjs/schematics": "^12.0.6",
     "@nestjs/testing": "^12.1.2",
+    "@rspack/core": "^2.2.8",
     "@types/express": "^5.0.6",
     "@types/morgan": "^1.9.10",
     "@types/node": "^24.19.1",
@@ -63,12 +64,10 @@
     "fork-ts-checker-webpack-plugin": "^9.1.0",
     "globals": "^17.8.0",
     "prettier": "^3.9.6",
-    "ts-loader": "^9.6.2",
     "tsconfig-paths-webpack-plugin": "^4.2.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3",
-    "webpack": "^5.111.1",
     "webpack-node-externals": "^3.0.0"
   },
   "allowScripts": {
