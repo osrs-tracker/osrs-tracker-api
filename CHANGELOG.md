@@ -14,6 +14,9 @@
 - Request logs no longer report a client that disconnects before the response as an error. These lines are logged at
   `warn` with `aborted: true` and no `status`, and `responseTime` is the time until the connection closed instead of
   `undefinedms`. Other requests are logged as before.
+- Errors that Nest logs as plain text, such as the port already being in use or a failed shutdown, are logged with their
+  real cause instead of crashing the logger with a `TypeError`. A failed shutdown now exits the way Nest intends. An
+  error's stack trace is part of its JSON log line (`stack`) instead of being written to the output separately.
 
 ### Behind the scenes
 
