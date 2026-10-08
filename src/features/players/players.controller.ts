@@ -22,7 +22,7 @@ import { addHours, differenceInHours, differenceInSeconds } from 'date-fns';
 import { Player } from '@osrs-tracker/models';
 import { Request, Response } from 'express';
 import { isBotRequest } from '../../common/bot/is-bot-request';
-import { PLAYER_CONFIG } from './player.config';
+import { MIN_PLAYER_REFRESH_HOURS } from './player.config';
 import { ParseUsernamePipe } from './parse-username.pipe';
 import { PlayersService } from './players.service';
 
@@ -71,7 +71,7 @@ export class PlayersController {
     if (player) {
       response.setHeader(
         'Cache-Control', // Set cache control to 15 minutes (900 seconds) or time until the minimum refresh time has passed
-        `max-age=${Math.max(0, Math.min(900, differenceInSeconds(addHours(player.lastModified, PLAYER_CONFIG.minPlayerRefreshTime), new Date())))}`,
+        `max-age=${Math.max(0, Math.min(900, differenceInSeconds(addHours(player.lastModified, MIN_PLAYER_REFRESH_HOURS), new Date())))}`,
       );
       return player;
     }
@@ -137,9 +137,9 @@ export class PlayersController {
     if (
       !player || // Player does not exist
       !playerHasOffset || // Player does not have the requested scraping offset
-      differenceInHours(new Date(), player.lastModified) >= PLAYER_CONFIG.minPlayerRefreshTime // Player is older than the refresh time
+      differenceInHours(new Date(), player.lastModified) >= MIN_PLAYER_REFRESH_HOURS // Player is older than the refresh time
     ) {
-      this.logger.log(`Player '${username} not found for offset '${scrapingOffset}' or outdated. Refreshing...`);
+      this.logger.log(`Player '${username}' not found for offset '${scrapingOffset}' or outdated. Refreshing...`);
 
       const result = await this.playersService.refreshPlayerInfo(username, scrapingOffset, !playerHasOffset);
       if (result === 'notFound') throw new NotFoundException(`Player '${username}' not found`);

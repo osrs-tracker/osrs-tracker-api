@@ -16,7 +16,8 @@ When you run it locally, the Swagger docs are available at `/swagger`.
 The [OSRS Tracker website](https://osrs-tracker.freekmencke.com)
 ([osrs-tracker-web](https://github.com/osrs-tracker/osrs-tracker-web)) gets its data from this API. Background jobs in
 [osrs-tracker-aws](https://github.com/osrs-tracker/osrs-tracker-aws) keep the player and item data up to date, and
-everything is stored in MongoDB.
+everything is stored in MongoDB. Which fields and indexes each of them owns is described in osrs-tracker-aws's
+[`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md).
 
 ## Running it locally
 

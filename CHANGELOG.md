@@ -23,6 +23,15 @@
 - Hiscore entries no longer have a `sourceString` (`@osrs-tracker/models` 0.10.0 removed it): the API stops writing
   `'LEGACY'` into new entries and returns stored entries as they are, now that none has a real one left. Responses get
   slightly smaller (24 bytes per entry).
+- Player requests are faster: they no longer ask MongoDB to create the `username` index on every call (one extra round
+  trip per `GET /players/:username` and `/hiscores`, two per POST lookup); the index is created once at startup.
+- `GET /players/:username` no longer returns `"hiscoreEntries": null` when `includeLatestHiscoreEntry` isn't set; the
+  key is left out, as the model describes.
+
+### News
+
+- `GET /news?limit=N` only accepts 1 to 50, like the other lists, and answers 400 otherwise (`limit=-1` used to return
+  every item but the last).
 
 ### Behind the scenes
 
@@ -44,6 +53,10 @@
   `source-map-support`), which also clears the only `npm audit` finding, and leftover lint globs and Jest globals.
 - Dependency updates: `eslint` 10.12.0 and `typescript-eslint` 8.71.1 (lint tooling only).
 - Claude's pre-push lint check checks the worktree being pushed.
+- Small cleanups: a log line's missing quote, the player refresh interval as a named constant
+  (`MIN_PLAYER_REFRESH_HOURS`) and no second username normalisation in `PlayersService` (the route pipe already does
+  it). The README and the project skill link osrs-tracker-aws's `DATA-MODEL.md` for who owns which field and index, and
+  the skill keeps only the API's side of the pause/resume contract.
 - Project skill: when adding a changelog entry, reread the whole day, add subtitles once it's busy and merge entries
   about the same feature. Regrouped this day and 2026/10/07 that way.
 - README: fixed the license badge link, setup now starts from `.env.example` and warns that `.env` points at production
