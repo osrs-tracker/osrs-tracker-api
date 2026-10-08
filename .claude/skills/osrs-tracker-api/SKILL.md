@@ -60,7 +60,11 @@ responses**, making the UI flash back to skeletons on hydration — never use th
 `src/common/http/cache-control.ts`; add new ones there, not as inline strings (only the stored player's dynamic
 `max-age` is built in place). Enforced in CI: ESLint's `no-restricted-syntax` (`eslint.config.mjs`) rejects the three
 banned words in any string in `src/`, and `src/app.e2e.spec.ts` requests every GET route and checks its exact
-`Cache-Control` and that it doesn't write. A new GET route fails that spec until it gets a case in its `CASES`.
+`Cache-Control` and that it doesn't write. Keep its `CASES` current: one case per outcome of a GET that sends its own
+`Cache-Control` (stored or unknown, success or outage), so a GET change that adds, removes or changes such an outcome
+changes `CASES` in the same diff. The spec fails on a new GET route without a case and on a new `CACHE_CONTROL` value no
+case expects (values only POSTs send go in its `POST_ONLY`); a new branch reusing an existing value it can't see, so
+that one is on the author and the `conventions-reviewer`.
 
 - Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/news/image` 604800).
 - Routes that fetch Jagex live (`/news`, `/news/image`) set it with `res.setHeader` after the fetch succeeds, not with

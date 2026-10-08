@@ -26,7 +26,8 @@ Review what the caller names (a PR number, a branch or a path). Otherwise review
 
 Judge the changed lines, but read the surrounding code to confirm a finding: a missing check may live in a caller, a
 base class, an interceptor or a shared provider. Rules that span files (a new index and `mongo.provider.ts`, a GET route
-and its `Cache-Control`, a user-visible change and `CHANGELOG.md`) are checked against the whole diff.
+and its `Cache-Control`, a GET's `Cache-Control` outcomes and `CASES` in `src/app.e2e.spec.ts`, a user-visible change
+and `CHANGELOG.md`) are checked against the whole diff.
 
 ## Output
 

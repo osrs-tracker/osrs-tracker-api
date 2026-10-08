@@ -45,8 +45,9 @@ const storedPlayer = {
 const item = { id: 4151, name: 'Abyssal whip', icon: 'whip.png' };
 
 /**
- * One or more requests per GET route, keyed by the route's path as Nest registers it. A new GET route fails the
- * "covers every GET route" test until it's added here.
+ * One or more requests per GET route, keyed by the route's path as Nest registers it: one per outcome that sends its
+ * own `Cache-Control` (stored or unknown, success or outage). A new GET route fails the "covers every GET route" test
+ * until it's added here, and a new `CACHE_CONTROL` value fails "expects every GET Cache-Control value".
  */
 const CASES: Record<string, Case[]> = {
   '/players': [{ url: '/players', status: 200, cacheControl: CACHE_CONTROL.REVALIDATE }],
@@ -89,6 +90,9 @@ const CASES: Record<string, Case[]> = {
     },
   ],
 };
+
+/** `CACHE_CONTROL` values only the POST lookup sends, which this spec doesn't request. */
+const POST_ONLY: string[] = [CACHE_CONTROL.PLAYER_REFRESH_FAILED, CACHE_CONTROL.PLAYER_REFRESHED];
 
 let fakes: Fakes = {};
 let collectionCalls: string[] = [];
@@ -181,6 +185,15 @@ describe('GET routes', () => {
     const getRoutes = router.stack.flatMap(({ route }) => (route?.methods['get'] ? [route.path] : []));
 
     expect(getRoutes.sort()).toEqual(Object.keys(CASES).sort());
+  });
+
+  it('expects every GET Cache-Control value', () => {
+    const expected = new Set(Object.values(CASES).flatMap((routeCases) => routeCases.map((c) => c.cacheControl)));
+    const unchecked = Object.values(CACHE_CONTROL).filter(
+      (value) => !expected.has(value) && !POST_ONLY.includes(value),
+    );
+
+    expect(unchecked).toEqual([]);
   });
 
   const cases = Object.entries(CASES).flatMap(([route, routeCases]) =>
