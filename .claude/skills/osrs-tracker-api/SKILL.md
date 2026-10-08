@@ -24,7 +24,11 @@ keep code rules here, not in the agent.
   stored field also needs an update there: open an issue in osrs-tracker-aws.
 - Env: `.env.example` lists the vars, `.env` holds local values (points at prod). In the cluster they come from the
   `aws-mongodb-credentials` secret, with the `env:` block in `osrs-tracker-api.yaml` overriding `OSRS_API_BASE_URL` (an
-  API Gateway proxy to `https://secure.runescape.com` that passes Jagex's headers through).
+  API Gateway proxy to `https://secure.runescape.com` that passes Jagex's headers through). `validateEnv`
+  (`src/config/env.ts`, `ConfigModule`'s `validate` in `AppModule`) checks and types them at startup; read them with
+  `ConfigService<Env, true>` (`config.get('X', { infer: true })`), never `process.env`. A new var goes in `Env`,
+  `validateEnv`, its spec and `.env.example`; a required one also in `app.e2e.spec.ts`'s `vi.stubEnv` calls (validation
+  runs when `AppModule` is imported) and in the cluster.
 - Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert).
 - `npm run build` bundles `node_modules` into `dist/` with webpack (only `sharp` is external; the image ships just
   `dist/`). Nest CLI 12 only peers webpack and its plugins, so they're direct dev dependencies: a worktree finds the

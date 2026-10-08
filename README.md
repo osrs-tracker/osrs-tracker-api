@@ -22,7 +22,8 @@ everything is stored in MongoDB. Which fields and indexes each of them owns is d
 ## Running it locally
 
 Copy `.env.example` to `.env` and fill in the MongoDB credentials (`MONGODB_URI`, `MONGODB_USERNAME`,
-`MONGODB_PASSWORD`). It also lists the optional settings (`CORS_ORIGIN`, `PORT`, `METRICS_PORT`, `NODE_ENV`). Then run:
+`MONGODB_PASSWORD`). It also lists the optional settings (`CORS_ORIGIN`, `PORT`, `METRICS_PORT`, `NODE_ENV`). The API
+won't start while a required one is missing or a value is invalid; the error lists them all. Then run:
 
 ```bash
 npm ci

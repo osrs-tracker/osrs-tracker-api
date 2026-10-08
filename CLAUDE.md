@@ -12,9 +12,9 @@ this file.
 - Verify: `npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build && npm test`.
 - Dev server: `npm run start:dev` on port 3000, Swagger at `/swagger`. `.env` points at production data.
 - Worktrees in `.claude/worktrees/` use the main checkout's `node_modules` (found in a parent folder); run `npm ci` in
-  one only when its `package.json` changes. They have no `.env` (`start:dev` then fails on the Mongo URI): link the main
-  checkout's with `ln -s ../../../.env .env` and remove the link when done. Other sessions share port 3000: check
-  `ss -ltn | grep :3000` before `npm run start:dev`, and stop it when done.
+  one only when its `package.json` changes. They have no `.env` (`start:dev` then fails listing the missing vars): link
+  the main checkout's with `ln -s ../../../.env .env` and remove the link when done. Other sessions share port 3000:
+  check `ss -ltn | grep :3000` before `npm run start:dev`, and stop it when done.
 
 ## Hard rules
 

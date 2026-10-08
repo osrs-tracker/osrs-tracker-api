@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { getHiscore, HiscoreResult } from '@osrs-tracker/hiscores';
 import { HiscoreEntry, Player, PlayerType } from '@osrs-tracker/models';
 import { Agent } from 'https';
@@ -6,6 +7,7 @@ import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
 import fetch from 'node-fetch';
 import { Semaphore } from '../../common/concurrency/semaphore';
+import { Env } from '../../config/env';
 import { MAX_CONCURRENT_HISCORE_REQUESTS, NOT_FOUND_CACHE_MAX, NOT_FOUND_CACHE_TTL_MS } from './player.config';
 import { buildRefreshUpdate } from './player.policy';
 import { PlayerUtils } from './player.utils';
@@ -40,6 +42,7 @@ export class PlayersService {
   constructor(
     @Inject('AGENT') private readonly agent: Agent,
     @Inject('MONGODB_DATABASE') private readonly db: Db,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   async getPlayer(
@@ -314,7 +317,7 @@ export class PlayersService {
   private async getHiscore(username: string, type: PlayerType): Promise<HiscoreResult> {
     const result = await this.hiscoreRequests.run(() =>
       getHiscore({
-        baseUrl: process.env.OSRS_API_BASE_URL!,
+        baseUrl: this.config.get('OSRS_API_BASE_URL', { infer: true }),
         username,
         table: PlayerUtils.getHiscoreTable(type),
         fetch: (url, init) => fetch(url, { ...init, agent: this.agent }),

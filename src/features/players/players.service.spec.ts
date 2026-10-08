@@ -1,7 +1,9 @@
+import { ConfigService } from '@nestjs/config';
 import { getHiscore, HiscoreResult } from '@osrs-tracker/hiscores';
 import { Db } from 'mongodb';
 import { Agent } from 'https';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Env } from '../../config/env';
 import { MAX_CONCURRENT_HISCORE_REQUESTS } from './player.config';
 import { PlayersService } from './players.service';
 
@@ -32,7 +34,8 @@ describe('PlayersService hiscore lookups', () => {
 
   beforeEach(() => {
     mockGetHiscore.mockReset();
-    service = new PlayersService(undefined as unknown as Agent, {} as Db); // Previews never touch the database
+    const config = { get: () => 'https://secure.runescape.com' } as unknown as ConfigService<Env, true>;
+    service = new PlayersService(undefined as unknown as Agent, {} as Db, config); // Previews never touch the database
   });
 
   it("asks only the normal table for a name that isn't on the hiscores, or when it fails", async () => {

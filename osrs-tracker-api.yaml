@@ -53,15 +53,15 @@ spec:
             preStop:
               sleep:
                 seconds: 5
-          # /healthy only answers once MongoDB is connected (about 1s after the container starts), so allow 3 min for the
-          # connect retries in mongo.provider.ts. Readiness and liveness only start once this has passed.
+          # /healthy only answers once MongoDB is connected (about 1s after the container starts), so allow 4.5 min for
+          # the connect retries in mongo.provider.ts (230s at worst). Readiness and liveness only start once this passed.
           startupProbe:
             httpGet:
               path: /healthy
               port: 9090
             initialDelaySeconds: 2
             periodSeconds: 5
-            failureThreshold: 36
+            failureThreshold: 54
           readinessProbe:
             httpGet:
               path: /healthy
