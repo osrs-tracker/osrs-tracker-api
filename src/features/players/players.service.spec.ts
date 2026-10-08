@@ -49,6 +49,16 @@ describe('PlayersService hiscore lookups', () => {
     expect(mockGetHiscore).toHaveBeenCalledTimes(1);
   });
 
+  it('fails on a hiscore without the combat skills instead of throwing or storing a wrong combat level', async () => {
+    answerWith({
+      status: 'found',
+      hiscore: { skills: skills.slice(0, 5), activities: [] },
+    } as unknown as HiscoreResult);
+    expect(await service.previewPlayer('truncated', 0, false)).toEqual({ status: 'failed' });
+    expect(mockGetHiscore).toHaveBeenCalledTimes(1);
+    expect(await service.refreshPlayerInfo('truncated', 0, true)).toBe('failed');
+  });
+
   it('asks all four tables for a player that is on the hiscores', async () => {
     answerWith(found);
     expect((await service.previewPlayer('toxsick', 0, false)).status).toBe('found');

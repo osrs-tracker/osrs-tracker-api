@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Item } from '@osrs-tracker/models';
 import { Collection, Db } from 'mongodb';
+import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 
 @Injectable()
 export class ItemsService {
@@ -10,7 +11,7 @@ export class ItemsService {
     return this.db.collection(this.COLLECTION_NAME);
   }
 
-  constructor(@Inject('MONGODB_DATABASE') private readonly db: Db) {}
+  constructor(@Inject(MONGODB_DATABASE) private readonly db: Db) {}
 
   getLastFetchedItems(limit: number): Promise<Item[]> {
     return this.collection

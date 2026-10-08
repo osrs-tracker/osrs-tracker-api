@@ -5,7 +5,9 @@ import { AddressInfo } from 'node:net';
 import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from './app.module';
+import { AGENT } from './common/agent/agent.provider';
 import { CACHE_CONTROL } from './common/http/cache-control';
+import { MONGO_CLIENT, MONGODB_DATABASE } from './common/mongo/mongo.provider';
 
 /**
  * Boots the whole app against a fake database and a fake Jagex, and checks the skill's Cache-Control rules for every
@@ -115,6 +117,9 @@ const cursor = (docs: object[]) => {
   return self;
 };
 
+/** Only closed, by `MongoModule` on shutdown. */
+const fakeMongoClient = { close: vi.fn(async () => undefined) };
+
 /** Records every method called on any collection, and answers reads with `fakes.docs`. */
 const fakeDb = {
   collection: (name: string) =>
@@ -166,11 +171,11 @@ describe('GET routes', () => {
     fakeFetch.mockImplementation(fakeJagex);
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider('MONGO_CLIENT')
-      .useValue({})
-      .overrideProvider('MONGODB_DATABASE')
+      .overrideProvider(MONGO_CLIENT)
+      .useValue(fakeMongoClient)
+      .overrideProvider(MONGODB_DATABASE)
       .useValue(fakeDb)
-      .overrideProvider('AGENT')
+      .overrideProvider(AGENT)
       .useValue(undefined)
       .compile();
 
@@ -179,7 +184,10 @@ describe('GET routes', () => {
     baseUrl = `http://127.0.0.1:${((app.getHttpServer() as Server).address() as AddressInfo).port}`;
   });
 
-  afterAll(() => app?.close());
+  afterAll(async () => {
+    await app?.close();
+    expect(fakeMongoClient.close).toHaveBeenCalledOnce();
+  });
 
   beforeEach(() => {
     fakes = {};

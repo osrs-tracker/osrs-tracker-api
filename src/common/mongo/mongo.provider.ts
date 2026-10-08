@@ -4,6 +4,9 @@ import { setTimeout } from 'node:timers/promises';
 import { MongoClient, ServerApiVersion } from 'mongodb';
 import { Env } from '../../config/env';
 
+export const MONGO_CLIENT = 'MONGO_CLIENT';
+export const MONGODB_DATABASE = 'MONGODB_DATABASE';
+
 const logger = new Logger('MongoProvider');
 
 const MAX_CONNECT_ATTEMPTS = 12;
@@ -43,13 +46,13 @@ async function connectWithRetry(config: ConfigService<Env, true>): Promise<Mongo
 }
 
 export const mongoClientProvider: FactoryProvider = {
-  provide: 'MONGO_CLIENT',
+  provide: MONGO_CLIENT,
   useFactory: connectWithRetry,
   inject: [ConfigService],
 };
 
 export const mongoDBProvider: FactoryProvider = {
-  provide: 'MONGODB_DATABASE',
+  provide: MONGODB_DATABASE,
   useFactory: async (mongoClient: MongoClient, config: ConfigService<Env, true>) => {
     const db = mongoClient.db(config.get('MONGODB_DATABASE', { infer: true }));
 
@@ -68,5 +71,5 @@ export const mongoDBProvider: FactoryProvider = {
 
     return db;
   },
-  inject: ['MONGO_CLIENT', ConfigService],
+  inject: [MONGO_CLIENT, ConfigService],
 };
