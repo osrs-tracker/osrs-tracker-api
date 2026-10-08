@@ -77,14 +77,14 @@ changes within 10 minutes.
 2. Flux applies that commit within a minute and reports the rollout as the `Flux / deploy` commit status (failures also
    reach Discord). The workflow waits up to 10 minutes for it, then checks that `/news` and `/items` on
    `https://osrs-tracker-api.freekmencke.com` answer 200.
-3. Follow it with `gh run watch` on the `Deploy` run, then smoke test the changed routes yourself:
+3. Follow it with `gh run watch` on the `CD` run, then smoke test the changed routes yourself:
    `curl -s -D - -o /dev/null` (status, `cache-control`), and
    `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m` (reading the cluster is fine).
 4. If the web app's rendering changes, check those pages in the browser (see the web skill); cached pages may lag up to
    5 minutes.
 
-- **Retry** a failed deploy (Docker Hub or Flux hiccup) by re-running the failed `Deploy` run; a later docs-only push
-  won't redeploy.
+- **Retry** a failed deploy (Docker Hub or Flux hiccup) by re-running the failed `CD` run; a later docs-only push won't
+  redeploy.
 - **Roll back** by reverting the digest commit on `main` (`git revert <sha> && git push`, admin bypass): Flux applies
   the previous digest, and the revert itself doesn't trigger a build. Fix or revert the code too, or the next merge
   deploys it again.
@@ -104,7 +104,7 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 - Doc-only changes go straight to `main`. Otherwise, outside a release, **ask every time**: `main` or a PR. The admin
   account bypasses `main`'s PR rule; after a direct push, `gh run watch --exit-status`. A direct push to `main` with
   source changes deploys it.
-- Conventional commits. `chore(deploy)` is reserved for the Deploy workflow's digest commits (it skips them).
+- Conventional commits. `chore(deploy)` is reserved for the CD workflow's digest commits (it skips them).
 - **Every change gets a `CHANGELOG.md` entry** under `## YYYY/MM/DD`, newest first. Busy days get `###` subtitles (by
   area, "Behind the scenes" last); extend an existing entry rather than add a near-duplicate, and don't repeat the
   subtitle in its entries.
