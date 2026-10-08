@@ -77,7 +77,9 @@
   it). The README and the project skill link osrs-tracker-aws's `DATA-MODEL.md` for who owns which field and index, and
   the skill keeps only the API's side of the pause/resume contract.
 - Project skill: when adding a changelog entry, reread the whole day, add subtitles once it's busy and merge entries
-  about the same feature. Regrouped this day and 2026/10/07 that way.
+  about the same feature. Regrouped this day and 2026/10/07 that way. Releasing from a worktree no longer tries to
+  switch to `main` (the main checkout has it) or delete the PR branch GitHub already deleted; `CLAUDE.md` and the README
+  point at the new Cache-Control checks.
 - README: fixed the license badge link, setup now starts from `.env.example` and warns that `.env` points at production
   data, and it describes the metrics/health server on port 9090 and the checks to run before committing. Added a short
   summary of the history before 2026/10/02 at the end of this changelog. The `Dockerfile` health check comment now names

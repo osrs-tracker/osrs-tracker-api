@@ -21,12 +21,14 @@ this file.
   merging one after another, rebase and fold the entries under one heading.
 - Doc-only changes go straight to `main`; for anything else, ask: `main` or a PR (unless releasing).
 - Deploying is merging to `main` (GitHub Actions → Flux). Never build, push or `kubectl apply` by hand.
-- Never `--no-gpg-sign`. Never `no-store`, `no-cache` or `private` in `Cache-Control`.
+- Never `--no-gpg-sign`. Never `no-store`, `no-cache` or `private` in `Cache-Control` (ESLint and `src/app.e2e.spec.ts`
+  enforce it).
 
 ## Where things live
 
 - `src/features/<feature>/` (items, news, players): controller, service and module per feature; the player refresh and
-  `max-age` rules in `players/player.policy.ts`. Specs (`*.spec.ts`) sit next to the code.
+  `max-age` rules in `players/player.policy.ts`. Specs (`*.spec.ts`) sit next to the code; `src/app.e2e.spec.ts` boots
+  the app on fakes and lists every GET route's `Cache-Control`.
 - `src/common/` shared providers, injected by string token (Mongo, HTTP agent, XML parser), plus bot detection, route
   labels and the `Cache-Control` values (`http/cache-control.ts`); `src/middleware/` request logging and robots.
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.

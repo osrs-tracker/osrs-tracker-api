@@ -129,9 +129,11 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 
 1. Commit on a `<type>/<short-name>` branch, push, `gh pr create --base main`.
 2. Review `gh pr diff` for bugs and leftovers while the `conventions-reviewer` agent checks the PR; fix both and push.
-3. `gh pr checks <n> --watch`. When checks pass: `gh pr merge <n> --merge --delete-branch` (it deploys; if Claude Code's
-   permission check blocks it, give the user the command and wait), switch to `main`, pull, `git branch -d <branch>`,
-   `git fetch --prune`.
+3. `gh pr checks <n> --watch`. When checks pass: `gh pr merge <n> --merge` (it deploys; if Claude Code's permission
+   check blocks it, give the user the command and wait). GitHub deletes the PR branch on merge. Then pull `main` and
+   `git fetch --prune`; in the main checkout also switch to `main` first and `git branch -d <branch>`. In a worktree
+   `main` is checked out by the main checkout, so pull there (`git -C <main checkout> pull --ff-only`) instead of
+   switching.
 4. Done: the deploy runs on its own (Deploy step 3). Pull `main` again later for the digest commit.
 
 ## Commit and push
@@ -139,7 +141,8 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 - PRs need the `build`, `lint` and `test` checks (the `main` ruleset); `build` and `test` report as skipped when CI
   finds no source changes, which still passes.
 - `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push, watch its **CI**
-  run (`gh run watch --exit-status`), not CD. A direct push to `main` with source changes deploys it.
+  run (`gh run watch --exit-status`), not CD. A direct push to `main` with source changes deploys it. From a worktree,
+  push with `git push origin HEAD:main`.
 - Conventional commits. `chore(deploy)` is reserved for the CD workflow's digest commits (it skips them).
 - `CHANGELOG.md`: newest day first. Busy days get `###` subtitles (by area, "Behind the scenes" last); extend an
   existing entry rather than add a near-duplicate, and don't repeat the subtitle in its entries. When adding an entry,
