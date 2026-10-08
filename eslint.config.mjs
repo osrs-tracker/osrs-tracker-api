@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   {
-    ignores: ['eslint.config.mjs', 'webpack.config.js'],
+    ignores: ['eslint.config.mjs', 'rspack.config.js'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

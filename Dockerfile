@@ -22,7 +22,7 @@ FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b533
 
 WORKDIR /app
 
-# webpack keeps sharp external (webpack.config.js): install the version package.json pins
+# The bundle keeps sharp external (rspack.config.js): install the version package.json pins
 COPY package.json /tmp/
 RUN npm install --cpu=x64 --os=linux --libc=musl sharp@$(node -p "require('/tmp/package.json').dependencies.sharp") \
   && rm /tmp/package.json

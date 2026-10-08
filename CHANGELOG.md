@@ -96,10 +96,14 @@
 - Upgraded to NestJS 12 (`@nestjs/*` 12, `@nestjs/config` 12, `@nestjs/swagger` 12) and TypeScript 6.0; responses, logs
   and graceful shutdown are unchanged. Swagger 12 brings the patched `js-yaml` itself, so the `overrides` entry for it
   is gone. `@osrs-tracker/models` 0.10.1 lists its types first in `exports`, which TypeScript 6 needs, and
-  `tsconfig.json` now names `node` in `types` (TypeScript 6 no longer loads every `@types` package). Nest's CLI no
-  longer brings webpack, so it and its plugins are dev dependencies now. The build skips Nest's optional imports under
-  their new ESM names and Swagger's optional `@fastify/static`. Dependabot doesn't propose TypeScript 6.1 until
-  `typescript-eslint` supports it.
+  `tsconfig.json` now names `node` in `types` (TypeScript 6 no longer loads every `@types` package). The build skips
+  Nest's optional imports under their new ESM names and Swagger's optional `@fastify/static`. Dependabot doesn't propose
+  TypeScript 6.1 until `typescript-eslint` supports it.
+- The build uses rspack instead of webpack, which Nest CLI 12 deprecates (`rspack.config.js` replaces
+  `webpack.config.js`; `webpack` and `ts-loader` are no longer dev dependencies). It takes about 1.5s instead of 2s, and
+  the bundle is 6.1 MB instead of 6.7 MB. Responses, Swagger's document, logs and graceful shutdown are unchanged. The
+  build still fails on type errors, CI's only type check, and now also fails if the type checker is missing instead of
+  silently skipping it. `npm run start:dev` still compiles with `tsc`.
 - Settings are read once, validated, through Nest's `ConfigService` (`src/config/env.ts`) instead of `process.env` in
   six files. `.env` is loaded once instead of twice, and CORS no longer depends on which module happens to load it
   first.

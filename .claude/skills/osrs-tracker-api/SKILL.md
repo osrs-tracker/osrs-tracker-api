@@ -32,12 +32,16 @@ keep code rules here, not in the agent.
   `validateEnv`, its spec and `.env.example`; a required one also in `app.e2e.spec.ts`'s `vi.stubEnv` calls (validation
   runs when `AppModule` is imported) and in the cluster.
 - Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert).
-- `npm run build` bundles `node_modules` into `dist/` with webpack (only `sharp` is external; the image ships just
-  `dist/` plus `sharp`, which the `Dockerfile` installs at the exact version `package.json` pins: keep it exact, with no
-  `^`). Nest CLI 12 only peers webpack and its plugins, so they're direct dev dependencies: a worktree finds the main
-  checkout's `node_modules` too, so check a build-tool change with `npm ci` in a copy outside the repo, like CI. An
-  optional package a dependency imports lazily and tolerates missing fails the build with "Can't resolve": add it to
-  `lazyImports` in `webpack.config.js`, under the exact specifier (Nest 12's ESM imports end in `.js`).
+- `npm run build` (`nest build -b rspack`, configured by `rspack.config.js`) bundles `node_modules` into `dist/` (only
+  `sharp` is external; the image ships just `dist/` plus `sharp`, which the `Dockerfile` installs at the exact version
+  `package.json` pins: keep it exact, with no `^`). It compiles with SWC and type checks with
+  `fork-ts-checker-webpack-plugin`, CI's only type check: Nest CLI skips it silently when it's missing, so
+  `rspack.config.js` fails the build instead. The builder is set in the script, not `nest-cli.json`, so `nest start`
+  keeps using `tsc`. Nest CLI 12 only peers `@rspack/core` and the plugins, so they're direct dev dependencies: a
+  worktree finds the main checkout's `node_modules` too, so check a build-tool change with `npm ci` in a copy outside
+  the repo, like CI. An optional package a dependency imports lazily and tolerates missing fails the build with "Can't
+  resolve": add it to `lazyImports` in `rspack.config.js`, under the exact specifier (Nest 12's ESM imports end in
+  `.js`; the CLI's own list doesn't, so don't drop ours).
 - TypeScript 6 only loads the `@types` packages listed in `tsconfig.json`'s `types` (`node`); add one there when its
   globals are needed. It resolves packages through `exports`, so a package that lists `types` after `require` gets its
   CJS typings (`@osrs-tracker/models` before 0.10.1).

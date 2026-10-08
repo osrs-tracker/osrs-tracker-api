@@ -57,7 +57,7 @@ jobs:
           fi
           printf 'Changed files:\n%s\n' "$files"
           if printf '%s\n' "$files" \
-            | grep -q -E '^(src/|\.github/|package(-lock)?\.json$|tsconfig[^/]*\.json$|nest-cli\.json$|webpack\.config\.js$|vitest\.config\.mjs$|Dockerfile$|\.dockerignore$)'; then
+            | grep -q -E '^(src/|\.github/|package(-lock)?\.json$|tsconfig[^/]*\.json$|nest-cli\.json$|rspack\.config\.js$|vitest\.config\.mjs$|Dockerfile$|\.dockerignore$)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
