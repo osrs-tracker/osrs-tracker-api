@@ -2,8 +2,9 @@
 
 - Behind the scenes: redeploys no longer fill the cluster with `Unhealthy` probe events. A shutting-down pod keeps
   answering its health check until it has finished its requests, waits 5s for Traefik to stop sending it traffic (so
-  requests during a rollout don't get a 502), and new pods are probed once they're likely up, 2s after starting. Rollouts
-  are also about 10s faster per pod.
+  requests during a rollout don't get a 502), and new pods are probed once they're likely up, 2s after starting.
+  Rollouts are also faster: an old pod now exits as soon as its requests are done instead of hanging until it's killed
+  30s after shutdown starts.
 - Request logs no longer report a client that disconnects before the response as an error. These lines are logged at
   `warn` with `aborted: true` and no `status`, and `responseTime` is the time until the connection closed instead of
   `undefinedms`. Other requests are logged as before.

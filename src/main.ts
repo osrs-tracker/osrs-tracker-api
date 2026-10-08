@@ -11,7 +11,9 @@ import { SWAGGER_CONFIG } from './config/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: CORS_CONFIG, logger: new JSONLogger() });
-  app.enableShutdownHooks();
+  // Exit with process.exit() once closed: by default Nest re-sends the signal to itself, which the kernel ignores for
+  // PID 1 (node in the container), so the pod would hang until the kubelet SIGKILLs it at the grace period
+  app.enableShutdownHooks(undefined, { useProcessExit: true });
   app.getHttpAdapter().getInstance().disable('x-powered-by');
   // Traefik is the only hop in front of the API and overwrites any client-sent X-Forwarded-For, so req.ip is the client
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
