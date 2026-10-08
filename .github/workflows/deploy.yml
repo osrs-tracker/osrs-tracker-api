@@ -1,4 +1,6 @@
 name: CD
+# Without it, runs started by workflow_run are all just called "CD"
+run-name: ${{ github.event.workflow_run.display_title }}
 
 # Builds and pushes the image, then commits its digest to `osrs-tracker-api.yaml` on main. Flux in the cluster applies
 # that commit and reports the rollout as the `Flux / deploy` commit status. Nothing here has cluster access.
