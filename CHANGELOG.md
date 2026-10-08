@@ -12,6 +12,8 @@
   after the commit they deploy.
 - Behind the scenes: deploy digest commits are attributed to the `github-actions[bot]` account (the committer email had
   the wrong user ID).
+- Behind the scenes: removed the `docker:build` and `docker:push` scripts; images are only built and pushed by the CD
+  workflow.
 
 ## 2026/10/07
 
