@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Controller,
   DefaultValuePipe,
   Get,
@@ -10,7 +9,6 @@ import {
   NotFoundException,
   Param,
   ParseBoolPipe,
-  ParseIntPipe,
   Post,
   Query,
   Req,
@@ -22,6 +20,8 @@ import { Player } from '@osrs-tracker/models';
 import { Request, Response } from 'express';
 import { isBotRequest } from '../../common/bot/is-bot-request';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
+import { ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
+import { ParseScrapingOffsetPipe } from './parse-scraping-offset.pipe';
 import { ParseUsernamePipe } from './parse-username.pipe';
 import { needsRefresh, playerMaxAgeSeconds } from './player.policy';
 import { PlayersService } from './players.service';
@@ -39,13 +39,9 @@ export class PlayersController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'scrapingOffset', required: false, type: Number })
   getRecentPlayers(
-    @Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number,
-    @Query('scrapingOffset', new ParseIntPipe({ optional: true })) scrapingOffset?: number,
+    @Query('limit', new ParseIntRangePipe({ min: 1, max: 50, default: 5 })) limit: number,
+    @Query('scrapingOffset', new ParseScrapingOffsetPipe({ optional: true })) scrapingOffset?: number,
   ) {
-    if (limit < 1 || limit > 50) throw new BadRequestException('Limit must be between 1 and 50.');
-    if (scrapingOffset !== undefined && (scrapingOffset < -12 || scrapingOffset > 11))
-      throw new BadRequestException('ScrapingOffset < -12 or > 11.');
-
     return this.playersService.getLastFetchedPlayers(limit, scrapingOffset);
   }
 
@@ -58,13 +54,10 @@ export class PlayersController {
   async getByUsername(
     @Res({ passthrough: true }) response: Response,
     @Param('username', ParseUsernamePipe) username: string,
-    @Query('scrapingOffset', new DefaultValuePipe(0), ParseIntPipe) scrapingOffset: number,
+    @Query('scrapingOffset', new ParseScrapingOffsetPipe()) scrapingOffset: number,
     @Query('includeLatestHiscoreEntry', new DefaultValuePipe(false), ParseBoolPipe) includeLatestHiscoreEntry: boolean,
     @Query('skipRefresh', new DefaultValuePipe(false), ParseBoolPipe) skipRefresh: boolean,
   ) {
-    if (isNaN(scrapingOffset)) throw new BadRequestException('Invalid scraping offset');
-    if (scrapingOffset < -12 || scrapingOffset > 11) throw new BadRequestException('ScrapingOffset < -12 or > 11.');
-
     // Read-only: refreshing, starting to track and recording the lookup happen in the browser's POST lookup.
     const player = await this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
 
@@ -99,12 +92,9 @@ export class PlayersController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
     @Param('username', ParseUsernamePipe) username: string,
-    @Query('scrapingOffset', new DefaultValuePipe(0), ParseIntPipe) scrapingOffset: number,
+    @Query('scrapingOffset', new ParseScrapingOffsetPipe()) scrapingOffset: number,
     @Query('includeLatestHiscoreEntry', new DefaultValuePipe(false), ParseBoolPipe) includeLatestHiscoreEntry: boolean,
   ) {
-    if (isNaN(scrapingOffset)) throw new BadRequestException('Invalid scraping offset');
-    if (scrapingOffset < -12 || scrapingOffset > 11) throw new BadRequestException('ScrapingOffset < -12 or > 11.');
-
     if (isBotRequest(request)) {
       response.status(HttpStatus.NO_CONTENT);
       return;
@@ -168,15 +158,10 @@ export class PlayersController {
   @ApiQuery({ name: 'skip', required: false, type: Number })
   getHiscoresByUsername(
     @Param('username', ParseUsernamePipe) username: string,
-    @Query('scrapingOffset', new DefaultValuePipe(0), ParseIntPipe) scrapingOffset: number,
-    @Query('size', new DefaultValuePipe(7), ParseIntPipe) size: number,
-    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
+    @Query('scrapingOffset', new ParseScrapingOffsetPipe()) scrapingOffset: number,
+    @Query('size', new ParseIntRangePipe({ min: 1, max: 100, default: 7 })) size: number,
+    @Query('skip', new ParseIntRangePipe({ min: 0, default: 0 })) skip: number,
   ) {
-    if (isNaN(scrapingOffset)) throw new BadRequestException('Invalid scraping offset');
-    if (scrapingOffset < -12 || scrapingOffset > 11) throw new BadRequestException('ScrapingOffset < -12 or > 11.');
-    if (size < 1 || size > 100) throw new BadRequestException('Size must be between 1 and 100.');
-    if (skip < 0) throw new BadRequestException('Skip must be 0 or greater.');
-
     return this.playersService.getPlayerHiscores(username, scrapingOffset, size, skip);
   }
 }

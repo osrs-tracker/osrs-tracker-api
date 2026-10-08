@@ -2,10 +2,10 @@
 name: osrs-tracker-api
 description: >-
   Repo-specific rules for the osrs-tracker-api NestJS/MongoDB service: Cache-Control rules for the web app's SSR
-  transfer cache, Mongo pipeline-update pitfalls, the player pause/resume contract, unit tests (Vitest), production
-  testing, and the GitHub Actions → Flux deploy. Use when adding or changing endpoints, Cache-Control headers or
-  player/item writes, writing or running tests, testing against production data, or building, deploying, committing,
-  pushing, releasing or shipping this repo.
+  transfer cache, param validation pipes, Mongo pipeline-update pitfalls, the player pause/resume contract, unit tests
+  (Vitest), production testing, and the GitHub Actions → Flux deploy. Use when adding or changing endpoints, query or
+  route params, Cache-Control headers or player/item writes, writing or running tests, testing against production data,
+  or building, deploying, committing, pushing, releasing or shipping this repo.
 ---
 
 # osrs-tracker-api
@@ -30,6 +30,14 @@ keep code rules here, not in the agent.
   (dist-tags lag).
 - Request logs (`logger.middleware.ts`, JSON to Loki): 5xx `error`, 4xx `warn`, else `info`. A client that disconnects
   before the response is `warn` with `aborted: true` and no `status`; keep that shape, osrs-tracker-web logs the same.
+
+## Validating params
+
+Validate query and route params in pipes, not with checks in the handler: `ParseUsernamePipe`,
+`ParseScrapingOffsetPipe`, and `new ParseIntRangePipe({ min, max?, default?, optional?, message? })` from
+`common/pipes/` for any other integer (its message is named after the param: `Limit must be between 1 and 50.`). Don't
+add `DefaultValuePipe` + `ParseIntPipe` + a range check, or an `isNaN` check after a parse pipe. Keep existing status
+codes and messages: the web may show them. A new pipe gets a spec.
 
 ## Mongo pipeline updates
 
@@ -86,9 +94,10 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   records every collection call, and `node-fetch` mocked as a fake Jagex (no network). Vite's transformer emits Nest's
   decorator metadata from `tsconfig.json`, so no SWC plugin is needed.
 - Covered: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's pause/resume,
-  `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status (`PlayerUtils`) and
-  `ParseUsernamePipe`, and per GET route its `Cache-Control` and that it never writes (`app.e2e.spec.ts`; a route's
-  header or a new GET route means changing its `CASES`). Changing one of those means changing its spec.
+  `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status (`PlayerUtils`), the validation
+  pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`,
+  `skip` and IDs), and per GET route its `Cache-Control` and that it never writes (`app.e2e.spec.ts`; a route's header
+  or a new GET route means changing its `CASES`). Changing one of those means changing its spec.
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.

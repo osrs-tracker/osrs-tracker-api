@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Controller,
-  DefaultValuePipe,
   Get,
   Header,
   HttpCode,
@@ -9,7 +8,6 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
-  ParseIntPipe,
   Post,
   Query,
   Req,
@@ -18,7 +16,10 @@ import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { isBotRequest } from '../../common/bot/is-bot-request';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
+import { ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
 import { ItemsService } from './items.service';
+
+const ITEM_ID_PIPE = new ParseIntRangePipe({ min: 1, message: (id) => `Invalid item ID "${id}"` });
 
 @ApiTags('items')
 @Controller('items')
@@ -29,9 +30,7 @@ export class ItemsController {
   @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
   @ApiOperation({ summary: 'Get the last fetched items' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  getRecentItems(@Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number) {
-    if (limit < 1 || limit > 50) throw new BadRequestException('Limit must be between 1 and 50.');
-
+  getRecentItems(@Query('limit', new ParseIntRangePipe({ min: 1, max: 50, default: 5 })) limit: number) {
     return this.itemsService.getLastFetchedItems(limit);
   }
 
@@ -39,9 +38,7 @@ export class ItemsController {
   @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
   @ApiOperation({ summary: 'Get an item by ID' })
   @ApiParam({ name: 'id', description: 'Item ID' })
-  async getById(@Param('id', new DefaultValuePipe(0), ParseIntPipe) id: number) {
-    if (isNaN(id) || id <= 0) throw new BadRequestException(`Invalid item ID "${id}"`);
-
+  async getById(@Param('id', ITEM_ID_PIPE) id: number) {
     const item = await this.itemsService.getItem(id);
 
     if (!item) throw new NotFoundException(`Item with ID "${id}" not found`);
@@ -53,9 +50,7 @@ export class ItemsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Record a visitor's lookup of an item (ignored for bots)" })
   @ApiParam({ name: 'id', description: 'Item ID' })
-  async recordLookup(@Req() request: Request, @Param('id', new DefaultValuePipe(0), ParseIntPipe) id: number) {
-    if (isNaN(id) || id <= 0) throw new BadRequestException(`Invalid item ID "${id}"`);
-
+  async recordLookup(@Req() request: Request, @Param('id', ITEM_ID_PIPE) id: number) {
     if (isBotRequest(request)) return;
 
     await this.itemsService.recordLookup(id);

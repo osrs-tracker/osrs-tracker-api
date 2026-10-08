@@ -1,9 +1,9 @@
 ---
 name: conventions-reviewer
 description:
-  Reviews a diff in osrs-tracker-api against the project's own conventions (Cache-Control, Mongo pipeline updates, the
-  player pause/resume contract), not general bugs. Use after implementing a change, before opening or merging a PR, or
-  when asked to check conventions.
+  Reviews a diff in osrs-tracker-api against the project's own conventions (Cache-Control, param validation pipes, Mongo
+  pipeline updates, the player pause/resume contract), not general bugs. Use after implementing a change, before opening
+  or merging a PR, or when asked to check conventions.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -15,8 +15,9 @@ You review changes in osrs-tracker-api against the project's house rules. You re
 Read these first, every run. They are the only source of rules; don't apply generic NestJS style preferences.
 
 1. `.claude/skills/osrs-tracker-api/SKILL.md`: the conventions. Every rule in it about code applies (setup gotchas,
-   Mongo pipeline updates, pausing and resuming players, Cache-Control). Process steps (deploy, release, commits) apply
-   only when the diff touches what they describe, such as `CHANGELOG.md` or `osrs-tracker-api.yaml`.
+   validating params, Mongo pipeline updates, pausing and resuming players, Cache-Control). Process steps (deploy,
+   release, commits) apply only when the diff touches what they describe, such as `CHANGELOG.md` or
+   `osrs-tracker-api.yaml`.
 2. `CLAUDE.md`: the hard rules and code placement, which the skill doesn't repeat.
 
 ## Scope

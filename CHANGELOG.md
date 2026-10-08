@@ -71,6 +71,8 @@
   route: each must send its expected `Cache-Control` and must not write to the database, and a new GET route or a new
   `Cache-Control` value fails it until a test case covers it. ESLint rejects `no-store`, `no-cache` and `private`
   anywhere in a string in `src/`.
+- Query and route param validation (`limit`, `size`, `skip`, `scrapingOffset` and item IDs) lives in two shared, tested
+  pipes instead of checks repeated in every handler. Status codes and error messages are unchanged.
 - Dependency updates: `eslint` 10.12.0 and `typescript-eslint` 8.71.1 (lint tooling only).
 - Claude's pre-push lint check checks the worktree being pushed.
 - Small cleanups: a log line's missing quote, the player refresh interval as a named constant

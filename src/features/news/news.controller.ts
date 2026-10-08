@@ -1,7 +1,8 @@
-import { BadRequestException, Controller, DefaultValuePipe, Get, ParseIntPipe, Query, Res } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Query, Res } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
+import { ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
 import { NewsService } from './news.service';
 
 @ApiTags('news')
@@ -14,10 +15,8 @@ export class NewsController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getRecentNews(
     @Res({ passthrough: true }) res: Response,
-    @Query('limit', new DefaultValuePipe(4), ParseIntPipe) limit: number,
+    @Query('limit', new ParseIntRangePipe({ min: 1, max: 50, default: 4 })) limit: number,
   ) {
-    if (limit < 1 || limit > 50) throw new BadRequestException('Limit must be between 1 and 50.');
-
     const news = await this.newsService.getRecentNews(limit);
 
     // Set only on success (not with @Header), so caches don't keep a 503 for 5 minutes while Jagex is down
