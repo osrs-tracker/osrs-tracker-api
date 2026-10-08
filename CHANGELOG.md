@@ -27,6 +27,11 @@
   trip per `GET /players/:username` and `/hiscores`, two per POST lookup); the index is created once at startup.
 - `GET /players/:username` no longer returns `"hiscoreEntries": null` when `includeLatestHiscoreEntry` isn't set; the
   key is left out, as the model describes.
+- Hiscores are fetched with the shared client from `@osrs-tracker/hiscores` 3.1.1, the one the `process-players` Lambda
+  uses, instead of the API's own copy. Timeouts, 404/400 handling and the 503s stay the same; a hiscores response is now
+  also rejected when `activities` isn't a list, and a failure's log line says why (status, timeout or network error).
+  New players' first hiscore entry, and the preview of an unknown player, no longer include the `name` the hiscores echo
+  back, matching the entries the Lambda stores.
 
 ### News
 
