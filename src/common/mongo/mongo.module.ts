@@ -1,6 +1,7 @@
 import { Global, Inject, Logger, Module, OnApplicationShutdown } from '@nestjs/common';
 import { MongoClient } from 'mongodb';
 import { setTimeout } from 'node:timers/promises';
+import { MONGO_LOG_CONTEXT } from '../logger/nest-logger';
 import { MONGO_CLIENT, mongoClientProvider, mongoDBProvider } from './mongo.provider';
 
 /** Bounds closing the client on shutdown, so an unreachable Atlas can't keep a terminating pod alive. */
@@ -12,7 +13,7 @@ const CLOSE_TIMEOUT_MS = 5_000;
   exports: [mongoClientProvider, mongoDBProvider],
 })
 export class MongoModule implements OnApplicationShutdown {
-  private readonly logger = new Logger(MongoModule.name);
+  private readonly logger = new Logger(MONGO_LOG_CONTEXT);
 
   constructor(@Inject(MONGO_CLIENT) private readonly client: MongoClient) {}
 

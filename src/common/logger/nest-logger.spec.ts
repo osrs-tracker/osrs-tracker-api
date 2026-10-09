@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLS_ID, ClsServiceManager } from 'nestjs-cls';
-import { NestLogger } from './nest-logger';
+import { MONGO_LOG_CONTEXT, NestLogger } from './nest-logger';
 import { createApiLogger } from './logger';
 
 describe('NestLogger', () => {
@@ -11,6 +11,10 @@ describe('NestLogger', () => {
   beforeEach(() => {
     written = [];
     logger = new NestLogger(createApiLogger({ write: (line: string) => written.push(line) }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   /** Everything written, as one parsed object per line. */
@@ -118,5 +122,48 @@ describe('NestLogger', () => {
     logger.verbose('verbose', 'PlayersService');
 
     expect(written).toEqual([]);
+  });
+
+  it('writes only through pino: no plain stack lines on stdout or stderr', () => {
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    logger.error('Unhandled exception', new Error('boom').stack, 'ExceptionsHandler');
+    logger.fatal('Fatal', new Error('boom').stack);
+
+    expect(stdout).not.toHaveBeenCalled();
+    expect(stderr).not.toHaveBeenCalled();
+    expect(lines()).toHaveLength(2);
+  });
+
+  it("writes a Nest Logger's structured params as fields, without overwriting the format's own", () => {
+    Logger.overrideLogger(logger);
+    new Logger('PlayersService').warn('Hiscores failed', { username: 'toxsick', level: 'debug', type: 'x' });
+    Logger.overrideLogger(false);
+
+    expect(line()).toMatchObject({ level: 'warn', type: 'app', username: 'toxsick', message: 'Hiscores failed' });
+  });
+
+  it('writes an object message on one line, not as [object Object]', () => {
+    logger.error({ code: 'E_THROWN' }, 'ExceptionsHandler');
+
+    expect(line()).toMatchObject({ type: 'uncaught', message: "{ code: 'E_THROWN' }" });
+  });
+
+  it('writes the stack on the first line only when one call logs several messages', () => {
+    const { stack } = new Error('boom');
+
+    logger.error('first', 'second', stack, 'PlayersService');
+
+    const [first, second] = lines();
+    expect(first).toMatchObject({ message: 'first', error: stack });
+    expect(second).toMatchObject({ message: 'second' });
+    expect(second).not.toHaveProperty('error');
+  });
+
+  it("writes Mongo's connect and close lines as type lifecycle", () => {
+    logger.warn('MongoDB connect attempt 1/12 failed, retrying', MONGO_LOG_CONTEXT);
+
+    expect(line()).toMatchObject({ type: 'lifecycle', context: MONGO_LOG_CONTEXT });
   });
 });

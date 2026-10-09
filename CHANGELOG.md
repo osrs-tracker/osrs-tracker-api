@@ -23,11 +23,15 @@
 - All log lines now come from the shared `@osrs-tracker/logger` (pino), the same format as the web server's, replacing
   the hand-written request log (`morgan`) and app logger. Every line is one JSON object with `level` `info`, `warn` or
   `error` (Loki's level detection is unchanged), `time` as an ISO string and a new `type` saying what it's about:
-  `incoming` (a request the API answered), `outgoing` (a request it made), `lifecycle` (startup and shutdown), `uncaught`
-  (an unhandled error) or `app` (the API's own warnings and notes), so Grafana can pick one kind with
+  `incoming` (a request the API answered), `outgoing` (a request it made), `lifecycle` (startup and shutdown),
+  `uncaught` (an unhandled error) or `app` (the API's own warnings and notes), so Grafana can pick one kind with
   `| json | type="outgoing"`. App lines keep `context` (the logging class's name) and write an error's stack as one
   string under `error`; everything goes to stdout. Request lines keep their fields (`status`, `route`, `aborted`,
-  `responseTime`, …), but `responseTime` now runs until the response has finished, so it may read slightly higher.
+  `responseTime`, …), but `responseTime` now runs until the response has finished, so it may read slightly higher. An
+  error logged with a stack no longer also prints it as plain lines on stderr (which Loki read as separate lines without
+  a level), extra fields passed to a log call (`logger.warn('…', { username })`) are written as fields instead of
+  dropped, and an object logged as the message reads as the object instead of `[object Object]`. Mongo's connect and
+  close lines now have the context `MongoDB` (was `MongoProvider` and `MongoModule`).
 - Requests the API makes (Jagex's hiscores, the news feed and news images) are now logged as `type: "outgoing"` with
   their status, URL and duration, carrying the `requestId` of the request that made them.
 - Every request gets an ID, logged as `requestId` on its request line and on every line logged while handling it (such
