@@ -52,6 +52,9 @@ keep code rules here, not in the agent.
   bump with `--prefer-online` (dist-tags lag).
 - Request logs (`logger.middleware.ts`, JSON to Loki): 5xx `error`, 4xx `warn`, else `info`. A client that disconnects
   before the response is `warn` with `aborted: true` and no `status`; keep that shape, osrs-tracker-web logs the same.
+- Traefik compresses JSON for browsers (the `osrs-tracker-api-compress` Middleware in `osrs-tracker-api.yaml`, last in
+  the Ingress's chain), adding `Vary: Accept-Encoding`; the web's SSR calls the Service directly and gets it plain.
+  Don't add Nest's `compression`. The request log's `contentLength` is the uncompressed size.
 
 ## Validating params
 
