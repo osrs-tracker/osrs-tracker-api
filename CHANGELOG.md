@@ -35,6 +35,10 @@
 - A route that duplicates or shadows another (e.g. `/items/recent` next to `/items/:id`, which Express would never
   reach) now stops the API at startup and fails the tests, instead of silently never answering. Today's routes don't
   overlap, so nothing changes at runtime.
+- The 10 MB news image limit is enforced by `undici` itself, on an HTTP agent of its own for image requests (hiscore and
+  feed requests stay unlimited), replacing the hand-written byte counting. An image over it still answers 503, also when
+  it doesn't send its size up front, and is now always requested uncompressed, so the limit holds for what is actually
+  read.
 
 ## 2026/10/08
 

@@ -1,9 +1,12 @@
 import { Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { XMLParser } from 'fast-xml-parser';
+import { createServer, IncomingHttpHeaders, Server } from 'node:http';
+import { AddressInfo } from 'node:net';
 import sharp from 'sharp';
 import { Agent, fetch, Response } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
+import { imageAgentProvider, MAX_IMAGE_BYTES } from '../../common/agent/agent.provider';
 import { XMLParserProvider } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
 import { NewsService } from './news.service';
@@ -46,7 +49,7 @@ describe('NewsService caches', () => {
 
     const config = { get: () => 'https://secure.runescape.com' } as unknown as ConfigService<Env, true>;
     const xmlParser = XMLParserProvider.useFactory() as XMLParser;
-    service = new NewsService(undefined as unknown as Agent, xmlParser, config);
+    service = new NewsService(undefined as unknown as Agent, undefined as unknown as Agent, xmlParser, config);
   });
 
   afterEach(() => vi.restoreAllMocks());
@@ -129,6 +132,57 @@ describe('NewsService caches', () => {
 
       await expect(service.getImageAsWebp(IMAGE_URL)).rejects.toBeInstanceOf(NotFoundException);
       expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('getImageAsWebp size limit', () => {
+    let server: Server;
+    let imageAgent: Agent;
+    let requests: IncomingHttpHeaders[];
+
+    /** A local server answering every request with an image body one byte over the limit. */
+    function serveOversizedImage(withContentLength: boolean): Promise<void> {
+      server = createServer((req, res) => {
+        requests.push(req.headers);
+        res.setHeader('content-type', 'image/png');
+        const body = Buffer.alloc(MAX_IMAGE_BYTES + 1);
+        if (withContentLength) return void res.end(body); // sets content-length
+        res.write(body); // chunked, no content-length
+        res.end();
+      });
+      return new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    }
+
+    beforeEach(async () => {
+      const undici = await vi.importActual<typeof import('undici')>('undici');
+      mockFetch.mockImplementation(undici.fetch);
+      requests = [];
+      imageAgent = imageAgentProvider.useFactory() as Agent;
+      const config = { get: () => '' } as unknown as ConfigService<Env, true>;
+      service = new NewsService(undefined as unknown as Agent, imageAgent, {} as XMLParser, config);
+    });
+
+    afterEach(async () => {
+      await imageAgent.close();
+      await new Promise((resolve) => server.close(resolve));
+    });
+
+    it.each([
+      ['with', true],
+      ['without', false],
+    ])("answers 503 for a body over the limit %s content-length, logs why and doesn't cache it", async (_, cl) => {
+      await serveOversizedImage(cl);
+      const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/news/big.png`;
+
+      const error = await service.getImageAsWebp(url).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ServiceUnavailableException);
+      expect((error as ServiceUnavailableException).message).toBe('Failed to fetch image');
+      expect(warn).toHaveBeenCalledExactlyOnceWith(`Image request failed for ${url}: Body larger than 10485760 bytes`);
+      // The limit counts bytes off the wire, so a compressed body mustn't be asked for
+      expect(requests[0]['accept-encoding']).toBe('identity');
+
+      await expect(service.getImageAsWebp(url)).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(requests).toHaveLength(2);
     });
   });
 });
