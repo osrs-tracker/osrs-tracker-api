@@ -1,6 +1,5 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import type { FormatFn } from 'morgan';
 import { Server } from 'node:http';
 import { AddressInfo } from 'node:net';
 import sharp from 'sharp';
@@ -17,27 +16,27 @@ import { ROUTE_CONFLICT_POLICY } from './config/app-options';
  * transfer cache drops those), and never writes to the database.
  */
 
-const { fakeFetch, requestLines } = vi.hoisted(() => {
+const { fakeFetch, logLines } = vi.hoisted(() => {
   // Before AppModule is imported: `ConfigModule.forRoot` validates the environment then. These win over a local `.env`.
   vi.stubEnv('MONGODB_URI', 'mongodb://fake');
   vi.stubEnv('MONGODB_USERNAME', 'fake');
   vi.stubEnv('MONGODB_PASSWORD', 'fake');
   vi.stubEnv('MONGODB_DATABASE', 'fake');
   vi.stubEnv('OSRS_API_BASE_URL', 'https://secure.runescape.com');
-  return { fakeFetch: vi.fn<(url: string) => Promise<Response>>(), requestLines: [] as Record<string, unknown>[] };
+  return { fakeFetch: vi.fn<(url: string) => Promise<Response>>(), logLines: [] as Record<string, unknown>[] };
 });
 vi.mock('undici', async (importOriginal) => ({
   ...(await importOriginal<typeof import('undici')>()),
   fetch: fakeFetch,
 }));
-// Request log lines go to `requestLines`, not the test output
-vi.mock('morgan', async (importOriginal) => {
-  const { default: morgan } = await importOriginal<{ default: typeof import('morgan') }>();
+// Every log line (request lines, app lines; Nest's own are off) goes to `logLines`, not the test output
+vi.mock('./common/logger/logger', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./common/logger/logger')>();
   return {
-    default: (format: FormatFn) =>
-      morgan(format, {
-        stream: { write: (line: string) => requestLines.push(JSON.parse(line) as Record<string, unknown>) },
-      }),
+    ...actual,
+    logger: actual.createApiLogger({
+      write: (line: string) => logLines.push(JSON.parse(line) as Record<string, unknown>),
+    }),
   };
 });
 
@@ -249,8 +248,14 @@ describe('GET routes', () => {
     async function requestId(headers?: Record<string, string>): Promise<string | null> {
       const response = await fetch(`${baseUrl}/items`, { headers });
       const id = response.headers.get('x-request-id');
-      // Morgan writes the line once the response has finished, which can be after the client has it
-      await vi.waitFor(() => expect(requestLines.at(-1)).toMatchObject({ route: '/items', requestId: id }));
+      // The line is written once the response has finished, which can be after the client has it
+      await vi.waitFor(() =>
+        expect(logLines.filter((line) => line.type === 'incoming').at(-1)).toMatchObject({
+          status: '200',
+          route: '/items',
+          requestId: id,
+        }),
+      );
       return id;
     }
 

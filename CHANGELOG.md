@@ -20,16 +20,21 @@
 
 ### Logging
 
-- The app's own log lines (startup, warnings, errors) come from Nest's built-in JSON logger instead of a hand-written
-  one. They keep one JSON object per line with `level` `info`, `warn` or `error`, so Loki's level detection is
-  unchanged; the time is now `timestamp` (epoch ms) with the `pid`, `context` is the logging class's name, an error
-  logged as an `Error` gets a structured `error` field (name, message, stack, cause), and errors go to stderr. Request
-  log lines keep their format.
+- All log lines now come from the shared `@osrs-tracker/logger` (pino), the same format as the web server's, replacing
+  the hand-written request log (`morgan`) and app logger. Every line is one JSON object with `level` `info`, `warn` or
+  `error` (Loki's level detection is unchanged), `time` as an ISO string and a new `type` saying what it's about:
+  `incoming` (a request the API answered), `outgoing` (a request it made), `lifecycle` (startup and shutdown), `uncaught`
+  (an unhandled error) or `app` (the API's own warnings and notes), so Grafana can pick one kind with
+  `| json | type="outgoing"`. App lines keep `context` (the logging class's name) and write an error's stack as one
+  string under `error`; everything goes to stdout. Request lines keep their fields (`status`, `route`, `aborted`,
+  `responseTime`, …), but `responseTime` now runs until the response has finished, so it may read slightly higher.
+- Requests the API makes (Jagex's hiscores, the news feed and news images) are now logged as `type: "outgoing"` with
+  their status, URL and duration, carrying the `requestId` of the request that made them.
 - Every request gets an ID, logged as `requestId` on its request line and on every line logged while handling it (such
   as a hiscores warning), so a warning can be tied to the request that caused it: in Grafana,
   `{app="osrs-tracker-api"} | json | requestId="<id>"`. Responses send it back as `X-Request-Id`; a client's own
   `X-Request-Id` is ignored, so clients can't give unrelated requests the same ID. Lines outside a request (startup,
-  shutdown) have none, and every other field is unchanged.
+  shutdown) have none.
 
 ### License
 

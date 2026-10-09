@@ -13,7 +13,7 @@ import { NewsModule } from './features/news/news.module';
 import { JAGEX_HISCORES, JAGEX_HISCORES_PRESET } from './features/players/player.config';
 import { PlayersModule } from './features/players/players.module';
 import { validateEnv } from './config/env';
-import { LoggerMiddleware } from './middleware/logger.middleware';
+import { requestLog } from './middleware/logger.middleware';
 import { NoIndexMiddleware } from './middleware/robots.middleware';
 
 @Module({
@@ -37,6 +37,6 @@ import { NoIndexMiddleware } from './middleware/robots.middleware';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggerMiddleware, NoIndexMiddleware).forRoutes('*');
+    consumer.apply(requestLog, NoIndexMiddleware).forRoutes('*');
   }
 }
