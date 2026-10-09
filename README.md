@@ -1,4 +1,12 @@
-# OSRS Tracker API &middot; [![GitHub license](https://img.shields.io/github/license/osrs-tracker/osrs-tracker-api.svg)](https://github.com/osrs-tracker/osrs-tracker-api/blob/main/LICENSE) [![GitHub issues](https://img.shields.io/github/issues/osrs-tracker/osrs-tracker-api.svg)](https://github.com/osrs-tracker/osrs-tracker-api/issues) &middot; [![CI](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/nodejs.yml/badge.svg)](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/nodejs.yml) [![CD](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/deploy.yml)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Elastic--2.0-blue.svg" /></a>
+  <a href="https://github.com/osrs-tracker/osrs-tracker-api/issues"><img src="https://img.shields.io/github/issues/osrs-tracker/osrs-tracker-api.svg" /></a>
+  &middot;
+  <a href="https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/nodejs.yml"><img src="https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/nodejs.yml/badge.svg" /></a>
+  <a href="https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/deploy.yml"><img src="https://github.com/osrs-tracker/osrs-tracker-api/actions/workflows/deploy.yml/badge.svg" /></a>
+</p>
+
+# OSRS Tracker API
 
 The API behind [OSRS Tracker](https://osrs-tracker.freekmencke.com). It looks up Old School RuneScape players, items and
 news, and stores player progress so the website can show how players gain XP over time.
@@ -70,4 +78,4 @@ reliability.
 ## License
 
 [Elastic License 2.0](LICENSE): you're welcome to read the code, learn from it, change it and run it yourself, but not
-to offer it to others as a hosted service, paid or free. Versions up to 9 October 2026 were released under Apache 2.0.
+to offer it to others as a hosted service, paid or free.
