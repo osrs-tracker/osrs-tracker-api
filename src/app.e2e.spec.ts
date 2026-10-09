@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import type { FormatFn } from 'morgan';
 import { Server } from 'node:http';
 import { AddressInfo } from 'node:net';
 import sharp from 'sharp';
@@ -16,21 +17,29 @@ import { ROUTE_CONFLICT_POLICY } from './config/app-options';
  * transfer cache drops those), and never writes to the database.
  */
 
-const { fakeFetch } = vi.hoisted(() => {
+const { fakeFetch, requestLines } = vi.hoisted(() => {
   // Before AppModule is imported: `ConfigModule.forRoot` validates the environment then. These win over a local `.env`.
   vi.stubEnv('MONGODB_URI', 'mongodb://fake');
   vi.stubEnv('MONGODB_USERNAME', 'fake');
   vi.stubEnv('MONGODB_PASSWORD', 'fake');
   vi.stubEnv('MONGODB_DATABASE', 'fake');
   vi.stubEnv('OSRS_API_BASE_URL', 'https://secure.runescape.com');
-  return { fakeFetch: vi.fn<(url: string) => Promise<Response>>() };
+  return { fakeFetch: vi.fn<(url: string) => Promise<Response>>(), requestLines: [] as Record<string, unknown>[] };
 });
 vi.mock('undici', async (importOriginal) => ({
   ...(await importOriginal<typeof import('undici')>()),
   fetch: fakeFetch,
 }));
-// No request log lines in the test output
-vi.mock('morgan', () => ({ default: () => (_req: unknown, _res: unknown, next: () => void) => next() }));
+// Request log lines go to `requestLines`, not the test output
+vi.mock('morgan', async (importOriginal) => {
+  const { default: morgan } = await importOriginal<{ default: typeof import('morgan') }>();
+  return {
+    default: (format: FormatFn) =>
+      morgan(format, {
+        stream: { write: (line: string) => requestLines.push(JSON.parse(line) as Record<string, unknown>) },
+      }),
+  };
+});
 
 /** Collection methods that only read. Anything else a GET calls counts as a write, so new write methods fail too. */
 const READ_METHODS = new Set(['find', 'findOne', 'aggregate', 'countDocuments', 'estimatedDocumentCount', 'distinct']);
@@ -231,5 +240,34 @@ describe('GET routes', () => {
     expect(response.status).toBe(status);
     expect(response.headers.get('cache-control')).toBe(cacheControl);
     expect(collectionCalls.filter((call) => !READ_METHODS.has(call.split('.')[1]))).toEqual([]);
+  });
+
+  describe('request ID', () => {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+    /** The response's `X-Request-Id`, after checking the request log line carries the same `requestId`. */
+    async function requestId(headers?: Record<string, string>): Promise<string | null> {
+      const response = await fetch(`${baseUrl}/items`, { headers });
+      const id = response.headers.get('x-request-id');
+      // Morgan writes the line once the response has finished, which can be after the client has it
+      await vi.waitFor(() => expect(requestLines.at(-1)).toMatchObject({ route: '/items', requestId: id }));
+      return id;
+    }
+
+    it('generates a new UUID per request, logged on its request line', async () => {
+      const first = await requestId();
+      const second = await requestId();
+
+      expect(first).toMatch(UUID);
+      expect(second).toMatch(UUID);
+      expect(second).not.toBe(first);
+    });
+
+    it("reuses the client's X-Request-Id only when it's a UUID", async () => {
+      const incoming = crypto.randomUUID();
+
+      expect(await requestId({ 'X-Request-Id': incoming })).toBe(incoming);
+      expect(await requestId({ 'X-Request-Id': 'not-a-uuid' })).toMatch(UUID);
+    });
   });
 });

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
+import { CLS_ID, ClsServiceManager } from 'nestjs-cls';
 import { JsonLogger } from './json-logger';
 
 describe('JsonLogger', () => {
@@ -73,6 +74,20 @@ describe('JsonLogger', () => {
       message: 'fetch failed',
       error: { name: 'TypeError', message: 'fetch failed', stack: error.stack },
     });
+  });
+
+  it("writes the request's ID inside its context, and none outside", () => {
+    const cls = ClsServiceManager.getClsService();
+
+    cls.run(() => {
+      cls.set(CLS_ID, 'request-1');
+      logger.warn('Hiscores unavailable', 'PlayersService');
+    });
+    logger.log('Nest application successfully started', 'NestApplication');
+
+    const [inside, outside] = lines();
+    expect(inside).toMatchObject({ level: 'warn', requestId: 'request-1' });
+    expect(outside).not.toHaveProperty('requestId');
   });
 
   it('writes nothing for debug and verbose', () => {
