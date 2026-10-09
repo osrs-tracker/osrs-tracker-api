@@ -20,9 +20,11 @@ keep code rules here, not in the agent.
   (`MONGODB_DATABASE`, `MONGO_CLIENT`, `AGENT`, `XML_PARSER`): use the constant in `provide`, `@Inject` and
   `overrideProvider`, never the string. Outgoing requests use `fetch` from `undici` with `AGENT` (an `undici` `Agent`)
   as `dispatcher` and a timeout: an `AbortSignal.timeout` (news feed 10s, images 20s), or for hiscores the shared
-  client's own (10s). `MongoModule` is global and closes the client on shutdown (bounded to 5s); new indexes go in
-  `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy` stays liveness only and
-  never checks Mongo.
+  client's own (10s). Jagex data cached in memory (the news feed, images) is an `lru-cache` with a `fetchMethod`, read
+  with `forceFetch`: it shares the fetch in flight per key and doesn't cache a rejection, so don't add a pending map
+  beside it; to keep a stale value on failure, return it from `fetchMethod` (setting `options.ttl` for the retry delay).
+  `MongoModule` is global and closes the client on shutdown (bounded to 5s); new indexes go in `mongo.provider.ts`, the
+  only place the API creates indexes (never per request). `/healthy` stays liveness only and never checks Mongo.
 - The `players` and `items` collections, their fields, writers and index owners are described in osrs-tracker-aws's
   [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new or changed index or
   stored field also needs an update there: open an issue in osrs-tracker-aws.
@@ -133,9 +135,11 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   `hasCombatSkills`), the validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe`
   (`common/pipes/`, for `limit`, `size`, `skip` and IDs), the hiscore fan-out limits (`players.service.spec.ts` with
   `@osrs-tracker/hiscores` mocked: normal table first, shared in-flight lookups, the preview's not-found cache, the
-  concurrency cap; `Semaphore` in `common/concurrency/`), and per GET route its `Cache-Control` and that it never
-  writes, and that shutdown closes the Mongo client (`app.e2e.spec.ts`; a route's header or a new GET route means
-  changing its `CASES`). Changing one of those means changing its spec.
+  concurrency cap; `Semaphore` in `common/concurrency/`), the news feed and image caches (`news.service.spec.ts` with
+  `undici`'s `fetch` mocked and `performance.now` as lru-cache's clock: shared in-flight fetches, the stale feed's 60s
+  retry, the 503 and a 404 not cached), and per GET route its `Cache-Control` and that it never writes, and that
+  shutdown closes the Mongo client (`app.e2e.spec.ts`; a route's header or a new GET route means changing its `CASES`).
+  Changing one of those means changing its spec.
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.

@@ -34,21 +34,30 @@ export class NewsService {
   private evictionsSinceWarning = 0;
   private lastEvictionWarning = 0;
 
-  /** The parsed feed, so `/news` doesn't fetch Jagex on every request (SSR calls the API directly, not via a cache). */
-  private newsCache?: { items: OsrsNewsItem[]; expiresAt: number };
-  /** The refresh in flight, shared by concurrent requests. */
-  private pendingNews?: Promise<OsrsNewsItem[]>;
+  /**
+   * The parsed feed, so `/news` doesn't fetch Jagex on every request (SSR calls the API directly, not via a cache).
+   * `fetch` shares one refresh between concurrent requests; `fetchNews` keeps the stale copy when Jagex fails.
+   */
+  private readonly newsCache = new LRUCache<'news', OsrsNewsItem[]>({
+    max: 1,
+    ttl: this.NEWS_CACHE_TTL_MS,
+    fetchMethod: (_key, staleItems, { options }) => this.fetchNews(staleItems, options),
+  });
 
-  /** WebP images by URL, capped by total size so memory stays bounded whatever images are requested. */
+  /**
+   * WebP images by URL, capped by total size so memory stays bounded whatever images are requested. `fetch` shares one
+   * conversion per URL between concurrent requests; a failure rejects every waiting request and isn't cached.
+   */
   private readonly imageCache = new LRUCache<string, Buffer>({
     maxSize: this.IMAGE_CACHE_MAX_BYTES,
     sizeCalculation: (webp) => webp.length,
     dispose: (_webp, url, reason) => {
       if (reason === 'evict') this.warnImageCacheEviction(url);
     },
+    fetchMethod: (url) => this.fetchImageAsWebp(url),
+    // An eviction aborts a conversion in flight: finish it for the waiting requests instead of answering them nothing
+    ignoreFetchAbort: true,
   });
-  /** Conversions in flight by URL, so concurrent requests for one image fetch and convert it once. */
-  private readonly pendingImages = new Map<string, Promise<Buffer>>();
 
   constructor(
     @Inject(AGENT) private readonly agent: Agent,
@@ -57,7 +66,7 @@ export class NewsService {
   ) {}
 
   async getRecentNews(limit: number): Promise<OsrsNewsItem[]> {
-    const osrsNewsItems = await this.getNewsItems();
+    const osrsNewsItems = await this.newsCache.forceFetch('news');
 
     return osrsNewsItems.slice(0, limit);
   }
@@ -67,56 +76,40 @@ export class NewsService {
    * @param url Image URL to fetch
    * @returns WebP image as Buffer
    */
-  async getImageAsWebp(url: string): Promise<Buffer> {
-    // Check if image is in cache
-    const cached = this.imageCache.get(url);
-    if (cached) return cached;
-
-    let pending = this.pendingImages.get(url);
-    if (!pending) {
-      pending = this.fetchImageAsWebp(url).finally(() => this.pendingImages.delete(url));
-      this.pendingImages.set(url, pending);
-    }
-    return pending;
+  getImageAsWebp(url: string): Promise<Buffer> {
+    return this.imageCache.forceFetch(url);
   }
 
-  private getNewsItems(): Promise<OsrsNewsItem[]> {
-    if (this.newsCache && Date.now() < this.newsCache.expiresAt) return Promise.resolve(this.newsCache.items);
-
-    this.pendingNews ??= this.refreshNews().finally(() => (this.pendingNews = undefined));
-    return this.pendingNews;
-  }
-
-  /** Fetches the feed into the cache. When Jagex fails, serves the stale copy if there is one, else answers 503. */
-  private async refreshNews(): Promise<OsrsNewsItem[]> {
+  /**
+   * The feed cache's `fetchMethod`. When Jagex fails, serves the stale copy for `NEWS_RETRY_MS` if there is one, else
+   * answers 503 (a rejection isn't cached, so the next request retries).
+   */
+  private async fetchNews(
+    staleItems: OsrsNewsItem[] | undefined,
+    options: LRUCache.FetcherFetchOptions<'news', OsrsNewsItem[]>,
+  ): Promise<OsrsNewsItem[]> {
     try {
-      const items = await this.fetchNews();
-      this.newsCache = { items, expiresAt: Date.now() + this.NEWS_CACHE_TTL_MS };
-      return items;
+      const response = await fetch(
+        this.config.get('OSRS_API_BASE_URL', { infer: true }) + '/m=news/latest_news.rss?oldschool=true',
+        {
+          dispatcher: this.agent,
+          signal: AbortSignal.timeout(this.NEWS_FETCH_TIMEOUT_MS),
+        },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      return this.parseOSRSNewsRSS(await response.text());
     } catch (error) {
       const message = (error as Error).message;
-      if (!this.newsCache) {
+      if (!staleItems) {
         this.logger.warn(`News feed request failed: ${message}`);
         throw new ServiceUnavailableException('OSRS news is unavailable, try again later.');
       }
 
       this.logger.warn(`News feed request failed, serving the cached copy: ${message}`);
-      this.newsCache.expiresAt = Date.now() + this.NEWS_RETRY_MS;
-      return this.newsCache.items;
+      options.ttl = this.NEWS_RETRY_MS; // the stale copy is stored again with this ttl, so it's retried sooner
+      return staleItems;
     }
-  }
-
-  private async fetchNews(): Promise<OsrsNewsItem[]> {
-    const response = await fetch(
-      this.config.get('OSRS_API_BASE_URL', { infer: true }) + '/m=news/latest_news.rss?oldschool=true',
-      {
-        dispatcher: this.agent,
-        signal: AbortSignal.timeout(this.NEWS_FETCH_TIMEOUT_MS),
-      },
-    );
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    return this.parseOSRSNewsRSS(await response.text());
   }
 
   private async fetchImageAsWebp(url: string): Promise<Buffer> {
@@ -159,9 +152,6 @@ export class NewsService {
       this.logger.warn(`Image conversion failed for ${url}: ${(error as Error).message}`);
       throw new BadGatewayException('Failed to convert image');
     }
-
-    // Store in cache, evicting the least recently used images when full
-    this.imageCache.set(url, webpBuffer);
 
     return webpBuffer;
   }

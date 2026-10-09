@@ -8,6 +8,10 @@
   also drops `swagger-ui-dist` and `@scarf/scarf` from the dependencies. What the docs said about each route (its
   statuses, their `Cache-Control` and the params' meaning) is now a short comment on the route's handler. Routes,
   responses and headers are unchanged.
+- The news feed and news image caches are now plain `lru-cache` caches that fetch on a miss, replacing the hand-written
+  expiry and in-flight bookkeeping. Behaviour is unchanged: the feed is cached for 5 minutes and, while Jagex fails,
+  served stale and retried every 60s (503 only when nothing is cached); concurrent requests for the feed or for one
+  image share one fetch, and failed image requests aren't cached. Both are now covered by tests.
 
 ## 2026/10/08
 
