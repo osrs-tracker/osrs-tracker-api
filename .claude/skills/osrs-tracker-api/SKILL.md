@@ -46,6 +46,13 @@ keep code rules here, not in the agent.
   the repo, like CI. An optional package a dependency imports lazily and tolerates missing fails the build with "Can't
   resolve": add it to `lazyImports` in `rspack.config.js`, under the exact specifier (Nest 12's ESM imports end in
   `.js`; the CLI's own list doesn't, so don't drop ours).
+- Outgoing calls to Jagex's hiscores go through the `jagex-hiscores` preset of `@nestjs/resilience` (bulkhead with a
+  bounded queue, and a circuit breaker; `player.config.ts`), and resilience errors are mapped explicitly: `AppModule`
+  sets `mapErrors: false`, so its global interceptor never turns them into 503/504s, and `PlayersService` turns a
+  refusal (`BulkheadFullError`, `CircuitOpenError`) into a `failed` result. A failure the breaker should count has to
+  throw inside `execute()`; a not-found player is a success. `common/resilience/resilience-events.ts` logs breaker
+  changes and (throttled) rejections, and serves the `resilience_*` metrics on `/metrics`. The package is young: keep it
+  pinned exactly and read its release notes on every bump.
 - TypeScript 6 only loads the `@types` packages listed in `tsconfig.json`'s `types` (`node`); add one there when its
   globals are needed. It resolves packages through `exports`, so a package that lists `types` after `require` gets its
   CJS typings (`@osrs-tracker/models` before 0.10.1).
@@ -103,8 +110,9 @@ The full contract with the `process-players` Lambda (which pauses players whose 
 - `POST /players/:username/lookup` answers 404 only for not found. Failed returns the stored player with
   `refreshFailed: true`, or 503 when the player isn't stored.
 - Hiscore lookups go through `determinePlayerStatusAndType`, which asks the normal table first, shares lookups in flight
-  per name and caps requests to Jagex per pod (`player.config.ts`); only previews read the not-found cache. Don't add a
-  path to Jagex around it: the proxy is shared with process-players.
+  per name and sends every request through the `jagex-hiscores` preset (in flight and queued per pod, circuit breaker);
+  a request the preset refuses is failed. Only previews read the not-found cache. Don't add a path to Jagex around it:
+  the proxy is shared with process-players.
 - GETs never write: `GET /players/:username` returns a stored player as stored (stale or not, never refreshed), and an
   unknown player as a live preview from `determinePlayerStatusAndType` that isn't stored (`scrapingOffsets: []`,
   `trackedSince: null`), 404 only for not found and 503 when the hiscores fail. `skipRefresh` skips the preview (404).
@@ -139,19 +147,23 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
 - Specs sit next to the code as `src/**/*.spec.ts` and import from `vitest`. They don't need Nest, Express or Mongo:
   move a rule into a pure function first (like `player.policy.ts`), then test that. The exception is
   `src/app.e2e.spec.ts`, which boots `AppModule` with the Mongo and agent providers overridden by a fake database that
-  records every collection call, and `undici`'s `fetch` mocked as a fake Jagex (no network). Vite's transformer emits
-  Nest's decorator metadata from `tsconfig.json`, so no SWC plugin is needed. - Covered: the env validation
-  (`validateEnv`, `config/env.spec.ts`), the app logger's line shape (`common/logger/json-logger.spec.ts`), the stored
-  player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's pause/resume, `$literal` and
-  `$concatArrays` (`buildRefreshUpdate`), combat level, type and status (`PlayerUtils`; a hiscore without the combat
-  skills counts as failed, `hasCombatSkills`), the validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and
-  `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip` and IDs), the hiscore fan-out limits
-  (`players.service.spec.ts` with `@osrs-tracker/hiscores` mocked: normal table first, shared in-flight lookups, the
-  preview's not-found cache, the concurrency cap; `Semaphore` in `common/concurrency/`), the news feed and image caches
-  (`news.service.spec.ts` with `undici`'s `fetch` mocked and `performance.now` as lru-cache's clock: shared in-flight
-  fetches, the stale feed's 60s retry, the 503 and a 404 not cached), and per GET route its `Cache-Control` and that it
-  never writes, that no route overlaps another and that shutdown closes the Mongo client (`app.e2e.spec.ts`; a route's
-  header or a new GET route means changing its `CASES`). Changing one of those means changing its spec.
+  records every collection call, and `undici`'s `fetch` mocked as a fake Jagex (no network); and code behind a
+  `@nestjs/resilience` policy, tested in a `Test.createTestingModule` with a real `ResilienceModule` and the production
+  preset, not mocks (`players.service.spec.ts`). Vite's transformer emits Nest's decorator metadata from
+  `tsconfig.json`, so no SWC plugin is needed.
+- Covered: the env validation (`validateEnv`, `config/env.spec.ts`), the app logger's line shape
+  (`common/logger/json-logger.spec.ts`), the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the
+  refresh update's pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status
+  (`PlayerUtils`; a hiscore without the combat skills counts as failed, `hasCombatSkills`), the validation pipes
+  `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip`
+  and IDs), the hiscore fan-out limits (`players.service.spec.ts`, on a real `ResilienceModule` with production's preset
+  and `undici`'s `fetch` mocked: normal table first, shared in-flight lookups, the preview's not-found cache, the
+  concurrency cap in FIFO order, the queue bound, the breaker opening on failures but not on not-found players), the
+  news feed and image caches (`news.service.spec.ts` with `undici`'s `fetch` mocked and `performance.now` as lru-cache's
+  clock: shared in-flight fetches, the stale feed's 60s retry, the 503 and a 404 not cached), and per GET route its
+  `Cache-Control` and that it never writes, that no route overlaps another and that shutdown closes the Mongo client
+  (`app.e2e.spec.ts`; a route's header or a new GET route means changing its `CASES`). Changing one of those means
+  changing its spec.
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.
