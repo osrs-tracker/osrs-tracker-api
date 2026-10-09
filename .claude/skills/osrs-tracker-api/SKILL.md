@@ -95,6 +95,12 @@ keep code rules here, not in the agent.
   make it a Loki label (one stream per request). `LoggerMiddleware` reads the ID when the request starts (the context
   isn't guaranteed in morgan's callback), so the CLS middleware must run first: it does because `ClsModule` is global,
   and Nest applies global modules' middleware first.
+- Metrics: `/metrics` on `METRICS_PORT` comes from `@osrs-tracker/express-metrics` (HTTP durations and `up`, shared with
+  osrs-tracker-web, plus Node's `nodejs_*`/`process_*`). Import `Counter`, `Gauge`, `Histogram` and `register` from it,
+  never `prom-client` or `@prometheus-io/client` directly, so there's one registry. `metricsMiddleware` clears that
+  registry when called, so `main.ts` calls it before creating `AppModule`: register app metrics in a provider's
+  `onModuleInit` (like `ResilienceEventsListener`), never at import time, and remove them on shutdown so the e2e spec
+  can boot the app again. Keep labels low-cardinality: route patterns (`routeLabel`), never usernames or IDs.
 - Traefik compresses JSON for browsers (the `osrs-tracker-api-compress` Middleware in `osrs-tracker-api.yaml`, last in
   the Ingress's chain), adding `Vary: Accept-Encoding`; the web's SSR calls the Service directly and gets it plain.
   Don't add Nest's `compression`. The request log's `contentLength` is the uncompressed size.
