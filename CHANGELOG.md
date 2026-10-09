@@ -4,6 +4,10 @@
   `GET /players?limit=50` and a 50-entry hiscores page were about 350 KB each. Traefik compresses JSON responses of 1 KB
   and up; `/news/image` stays as it is (WebP is already compressed), and so do the web server's own calls to the API
   inside the cluster. `Cache-Control` is unchanged; responses now also vary on `Accept-Encoding`.
+- Removed the Swagger docs (`/swagger`, only served locally and no longer used) and `@nestjs/swagger` with them, which
+  also drops `swagger-ui-dist` and `@scarf/scarf` from the dependencies. What the docs said about each route (its
+  statuses, their `Cache-Control` and the params' meaning) is now a short comment on the route's handler. Routes,
+  responses and headers are unchanged.
 
 ## 2026/10/08
 

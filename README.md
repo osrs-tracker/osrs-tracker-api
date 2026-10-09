@@ -9,8 +9,6 @@ news, and stores player progress so the website can show how players gain XP ove
 - **Items**: item details and search by name.
 - **News**: the latest OSRS news posts, with their images converted to WebP.
 
-When you run it locally, the Swagger docs are available at `/swagger`.
-
 ## How it fits together
 
 The [OSRS Tracker website](https://osrs-tracker.freekmencke.com)

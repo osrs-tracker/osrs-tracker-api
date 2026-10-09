@@ -1,7 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { Request } from 'express';
-import { SwaggerModule } from '@nestjs/swagger';
 import promBundle from 'express-prom-bundle';
 import { AppMetricsModule } from './app-metrics.module';
 import { AppModule } from './app.module';
@@ -9,7 +8,6 @@ import { JSONLogger } from './common/logger/JsonLogger';
 import { routeLabel } from './common/route/route-label';
 import { corsOptions } from './config/cors';
 import { Env } from './config/env';
-import { SWAGGER_CONFIG } from './config/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { logger: new JSONLogger() });
@@ -36,10 +34,6 @@ async function bootstrap() {
       autoregister: false,
     }),
   );
-
-  if (config.get('NODE_ENV', { infer: true }) !== 'production') {
-    SwaggerModule.setup('swagger', app, () => SwaggerModule.createDocument(app, SWAGGER_CONFIG));
-  }
 
   await Promise.all([
     app.listen(config.get('PORT', { infer: true })),
