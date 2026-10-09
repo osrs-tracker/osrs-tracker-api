@@ -3,11 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { RetryPolicy } from '@nestjs/resilience';
 import { MongoClient, ServerApiVersion } from 'mongodb';
 import { Env } from '../../config/env';
+import { MONGO_LOG_CONTEXT } from '../logger/nest-logger';
 
 export const MONGO_CLIENT = 'MONGO_CLIENT';
 export const MONGODB_DATABASE = 'MONGODB_DATABASE';
 
-const logger = new Logger('MongoProvider');
+const logger = new Logger(MONGO_LOG_CONTEXT);
 
 export const MAX_CONNECT_ATTEMPTS = 12;
 export const RETRY_DELAY_MS = 10_000;
