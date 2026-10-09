@@ -99,8 +99,8 @@ metadata:
   namespace: osrs-tracker
   annotations:
     cert-manager.io/cluster-issuer: 'letsencrypt-prod'
-    # Per-client-IP rate limits: the Middlewares below.
-    traefik.ingress.kubernetes.io/router.middlewares: osrs-tracker-osrs-tracker-api-ratelimit@kubernetescrd,osrs-tracker-osrs-tracker-api-inflight@kubernetescrd
+    # The Middlewares below: per-client-IP rate limits, then JSON compression (last, so rejected requests cost none).
+    traefik.ingress.kubernetes.io/router.middlewares: osrs-tracker-osrs-tracker-api-ratelimit@kubernetescrd,osrs-tracker-osrs-tracker-api-inflight@kubernetescrd,osrs-tracker-osrs-tracker-api-compress@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
@@ -138,3 +138,15 @@ metadata:
 spec:
   inFlightReq:
     amount: 50
+---
+# Compresses JSON for browsers (gzip, br or zstd per Accept-Encoding, bodies of 1024 bytes and up). Only JSON, so
+# /news/image's WebP isn't compressed twice. The web's SSR calls the Service directly and gets plain JSON.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: osrs-tracker-api-compress
+  namespace: osrs-tracker
+spec:
+  compress:
+    includedContentTypes:
+      - application/json

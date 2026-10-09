@@ -1,3 +1,10 @@
+## 2026/10/09
+
+- API responses to browsers are compressed (Brotli, gzip or zstd, whichever the browser asks for):
+  `GET /players?limit=50` and a 50-entry hiscores page were about 350 KB each. Traefik compresses JSON responses of 1 KB
+  and up; `/news/image` stays as it is (WebP is already compressed), and so do the web server's own calls to the API
+  inside the cluster. `Cache-Control` is unchanged; responses now also vary on `Accept-Encoding`.
+
 ## 2026/10/08
 
 ### Rollouts

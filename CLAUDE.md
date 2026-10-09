@@ -38,8 +38,8 @@ steps. Keep detail there, not in this file.
 - `src/config/`: the env, validated at startup (`env.ts`, read through `ConfigService`), CORS and the Swagger document.
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.
 - Build and runtime: `rspack.config.js` (bundling), `Dockerfile` (image, `sharp` beside the bundle), `vitest.config.mjs`
-  (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies); `.github/workflows/` `CI` (`nodejs.yml`) and
-  `CD` (`deploy.yml`), `.github/dependabot.yml`.
+  (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies, with the Traefik rate-limit and compress
+  Middlewares); `.github/workflows/` `CI` (`nodejs.yml`) and `CD` (`deploy.yml`), `.github/dependabot.yml`.
 - `.claude/agents/conventions-reviewer.md` reviews diffs against the skill and this file;
   `.claude/hooks/pre-push-check.sh` lints and prettier-checks the pushed checkout before every `git push`, and
   `.claude/settings.json` runs Prettier on every file Claude edits.
