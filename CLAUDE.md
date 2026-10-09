@@ -11,6 +11,8 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 
 - Verify: `npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build && npm test`.
 - Dev server: `npm run start:dev` on port 3000. `.env` points at production data.
+- A `git push` blocked by the pre-push hook: run `npm run lint` and `npm run prettier` (both fix what they can), fix the
+  rest by hand, commit and push again.
 - Worktrees in `.claude/worktrees/` use the main checkout's `node_modules` (found in a parent folder); run `npm ci` in
   one only when its `package.json` changes. They have no `.env` (`start:dev` then fails listing the missing vars): link
   the main checkout's with `ln -s ../../../.env .env` and remove the link when done. Other sessions share port 3000:
@@ -20,7 +22,8 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 
 - Every change gets a `CHANGELOG.md` entry under today's `## YYYY/MM/DD`. Parallel PRs all add that heading: when
   merging one after another, rebase and fold the entries under one heading.
-- Doc-only changes go straight to `main`; for anything else, ask: `main` or a PR (unless releasing).
+- Doc-only changes go straight to `main`; for anything else, ask: `main` or a PR (unless releasing: "release it" or
+  "ship it", see the skill's Release steps).
 - Deploying is merging to `main` (GitHub Actions → Flux). Never build, push or `kubectl apply` by hand.
 - Never `--no-gpg-sign`. Never `no-store`, `no-cache` or `private` in `Cache-Control` (ESLint and `src/app.e2e.spec.ts`
   enforce it).

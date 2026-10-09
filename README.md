@@ -9,6 +9,9 @@ news, and stores player progress so the website can show how players gain XP ove
 - **Items**: item details and search by name.
 - **News**: the latest OSRS news posts, with their images converted to WebP.
 
+Each route's statuses, `Cache-Control` and parameters are described in a short comment on its handler in
+`src/features/*/*.controller.ts`.
+
 ## How it fits together
 
 The [OSRS Tracker website](https://osrs-tracker.freekmencke.com)
@@ -19,8 +22,11 @@ everything is stored in MongoDB. Which fields and indexes each of them owns is d
 
 ## Running it locally
 
-Copy `.env.example` to `.env` and fill in the MongoDB credentials (`MONGODB_URI`, `MONGODB_USERNAME`,
-`MONGODB_PASSWORD`); the database name and the OSRS API URL come prefilled. It also lists the optional settings
+You need Node 24 or newer. Copy `.env.example` to `.env` and fill in the MongoDB credentials (`MONGODB_URI`,
+`MONGODB_USERNAME`, `MONGODB_PASSWORD`): the MongoDB Atlas cluster's URI, username and password, the same values as the
+cluster's `aws-mongodb-credentials` secret (its template is `cluster/osrs-tracker/secrets.example.yaml` in
+`home-cluster`; the username and password are kept in a password manager). Your IP address must be on the Atlas
+project's IP access list. The database name and the OSRS API URL come prefilled. It also lists the optional settings
 (`CORS_ORIGIN`, `PORT`, `METRICS_PORT`). The API won't start while a required one is missing or a value is invalid; the
 error lists them all. Then run:
 
@@ -29,8 +35,13 @@ npm ci
 npm run start:dev
 ```
 
-**Careful:** there is no separate development database, so `.env` points at the **production** data. Looking up a player
-through the POST endpoints writes to it.
+If it logs a MongoDB connect warning every 10 seconds instead of starting, the credentials are wrong or your IP isn't on
+the Atlas access list. It gives up after 12 attempts (about 4 minutes) and stops with the connect error. If port 3000 is
+taken, set `PORT` in `.env`.
+
+**Careful:** there is no separate development database, so `.env` points at the **production** data. The POST lookup
+endpoints write to it: looking up a player stores their latest hiscores, and looking up an item moves it to the top of
+the recent items list.
 
 The API runs on http://localhost:3000. A second server on port 9090 (`METRICS_PORT`) serves `/healthy` for the
 Kubernetes probes and `/metrics` for Prometheus; it isn't exposed publicly.

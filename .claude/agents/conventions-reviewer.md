@@ -23,7 +23,8 @@ Read these first, every run. They are the only source of rules; don't apply gene
 ## Scope
 
 Review what the caller names (a PR number, a branch or a path). Otherwise review the current branch against `main`:
-`git diff main...HEAD` plus uncommitted changes (`git diff HEAD`). For a PR, `gh pr diff <n>`.
+`git fetch origin`, then `git diff origin/main...HEAD` (a worktree's local `main` lags behind, which would pull in
+commits already merged) plus uncommitted changes (`git diff HEAD`). For a PR, `gh pr diff <n>`.
 
 Judge the changed lines, but read the surrounding code to confirm a finding: a missing check may live in a caller, a
 base class, an interceptor or a shared provider. Rules that span files (a new index and `mongo.provider.ts`, a GET route

@@ -55,6 +55,11 @@
   sets it to `production` for Express and the libraries that read it.
 - ESLint's `no-useless-assignment` is off: it reported constants used only in a handler's parameter decorators as
   unused, which had forced `GET /players/:username/hiscores` out of its place in the controller.
+- Docs audit: the README says where the MongoDB credentials come from, that Node 24 is needed, what a hanging start
+  (MongoDB connect retries) means, that item lookups write too and where each route is described. The project skill
+  explains how to record and restore the ToxSick test player, when `/healthy` starts answering, what the cluster secret
+  holds, how to check a build-tool change in a clean checkout and the rebase before waiting on PR checks; `CLAUDE.md`
+  says what to do when the pre-push hook blocks a push, and the conventions reviewer diffs against `origin/main`.
 
 ## 2026/10/08
 

@@ -32,18 +32,22 @@ keep code rules here, not in the agent.
   stale value on failure, return it from `fetchMethod` (setting `options.ttl` for the retry delay).
 - `MongoModule` is global, retries the initial connect (12 x 10s, a standalone `RetryPolicy`, sized against the
   `startupProbe` in `osrs-tracker-api.yaml`: change both together) and closes the client on shutdown (bounded to 5s).
-  New indexes go in `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy` stays
-  liveness only and never checks Mongo.
+  New indexes go in `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy` only
+  answers once bootstrap, including the Mongo connect, is done (the metrics server starts listening then, which is what
+  the `startupProbe` waits for); after that it stays liveness only and never checks Mongo.
 - The `players` and `items` collections, their fields, writers and index owners are described in osrs-tracker-aws's
   [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new or changed index or
   stored field also needs an update there: open an issue in osrs-tracker-aws.
 - Env: `.env.example` lists the vars, `.env` holds local values (points at prod). In the cluster they come from the
-  `aws-mongodb-credentials` secret, with the `env:` block in `osrs-tracker-api.yaml` overriding `OSRS_API_BASE_URL` (an
-  API Gateway proxy to `https://secure.runescape.com` that passes Jagex's headers through). `validateEnv`
-  (`src/config/env.ts`, `ConfigModule`'s `validate` in `AppModule`) checks and types them at startup; read them with
+  `aws-mongodb-credentials` secret (the `MONGODB_*` vars and `OSRS_API_BASE_URL`; its template is
+  `cluster/osrs-tracker/secrets.example.yaml` in `../home-cluster`, and the user applies it, never this repo), with the
+  `env:` block in `osrs-tracker-api.yaml` setting `CORS_ORIGIN` and overriding `OSRS_API_BASE_URL` (an API Gateway proxy
+  to `https://secure.runescape.com` that passes Jagex's headers through). `validateEnv` (`src/config/env.ts`,
+  `ConfigModule`'s `validate` in `AppModule`) checks and types them at startup; read them with
   `ConfigService<Env, true>` (`config.get('X', { infer: true })`), never `process.env`. A new var goes in `Env`,
   `validateEnv`, its spec and `.env.example`; a required one also in `app.e2e.spec.ts`'s `vi.stubEnv` calls (validation
-  runs when `AppModule` is imported) and in the cluster.
+  runs when `AppModule` is imported) and in the cluster: the `env:` block for a plain value, or, for a secret, an issue
+  in home-cluster for the secret's template plus asking the user to apply it.
 - Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert).
 - `npm run build` (`nest build -b rspack`, configured by `rspack.config.js`) bundles `node_modules` into `dist/` (only
   `sharp` is external; the image ships just `dist/` plus `sharp`, which the `Dockerfile` installs at the exact version
@@ -51,10 +55,11 @@ keep code rules here, not in the agent.
   `fork-ts-checker-webpack-plugin`, CI's only type check: Nest CLI skips it silently when it's missing, so
   `rspack.config.js` fails the build instead. The builder is set in the script, not `nest-cli.json`, so `nest start`
   keeps using `tsc`. Nest CLI 12 only peers `@rspack/core` and the plugins, so they're direct dev dependencies: a
-  worktree finds the main checkout's `node_modules` too, so check a build-tool change with `npm ci` in a copy outside
-  the repo, like CI. An optional package a dependency imports lazily and tolerates missing fails the build with "Can't
-  resolve": add it to `lazyImports` in `rspack.config.js`, under the exact specifier (Nest 12's ESM imports end in
-  `.js`; the CLI's own list doesn't, so don't drop ours).
+  worktree finds the main checkout's `node_modules` too, so check a build-tool change in a clean checkout outside the
+  repo, like CI: commit it, `git worktree add <scratchpad>/build-check HEAD`, run `npm ci && npm run build` there, then
+  `git worktree remove` it. An optional package a dependency imports lazily and tolerates missing fails the build with
+  "Can't resolve": add it to `lazyImports` in `rspack.config.js`, under the exact specifier (Nest 12's ESM imports end
+  in `.js`; the CLI's own list doesn't, so don't drop ours).
 - `@nestjs/resilience` presets, registered in `AppModule`: `jagex-hiscores` (bulkhead with a bounded queue, and a
   circuit breaker; `player.config.ts`) for every hiscore request, and `news-images` (a bulkhead only; `news.config.ts`,
   with the memory arithmetic) for every image fetch and conversion, run inside the image cache's `fetchMethod` so a
@@ -203,9 +208,14 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
 ## Production testing
 
 Verify with the command in `CLAUDE.md`. There is no development database, by choice (a local MongoDB was declined, #53):
-a local run uses production data, so stick to GETs, which never write. When a change needs a write (a POST lookup), use
-**ToxSick** as the test player: ask before writing to it, record its state and restore it afterwards. Automated tests
-never need a database: they run on fakes (Tests).
+a local run uses production data, so stick to GETs, which never write. When a change needs a write, ask first. For
+`POST /players/:username/lookup`, use **ToxSick** as the test player: before the lookup, save `GET /players/ToxSick` and
+`GET /players/ToxSick/hiscores?scrapingOffset=<n>` for each of its `scrapingOffsets` to the scratchpad (GETs never
+write; the first page is enough, since entries are prepended). A lookup overwrites the stored player fields, merges
+`scrapingOffsets` and may prepend a hiscore entry (`buildRefreshUpdate`). Restoring that is a write to Atlas the user
+does, never Claude: give them the `updateOne` that puts back the changed fields and removes a prepended entry.
+`POST /items/:id/lookup` only sets the item's `lastFetch` (it moves to the top of `GET /items`), so it needs nothing
+restored. Automated tests never need a database: they run on fakes (Tests).
 
 ## Deploy
 
@@ -228,9 +238,10 @@ changes within 10 minutes.
 3. **Merging is the end of the job: don't wait for or watch the `CD` run.** It smoke tests on its own, and a failure
    shows as a failed `CD` run (named after the commit it deploys) and a failed `Flux / sync` status, and reaches
    Discord. Only when the user asks, follow it with `gh run watch` and smoke test the changed routes:
-   `curl -s -D - -o /dev/null` (status, `cache-control`),
-   `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m` (reading the cluster is fine), and for web
-   rendering changes the pages in the browser (see the web skill; cached pages may lag up to 5 minutes).
+   `curl -s -D - -o /dev/null` (status, `cache-control`), the pod logs (the read-only `kubernetes` or `flux` MCP
+   server's log tool; `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m` as a fallback; reading the
+   cluster is fine), and for web rendering changes the pages in the browser (see the web skill; cached pages may lag up
+   to 5 minutes).
 
 - **Retry** a failed deploy (Docker Hub or Flux hiccup) by re-running the failed `CD` run; a later docs-only push won't
   redeploy.
@@ -244,12 +255,17 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 
 1. Commit on a `<type>/<short-name>` branch, push, `gh pr create --base main`.
 2. Review `gh pr diff` for bugs and leftovers while the `conventions-reviewer` agent checks the PR; fix both and push.
-3. `gh pr checks <n> --watch`. When checks pass: `gh pr merge <n> --merge` (it deploys; if Claude Code's permission
+3. Get current with `main` before waiting on checks, and again before merging:
+   `git fetch origin && git rebase origin/main`, fold `CHANGELOG.md` under one day's heading, verify,
+   `git push --force-with-lease`. Then poll `gh pr view <n> --json mergeable,mergeStateStatus` until it isn't `UNKNOWN`;
+   on `CONFLICTING` (recheck once, it lags a push), rebase again: GitHub runs no PR CI on a conflicting PR, so `--watch`
+   would hang.
+4. `gh pr checks <n> --watch`. When checks pass: `gh pr merge <n> --merge` (it deploys; if Claude Code's permission
    check blocks it, give the user the command and wait). GitHub deletes the PR branch on merge. Then pull `main` and
    `git fetch --prune`; in the main checkout also switch to `main` first and `git branch -d <branch>`. In a worktree
    `main` is checked out by the main checkout, so pull there (`git -C <main checkout> pull --ff-only`) instead of
    switching.
-4. Done: the deploy runs on its own (Deploy step 3). Pull `main` again later for the digest commit.
+5. Done: the deploy runs on its own (Deploy step 3). Pull `main` again later for the digest commit.
 
 ## Commit and push
 
