@@ -34,7 +34,8 @@
 ### License
 
 - The API's source code is now under the Elastic License 2.0 instead of Apache 2.0. You can still read it, learn from it
-  and run it yourself, but not offer it to others as a hosted service, paid or free.
+  and run it yourself, but not offer it to others as a hosted service, paid or free. The README's license badge now
+  names it: GitHub can't identify the Elastic License, so it's a fixed badge.
 
 ### Behind the scenes
 
