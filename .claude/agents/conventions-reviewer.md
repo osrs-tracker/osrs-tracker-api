@@ -15,9 +15,9 @@ You review changes in osrs-tracker-api against the project's house rules. You re
 Read these first, every run. They are the only source of rules; don't apply generic NestJS style preferences.
 
 1. `.claude/skills/osrs-tracker-api/SKILL.md`: the conventions. Every rule in it about code applies (setup gotchas,
-   validating params, route doc comments, Mongo pipeline updates, pausing and resuming players, Cache-Control, tests).
-   Process steps (deploy, release, commits) apply only when the diff touches what they describe, such as `CHANGELOG.md`,
-   `osrs-tracker-api.yaml` or `.github/`.
+   validating params, route doc comments, route conflicts, Mongo pipeline updates, pausing and resuming players,
+   Cache-Control, tests). Process steps (deploy, release, commits) apply only when the diff touches what they describe,
+   such as `CHANGELOG.md`, `osrs-tracker-api.yaml` or `.github/`.
 2. `CLAUDE.md`: the hard rules and code placement, which the skill doesn't repeat.
 
 ## Scope

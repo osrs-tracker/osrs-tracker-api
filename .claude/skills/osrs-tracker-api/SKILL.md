@@ -77,6 +77,13 @@ The API is read from the controllers. Each handler has a short JSDoc comment wit
 statuses it answers and when, each one's `Cache-Control` (named by its `CACHE_CONTROL` key, never a copied value) and
 non-obvious param semantics. A change to a route's statuses or `Cache-Control` updates its comment in the same diff.
 
+## Route conflicts
+
+A route that duplicates or shadows another (`/items/recent` next to `/items/:id`, in any order) fails startup and the
+e2e spec: `ROUTE_CONFLICT_POLICY` (`config/app-options.ts`, `error` for both kinds) is passed by `main.ts` and
+`app.e2e.spec.ts`. Rename or restructure the route; don't relax the policy to `warn`, and leave
+`routeResolutionStrategy` at its default (with conflicts rejected, declaration order doesn't matter).
+
 ## Mongo pipeline updates
 
 Wrap player data and user input in `$literal` (strings starting with `$` read as field paths). Prepend `hiscoreEntries`
@@ -133,19 +140,18 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   move a rule into a pure function first (like `player.policy.ts`), then test that. The exception is
   `src/app.e2e.spec.ts`, which boots `AppModule` with the Mongo and agent providers overridden by a fake database that
   records every collection call, and `undici`'s `fetch` mocked as a fake Jagex (no network). Vite's transformer emits
-  Nest's decorator metadata from `tsconfig.json`, so no SWC plugin is needed.
-- Covered: the env validation (`validateEnv`, `config/env.spec.ts`), the app logger's line shape
-  (`common/logger/json-logger.spec.ts`), the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the
-  refresh update's pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status
-  (`PlayerUtils`; a hiscore without the combat skills counts as failed, `hasCombatSkills`), the validation pipes
-  `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip`
-  and IDs), the hiscore fan-out limits (`players.service.spec.ts` with `@osrs-tracker/hiscores` mocked: normal table
-  first, shared in-flight lookups, the preview's not-found cache, the concurrency cap; `Semaphore` in
-  `common/concurrency/`), the news feed and image caches (`news.service.spec.ts` with `undici`'s `fetch` mocked and
-  `performance.now` as lru-cache's clock: shared in-flight fetches, the stale feed's 60s retry, the 503 and a 404 not
-  cached), and per GET route its `Cache-Control` and that it never writes, and that shutdown closes the Mongo client
-  (`app.e2e.spec.ts`; a route's header or a new GET route means changing its `CASES`). Changing one of those means
-  changing its spec.
+  Nest's decorator metadata from `tsconfig.json`, so no SWC plugin is needed. - Covered: the env validation
+  (`validateEnv`, `config/env.spec.ts`), the app logger's line shape (`common/logger/json-logger.spec.ts`), the stored
+  player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's pause/resume, `$literal` and
+  `$concatArrays` (`buildRefreshUpdate`), combat level, type and status (`PlayerUtils`; a hiscore without the combat
+  skills counts as failed, `hasCombatSkills`), the validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and
+  `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip` and IDs), the hiscore fan-out limits
+  (`players.service.spec.ts` with `@osrs-tracker/hiscores` mocked: normal table first, shared in-flight lookups, the
+  preview's not-found cache, the concurrency cap; `Semaphore` in `common/concurrency/`), the news feed and image caches
+  (`news.service.spec.ts` with `undici`'s `fetch` mocked and `performance.now` as lru-cache's clock: shared in-flight
+  fetches, the stale feed's 60s retry, the 503 and a 404 not cached), and per GET route its `Cache-Control` and that it
+  never writes, that no route overlaps another and that shutdown closes the Mongo client (`app.e2e.spec.ts`; a route's
+  header or a new GET route means changing its `CASES`). Changing one of those means changing its spec.
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.
