@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "This repository contains the NestJS API for OSRS Tracker.",
-  "license": "Apache-2.0",
+  "license": "Elastic-2.0",
   "engines": {
     "node": ">=24"
   },

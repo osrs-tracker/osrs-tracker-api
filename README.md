@@ -66,3 +66,8 @@ Kubernetes. Merging to `main` deploys it: GitHub Actions builds the image and co
 OSRS Tracker was originally built entirely without AI assistance. Since October 2026, I've started using
 [Claude](https://claude.com/claude-code), Anthropic's AI coding assistant, to help improve development speed and
 reliability.
+
+## License
+
+[Elastic License 2.0](LICENSE): you're welcome to read the code, learn from it, change it and run it yourself, but not
+to offer it to others as a hosted service, paid or free. Versions up to 9 October 2026 were released under Apache 2.0.

@@ -31,6 +31,11 @@
   `X-Request-Id` is ignored, so clients can't give unrelated requests the same ID. Lines outside a request (startup,
   shutdown) have none, and every other field is unchanged.
 
+### License
+
+- The API's source code is now under the Elastic License 2.0 instead of Apache 2.0. You can still read it, learn from it
+  and run it yourself, but not offer it to others as a hosted service, paid or free.
+
 ### Behind the scenes
 
 - The API keeps idle connections open for 95s instead of Node's 5s, longer than Traefik reuses them (90s), so a request
