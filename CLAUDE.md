@@ -35,7 +35,8 @@ release steps. Keep detail there, not in this file.
   HTTP agent, XML parser), plus the JSON logger (`logger/`), bot detection, route labels, the `Cache-Control` values
   (`http/cache-control.ts`), `ParseIntRangePipe` (`pipes/`) and the `Semaphore` capping Jagex requests (`concurrency/`);
   `src/middleware/` request logging and robots.
-- `src/config/`: the env, validated at startup (`env.ts`, read through `ConfigService`), and CORS.
+- `src/config/`: the env, validated at startup (`env.ts`, read through `ConfigService`), CORS and the app options shared
+  by `main.ts` and the e2e spec (`app-options.ts`, the route conflict policy).
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.
 - Build and runtime: `rspack.config.js` (bundling), `Dockerfile` (image, `sharp` beside the bundle), `vitest.config.mjs`
   (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies, with the Traefik rate-limit and compress

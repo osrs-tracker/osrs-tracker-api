@@ -1,9 +1,22 @@
 ## 2026/10/09
 
+### Responses
+
 - API responses to browsers are compressed (Brotli, gzip or zstd, whichever the browser asks for):
   `GET /players?limit=50` and a 50-entry hiscores page were about 350 KB each. Traefik compresses JSON responses of 1 KB
   and up; `/news/image` stays as it is (WebP is already compressed), and so do the web server's own calls to the API
   inside the cluster. `Cache-Control` is unchanged; responses now also vary on `Accept-Encoding`.
+
+### Logging
+
+- The app's own log lines (startup, warnings, errors) come from Nest's built-in JSON logger instead of a hand-written
+  one. They keep one JSON object per line with `level` `info`, `warn` or `error`, so Loki's level detection is
+  unchanged; the time is now `timestamp` (epoch ms) with the `pid`, `context` is the logging class's name, an error
+  logged as an `Error` gets a structured `error` field (name, message, stack, cause), and errors go to stderr. Request
+  log lines are unchanged.
+
+### Behind the scenes
+
 - Removed the Swagger docs (`/swagger`, only served locally and no longer used) and `@nestjs/swagger` with them, which
   also drops `swagger-ui-dist` and `@scarf/scarf` from the dependencies. What the docs said about each route (its
   statuses, their `Cache-Control` and the params' meaning) is now a short comment on the route's handler. Routes,
@@ -12,11 +25,9 @@
   expiry and in-flight bookkeeping. Behaviour is unchanged: the feed is cached for 5 minutes and, while Jagex fails,
   served stale and retried every 60s (503 only when nothing is cached); concurrent requests for the feed or for one
   image share one fetch, and failed image requests aren't cached. Both are now covered by tests.
-- The app's own log lines (startup, warnings, errors) come from Nest's built-in JSON logger instead of a hand-written
-  one. They keep one JSON object per line with `level` `info`, `warn` or `error`, so Loki's level detection is
-  unchanged; the time is now `timestamp` (epoch ms) with the `pid`, `context` is the logging class's name, an error
-  logged as an `Error` gets a structured `error` field (name, message, stack, cause), and errors go to stderr. Request
-  log lines are unchanged.
+- A route that duplicates or shadows another (e.g. `/items/recent` next to `/items/:id`, which Express would never
+  reach) now stops the API at startup and fails the tests, instead of silently never answering. Today's routes don't
+  overlap, so nothing changes at runtime.
 
 ## 2026/10/08
 

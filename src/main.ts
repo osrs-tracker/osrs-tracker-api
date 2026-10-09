@@ -6,11 +6,15 @@ import { AppMetricsModule } from './app-metrics.module';
 import { AppModule } from './app.module';
 import { JsonLogger } from './common/logger/json-logger';
 import { routeLabel } from './common/route/route-label';
+import { ROUTE_CONFLICT_POLICY } from './config/app-options';
 import { corsOptions } from './config/cors';
 import { Env } from './config/env';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { logger: new JsonLogger() });
+  const app = await NestFactory.create(AppModule, {
+    logger: new JsonLogger(),
+    routeConflictPolicy: ROUTE_CONFLICT_POLICY,
+  });
   const config = app.get<ConfigService<Env, true>>(ConfigService);
   app.enableCors(corsOptions(config.get('CORS_ORIGIN', { infer: true })));
   // Exit with process.exit() once closed: by default Nest re-sends the signal to itself, which the kernel ignores for

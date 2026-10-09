@@ -8,6 +8,7 @@ import { AppModule } from './app.module';
 import { AGENT } from './common/agent/agent.provider';
 import { CACHE_CONTROL } from './common/http/cache-control';
 import { MONGO_CLIENT, MONGODB_DATABASE } from './common/mongo/mongo.provider';
+import { ROUTE_CONFLICT_POLICY } from './config/app-options';
 
 /**
  * Boots the whole app against a fake database and a fake Jagex, and checks the skill's Cache-Control rules for every
@@ -183,7 +184,7 @@ describe('GET routes', () => {
       .useValue(undefined)
       .compile();
 
-    app = moduleRef.createNestApplication({ logger: false });
+    app = moduleRef.createNestApplication({ logger: false, routeConflictPolicy: ROUTE_CONFLICT_POLICY });
     await app.listen(0, '127.0.0.1');
     baseUrl = `http://127.0.0.1:${((app.getHttpServer() as Server).address() as AddressInfo).port}`;
   });
