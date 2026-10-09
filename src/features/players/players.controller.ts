@@ -117,21 +117,6 @@ export class PlayersController {
   }
 
   /**
-   * A page (`size`, `skip`) of the player's hiscore entries for `scrapingOffset`, newest first; an empty body for a
-   * player that isn't stored. 400 for an invalid username or param. `REVALIDATE` on every response.
-   */
-  @Get(':username/hiscores')
-  @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
-  getHiscoresByUsername(
-    @Param('username', ParseUsernamePipe) username: string,
-    @Query('scrapingOffset', new ParseScrapingOffsetPipe()) scrapingOffset: number,
-    @Query('size', new ParseIntRangePipe(SIZE)) size: number,
-    @Query('skip', new ParseIntRangePipe(SKIP)) skip: number,
-  ) {
-    return this.playersService.getPlayerHiscores(username, scrapingOffset, size, skip);
-  }
-
-  /**
    * Refreshes the player when it's unknown, lacks `scrapingOffset` or is stale, and returns it. Throws 404 when the
    * player isn't on the hiscores, and 503 when the hiscores can't be reached for an unknown player.
    */
@@ -170,5 +155,20 @@ export class PlayersController {
     }
 
     return player;
+  }
+
+  /**
+   * A page (`size`, `skip`) of the player's hiscore entries for `scrapingOffset`, newest first; an empty body for a
+   * player that isn't stored. 400 for an invalid username or param. `REVALIDATE` on every response.
+   */
+  @Get(':username/hiscores')
+  @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
+  getHiscoresByUsername(
+    @Param('username', ParseUsernamePipe) username: string,
+    @Query('scrapingOffset', new ParseScrapingOffsetPipe()) scrapingOffset: number,
+    @Query('size', new ParseIntRangePipe(SIZE)) size: number,
+    @Query('skip', new ParseIntRangePipe(SKIP)) skip: number,
+  ) {
+    return this.playersService.getPlayerHiscores(username, scrapingOffset, size, skip);
   }
 }

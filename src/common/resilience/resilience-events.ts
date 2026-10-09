@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs
 import { CircuitState, ResilienceEvent, ResilienceEvents, ResilienceService } from '@nestjs/resilience';
 import { Counter, Gauge, register } from 'prom-client';
 import { Subscription } from 'rxjs';
+import { ThrottledWarning } from '../logger/throttled-warning';
 
 const CIRCUIT_STATE_VALUES: Record<CircuitState, number> = { 'closed': 0, 'half-open': 1, 'open': 2 };
 
@@ -20,10 +21,8 @@ const METRICS = {
 export class ResilienceEventsListener implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger('Resilience');
 
-  /** At most one warning per bulkhead in this interval, counting the rejections in between. */
-  private readonly REJECTION_WARNING_INTERVAL_MS = 60_000;
-  private readonly rejectionsSinceWarning = new Map<string, number>();
-  private readonly lastRejectionWarning = new Map<string, number>();
+  /** At most one warning per bulkhead and minute, counting the rejections in between. */
+  private readonly rejectionWarning = new ThrottledWarning();
 
   private subscription?: Subscription;
   private rejections?: Counter<'policy' | 'reason'>;
@@ -72,19 +71,13 @@ export class ResilienceEventsListener implements OnModuleInit, OnApplicationShut
   }
 
   private warnBulkheadRejected(name: string, reason: string, active: number, queued: number): void {
-    const rejections = (this.rejectionsSinceWarning.get(name) ?? 0) + 1;
-    this.rejectionsSinceWarning.set(name, rejections);
-
-    const now = Date.now();
-    if (now - (this.lastRejectionWarning.get(name) ?? 0) < this.REJECTION_WARNING_INTERVAL_MS) return;
+    const rejections = this.rejectionWarning.hit(name);
+    if (rejections === undefined) return;
 
     this.logger.warn(
       `Bulkhead "${name}" rejected ${rejections} call(s) since the last warning, last: ${reason} ` +
         `(${active} active, ${queued} queued)`,
     );
-
-    this.rejectionsSinceWarning.set(name, 0);
-    this.lastRejectionWarning.set(name, now);
   }
 
   private registerMetrics(): void {

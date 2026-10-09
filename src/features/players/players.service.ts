@@ -323,11 +323,12 @@ export class PlayersService {
   /**
    * Fetches one hiscore table with the shared client from `@osrs-tracker/hiscores` (see its `HiscoreResult`), through
    * the shared agent and the `jagex-hiscores` policy, and logs why it failed. A request the policy refuses (queue full,
-   * circuit open) is `failed` too, without asking Jagex.
+   * circuit open) is `failed` too, without asking Jagex, and isn't logged here: `ResilienceEventsListener` logs the
+   * circuit opening and bulkhead rejections (throttled), so an outage doesn't log a line per lookup.
    */
   private async getHiscore(username: string, type: PlayerType): Promise<HiscoreResult> {
-    const result = await this.hiscoresPolicy
-      .execute(async ({ signal }): Promise<HiscoreResult> => {
+    try {
+      return await this.hiscoresPolicy.execute(async ({ signal }): Promise<HiscoreResult> => {
         const result = await getHiscore({
           baseUrl: this.config.get('OSRS_API_BASE_URL', { infer: true }),
           username,
@@ -344,23 +345,22 @@ export class PlayersService {
         if (result.status === 'failed') throw new HiscoreFailedError(result.reason);
 
         return result; // Found or not found: both mean Jagex answered
-      })
-      .catch((error: unknown): HiscoreResult => ({ status: 'failed', reason: this.describeHiscoreFailure(error) }));
+      });
+    } catch (error) {
+      if (error instanceof BulkheadFullError) {
+        const reason = error.reason === 'full' ? 'too many requests queued' : 'timed out waiting for a request slot';
+        return { status: 'failed', reason };
+      }
+      if (error instanceof CircuitOpenError) {
+        return {
+          status: 'failed',
+          reason: `circuit open, Jagex is asked again in ${Math.ceil(error.retryAfterMs / 1000)}s`,
+        };
+      }
+      if (!(error instanceof HiscoreFailedError)) throw error;
 
-    if (result.status === 'failed') this.logger.warn(`Hiscores (${type}) failed for '${username}': ${result.reason}`);
-
-    return result;
-  }
-
-  /** The reason of a hiscore request that threw inside the policy or that the policy refused. Rethrows anything else. */
-  private describeHiscoreFailure(error: unknown): string {
-    if (error instanceof HiscoreFailedError) return error.message;
-    if (error instanceof BulkheadFullError) {
-      return error.reason === 'full' ? 'too many requests queued' : 'timed out waiting for a request slot';
+      this.logger.warn(`Hiscores (${type}) failed for '${username}': ${error.message}`);
+      return { status: 'failed', reason: error.message };
     }
-    if (error instanceof CircuitOpenError) {
-      return `circuit open, Jagex is asked again in ${Math.ceil(error.retryAfterMs / 1000)}s`;
-    }
-    throw error;
   }
 }

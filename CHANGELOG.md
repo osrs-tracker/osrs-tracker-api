@@ -11,8 +11,8 @@
   failed right away (503 for an unknown player, the stored player with `refreshFailed` otherwise), and requests that
   would wait in a full queue (32 behind the 8 in flight per pod) or longer than 10s for a slot fail the same way. A
   player that isn't on the hiscores never counts as a failure. Built on `@nestjs/resilience` (pinned to 0.0.2), which
-  replaces the hand-written request limiter; breaker changes and rejections are logged as warnings, and `/metrics` shows
-  the `resilience_*` gauges and rejection counts.
+  replaces the hand-written request limiter; breaker changes and rejections are logged as warnings (at most one a
+  minute, not one per lookup), and `/metrics` shows the `resilience_*` gauges and rejection counts.
 - News images are converted at most two at a time per pod, with up to 10 more waiting up to 10s for a turn; beyond that
   `/news/image` answers 503 at once (without `Cache-Control`, so it's retried), so a burst of large CDN images can no
   longer run the pod out of memory. Concurrent requests for one image still share one conversion, and cached images
@@ -28,8 +28,8 @@
 - Every request gets an ID, logged as `requestId` on its request line and on every line logged while handling it (such
   as a hiscores warning), so a warning can be tied to the request that caused it: in Grafana,
   `{app="osrs-tracker-api"} | json | requestId="<id>"`. Responses send it back as `X-Request-Id`; a client's own
-  `X-Request-Id` is kept when it's a UUID. Lines outside a request (startup, shutdown) have none, and every other field
-  is unchanged.
+  `X-Request-Id` is ignored, so clients can't give unrelated requests the same ID. Lines outside a request (startup,
+  shutdown) have none, and every other field is unchanged.
 
 ### Behind the scenes
 
@@ -45,13 +45,16 @@
   reach) now stops the API at startup and fails the tests, instead of silently never answering. Today's routes don't
   overlap, so nothing changes at runtime.
 - The 10 MB news image limit is enforced by `undici` itself, on an HTTP agent of its own for image requests (hiscore and
-  feed requests stay unlimited), replacing the hand-written byte counting. An image over it still answers 503, also when
-  it doesn't send its size up front, and is now always requested uncompressed, so the limit holds for what is actually
-  read.
+  feed requests stay unlimited), replacing the hand-written byte counting. An image over it still answers 503: refused
+  before downloading when it announces its size, cut off at 10 MB when it doesn't, and always requested uncompressed, so
+  the limit holds for what is actually read.
 - The MongoDB connect retry at startup uses `@nestjs/resilience`'s `RetryPolicy` instead of a hand-written loop, with
-  the same timing (12 attempts, 10s apart) and log lines; now covered by tests.
+  the same timing (12 attempts, 10s apart) and log lines; now covered by tests. A failing cleanup of a failed attempt no
+  longer hides the connect error.
 - `NODE_ENV` is no longer one of the API's own settings (nothing read it after the Swagger docs went); the image still
   sets it to `production` for Express and the libraries that read it.
+- ESLint's `no-useless-assignment` is off: it reported constants used only in a handler's parameter decorators as
+  unused, which had forced `GET /players/:username/hiscores` out of its place in the controller.
 
 ## 2026/10/08
 

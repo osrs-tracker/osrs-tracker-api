@@ -12,6 +12,7 @@ import { AGENT, IMAGE_AGENT, imageAgentProvider, MAX_IMAGE_BYTES } from '../../c
 import { XML_PARSER, XMLParserProvider } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
 import {
+  IMAGE_QUEUE_TIMEOUT_MS,
   MAX_CONCURRENT_IMAGE_CONVERSIONS,
   MAX_QUEUED_IMAGE_CONVERSIONS,
   NEWS_IMAGES,
@@ -166,6 +167,34 @@ describe('NewsService caches', () => {
       await expect(service.getImageAsWebp(IMAGE_URL)).rejects.toBeInstanceOf(NotFoundException);
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
+
+    it('refuses an image whose content-length is over the limit without reading its body', async () => {
+      let pulled = false;
+      // highWaterMark 0: nothing is pulled until the body is read
+      const body = new ReadableStream(
+        {
+          pull(controller) {
+            pulled = true;
+            controller.enqueue(new Uint8Array(1024));
+            controller.close();
+          },
+        },
+        { highWaterMark: 0 },
+      );
+      answerWith(
+        () =>
+          new Response(body, {
+            headers: { 'content-type': 'image/png', 'content-length': String(MAX_IMAGE_BYTES + 1) },
+          }),
+      );
+
+      const error = await service.getImageAsWebp(IMAGE_URL).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ServiceUnavailableException);
+      expect(warn).toHaveBeenCalledExactlyOnceWith(
+        `Image request failed for ${IMAGE_URL}: Body larger than ${MAX_IMAGE_BYTES} bytes`,
+      );
+      expect(pulled).toBe(false);
+    });
   });
 
   describe('getImageAsWebp conversion limit', () => {
@@ -201,7 +230,7 @@ describe('NewsService caches', () => {
       const error = await service.getImageAsWebp(imageUrl(max)).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ServiceUnavailableException);
       expect((error as ServiceUnavailableException).message).toBe('Failed to fetch image');
-      expect(warn).toHaveBeenCalledWith(`Image request rejected for ${imageUrl(max)}: too many images queued`);
+      expect(warn).not.toHaveBeenCalled(); // ResilienceEventsListener logs rejections, throttled
       expect(mockFetch).toHaveBeenCalledTimes(MAX_CONCURRENT_IMAGE_CONVERSIONS);
 
       // A finished conversion lets the next queued one fetch
@@ -215,6 +244,26 @@ describe('NewsService caches', () => {
       }
       await Promise.all(requests);
       expect(resilience.bulkhead(NEWS_IMAGES)).toMatchObject({ active: 0, queued: 0 });
+    });
+
+    it('answers 503 to a conversion that waits longer than the queue timeout for a slot', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const active = Array.from({ length: MAX_CONCURRENT_IMAGE_CONVERSIONS }, (_, i) =>
+          service.getImageAsWebp(imageUrl(i)),
+        );
+        await vi.waitFor(() => expect(held).toHaveLength(MAX_CONCURRENT_IMAGE_CONVERSIONS));
+        const queued = service.getImageAsWebp(imageUrl(MAX_CONCURRENT_IMAGE_CONVERSIONS)).catch((e: unknown) => e);
+
+        await vi.advanceTimersByTimeAsync(IMAGE_QUEUE_TIMEOUT_MS);
+        expect(await queued).toBeInstanceOf(ServiceUnavailableException);
+        expect(mockFetch).toHaveBeenCalledTimes(MAX_CONCURRENT_IMAGE_CONVERSIONS);
+
+        for (const request of held) request.answer();
+        await Promise.all(active);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('takes one slot for concurrent requests for one image, and none for a cached one', async () => {

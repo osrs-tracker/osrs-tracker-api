@@ -263,11 +263,12 @@ describe('GET routes', () => {
       expect(second).not.toBe(first);
     });
 
-    it("reuses the client's X-Request-Id only when it's a UUID", async () => {
+    it("ignores the client's X-Request-Id", async () => {
       const incoming = crypto.randomUUID();
+      const id = await requestId({ 'X-Request-Id': incoming });
 
-      expect(await requestId({ 'X-Request-Id': incoming })).toBe(incoming);
-      expect(await requestId({ 'X-Request-Id': 'not-a-uuid' })).toMatch(UUID);
+      expect(id).toMatch(UUID);
+      expect(id).not.toBe(incoming);
     });
   });
 });
