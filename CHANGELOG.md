@@ -50,6 +50,8 @@
   read.
 - The MongoDB connect retry at startup uses `@nestjs/resilience`'s `RetryPolicy` instead of a hand-written loop, with
   the same timing (12 attempts, 10s apart) and log lines; now covered by tests.
+- `NODE_ENV` is no longer one of the API's own settings (nothing read it after the Swagger docs went); the image still
+  sets it to `production` for Express and the libraries that read it.
 
 ## 2026/10/08
 
