@@ -33,6 +33,11 @@
 
 ### Behind the scenes
 
+- The API keeps idle connections open for 95s instead of Node's 5s, longer than Traefik reuses them (90s), so a request
+  can no longer land on a connection the API is just closing (a 502). The pods now run with a locked-down container
+  (non-root `node` user enforced, read-only filesystem, no capabilities, like the web server's), a node drain keeps at
+  least one of the two running (a PodDisruptionBudget), and pod starts no longer ask Docker Hub again for an image the
+  node already has (`imagePullPolicy: IfNotPresent`; the image is pinned by digest).
 - `/metrics` (port 9090, not public) now comes from the shared `@osrs-tracker/express-metrics`, like the web server's,
   instead of the unmaintained `express-prom-bundle` and the deprecated `prom-client` (its `npm ci` warning is gone).
   `http_request_duration_seconds`, `up` and the `resilience_*` series are unchanged; new are Node's process metrics

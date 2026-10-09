@@ -28,7 +28,7 @@ spec:
       containers:
         - name: osrs-tracker-api
           image: freekmencke/osrs-tracker-api@sha256:8503651d791674a8b36080fbfada2f18211d93fe97342560856866edb3e1e8f5
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:
                 name: aws-mongodb-credentials
@@ -48,6 +48,16 @@ spec:
               memory: 128Mi
             limits:
               memory: 512Mi
+          # Nothing writes to disk (the news image cache is in memory)
+          securityContext:
+            runAsNonRoot: true
+            # The image's `node` user, numeric so the kubelet can verify it isn't root
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
           lifecycle:
             # Keep serving until Traefik has dropped the terminating pod, otherwise in-flight requests get a 502/504
             preStop:
@@ -72,6 +82,18 @@ spec:
               path: /healthy
               port: 9090
             periodSeconds: 5
+---
+# Node drains evict one replica at a time
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: osrs-tracker-api
+  namespace: osrs-tracker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: osrs-tracker-api
 ---
 apiVersion: v1
 kind: Service
