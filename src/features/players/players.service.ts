@@ -113,28 +113,31 @@ export class PlayersService {
   ): Promise<HiscoreEntry[] | null> {
     // Retrieve the player's hiscores
     const player = await this.collection
-      .aggregate<Player>([
-        { $match: { username: username } },
-        {
-          $project: {
-            _id: 0,
-            username: 1,
-            hiscoreEntries: {
-              $slice: [
-                {
-                  $filter: {
-                    input: '$hiscoreEntries',
-                    as: 'entry',
-                    cond: { $eq: ['$$entry.scrapingOffset', scrapingOffset] },
+      .aggregate<Player>(
+        [
+          { $match: { username: username } },
+          {
+            $project: {
+              _id: 0,
+              username: 1,
+              hiscoreEntries: {
+                $slice: [
+                  {
+                    $filter: {
+                      input: '$hiscoreEntries',
+                      as: 'entry',
+                      cond: { $eq: ['$$entry.scrapingOffset', scrapingOffset] },
+                    },
                   },
-                },
-                skip,
-                size,
-              ],
+                  skip,
+                  size,
+                ],
+              },
             },
           },
-        },
-      ])
+        ],
+        { hint: { username: 1 } },
+      )
       .next();
 
     return player?.hiscoreEntries ?? null;
@@ -241,11 +244,10 @@ export class PlayersService {
    * merging the paused offsets back and removing the pause fields. A refresh that isn't `refreshed` writes nothing and
    * leaves them untouched: the Lambda does the 404 counting.
    *
-   * @param scrapingOffset The `scrapingOffset` will be added to the player's `scrapingOffsets` if not already present.
-   * @param initialScrape If true, will also add an initial `hiscoreEntry` for this `scrapingOffset`.
+   * @param scrapingOffset Added to the player's `scrapingOffsets` if not already present, with an initial `hiscoreEntry`.
    * @returns `notFound` when the player isn't on the normal hiscores, `failed` when the hiscores couldn't be reached.
    */
-  async refreshPlayerInfo(username: string, scrapingOffset: number, initialScrape: boolean): Promise<RefreshResult> {
+  async refreshPlayerInfo(username: string, scrapingOffset: number): Promise<RefreshResult> {
     // Never upsert a name that isn't a valid OSRS name (e.g. a double URL-encoded one that the hiscores still resolve).
     if (!PlayerUtils.isValidUsername(username)) throw new Error(`Refusing to store invalid username '${username}'`);
 
@@ -261,16 +263,17 @@ export class PlayersService {
       ...partialHiscoreEntry,
     };
 
-    const { upsertedCount, modifiedCount } = await this.collection.updateOne(
+    const { upsertedCount, matchedCount } = await this.collection.updateOne(
       { username: player.username },
-      buildRefreshUpdate(player, hiscoreEntry, scrapingOffset, initialScrape),
+      buildRefreshUpdate(player, hiscoreEntry, scrapingOffset),
       {
         upsert: true,
         hint: { username: 1 },
       },
     );
 
-    if (!upsertedCount && !modifiedCount) throw new Error('Player failed to be upserted');
+    // Not `modifiedCount`: concurrent lookups share one hiscore result, so the second update can change nothing
+    if (!upsertedCount && !matchedCount) throw new Error('Player failed to be upserted');
 
     return 'refreshed';
   }

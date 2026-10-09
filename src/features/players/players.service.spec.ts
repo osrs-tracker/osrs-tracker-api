@@ -111,7 +111,7 @@ describe('PlayersService hiscore lookups', () => {
     answerWith('found', { name: 'truncated', skills: skills.slice(0, 5), activities: [] });
     expect(await service.previewPlayer('truncated', 0, false)).toEqual({ status: 'failed' });
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(await service.refreshPlayerInfo('truncated', 0, true)).toBe('failed');
+    expect(await service.refreshPlayerInfo('truncated', 0)).toBe('failed');
   });
 
   it('asks all four tables for a player that is on the hiscores', async () => {
@@ -140,7 +140,7 @@ describe('PlayersService hiscore lookups', () => {
     expect(await service.previewPlayer('nobody', 0, false)).toEqual({ status: 'notFound' });
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
-    expect(await service.refreshPlayerInfo('nobody', 0, true)).toBe('notFound'); // A lookup asks again
+    expect(await service.refreshPlayerInfo('nobody', 0)).toBe('notFound'); // A lookup asks again
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
     answerWith('failed');

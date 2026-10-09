@@ -18,6 +18,18 @@
   longer run the pod out of memory. Concurrent requests for one image still share one conversion, and cached images
   never wait. The `news-images` bulkhead shows up in the `resilience_*` metrics and rejection warnings.
 
+### Players and items
+
+- Usernames match the way Jagex matches them: `_` and `-` count as spaces and leading or trailing ones are ignored, so
+  `/players/Lynx_Titan`, `/players/lynx-titan` and `/players/lynx titan` are one player (`lynx titan`), stored and
+  scraped once, instead of up to three separate players. Players already stored under an `_` or `-` name need a one-off
+  rename (or a merge, if both spellings are stored), which isn't part of this change.
+- Two lookups of one player at the same moment (two tabs, a double request) no longer answer one of them with a 500, and
+  a player's first entry for a time zone (`scrapingOffset`) is no longer stored twice when that happens.
+- `GET /players/:username/hiscores` answers 400 for a `skip` over 10,000, instead of a 500 from MongoDB for one that
+  doesn't fit in 32 bits.
+- The item search's 400 for a long query reads "Search query must be 64 characters or less" (was "must be at 64").
+
 ### Logging
 
 - All log lines now come from the shared `@osrs-tracker/logger` (pino), the same format as the web server's, replacing

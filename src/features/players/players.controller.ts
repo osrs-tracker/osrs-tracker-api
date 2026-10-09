@@ -27,7 +27,8 @@ import { PlayersService } from './players.service';
 
 const LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 5 };
 const SIZE: ParseIntRangeOptions = { min: 1, max: 100, default: 7 };
-const SKIP: ParseIntRangeOptions = { min: 0, default: 0 };
+// A cap far above a player's entries per offset (clean-hiscores keeps 60 days), and within the 32 bits `$slice` takes
+const SKIP: ParseIntRangeOptions = { min: 0, max: 10_000, default: 0 };
 
 @Controller('players')
 export class PlayersController {
@@ -51,7 +52,7 @@ export class PlayersController {
 
   /**
    * Read-only: never refreshes or stores the player (the browser's `POST .../lookup` does). The username is
-   * case-insensitive. A stored player as stored (stale or not), with `trackedSince` (its oldest entry for
+   * matched like Jagex does: case-insensitive, `_` and `-` as spaces, leading and trailing ones ignored. A stored player as stored (stale or not), with `trackedSince` (its oldest entry for
    * `scrapingOffset`, or `null`) and a `max-age` of the time left until it may be refreshed (0 to
    * `PLAYER_MAX_AGE_SECONDS`, `playerMaxAgeSeconds`). An unknown player is a live preview from the hiscores, not stored
    * (`scrapingOffsets: []`, `trackedSince: null`); 404 when not on the hiscores (or with `skipRefresh`, which skips the
@@ -130,11 +131,7 @@ export class PlayersController {
     if (needsRefresh(player, scrapingOffset, new Date())) {
       this.logger.log(`Player '${username}' not found for offset '${scrapingOffset}' or outdated. Refreshing...`);
 
-      const result = await this.playersService.refreshPlayerInfo(
-        username,
-        scrapingOffset,
-        !player?.scrapingOffsets?.includes(scrapingOffset), // Start tracking this offset with an initial entry
-      );
+      const result = await this.playersService.refreshPlayerInfo(username, scrapingOffset);
       if (result === 'notFound') throw new NotFoundException(`Player '${username}' not found`);
 
       if (result === 'failed') {

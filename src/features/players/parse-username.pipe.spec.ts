@@ -7,7 +7,13 @@ describe('ParseUsernamePipe', () => {
 
   it('normalizes valid names to trimmed lowercase', () => {
     expect(pipe.transform(' ToxSick ')).toBe('toxsick');
-    expect(pipe.transform('Iron Man_1-X')).toBe('iron man_1-x');
+  });
+
+  it('normalizes underscores and hyphens to spaces, like Jagex, so one player is stored once', () => {
+    expect(pipe.transform('Iron Man_1-X')).toBe('iron man 1 x');
+    expect(pipe.transform('_Lynx-Titan-')).toBe('lynx titan');
+    expect(pipe.transform('lynx__titan')).toBe('lynx  titan'); // Jagex doesn't collapse them either
+    expect(() => pipe.transform('_-_')).toThrow('No username provided');
   });
 
   it('rejects empty names', () => {

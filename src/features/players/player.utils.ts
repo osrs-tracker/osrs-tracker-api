@@ -11,11 +11,15 @@ export const NOT_ON_TABLE_XP = Number.MAX_SAFE_INTEGER;
 export const MIN_HISCORE_SKILLS = 8;
 
 export class PlayerUtils {
-  /** OSRS display names: 1-12 letters, numbers, spaces, hyphens and underscores (after normalizing to lowercase). */
+  /** OSRS display names: 1-12 letters, numbers, spaces, hyphens and underscores (`normalizeUsername` leaves no `_-`). */
   private static readonly USERNAME_REGEX = /^[a-z0-9 _-]{1,12}$/;
 
+  /**
+   * Jagex's own matching: case-insensitive, `_` and `-` are a space, and leading or trailing separators are ignored
+   * (`_Lynx-Titan` is `lynx titan`). Repeated separators aren't collapsed: Jagex doesn't match `lynx  titan` either.
+   */
   static normalizeUsername(username: string): string {
-    return username.trim().toLowerCase();
+    return username.toLowerCase().replace(/[_-]/g, ' ').trim();
   }
 
   static isValidUsername(username: string): boolean {

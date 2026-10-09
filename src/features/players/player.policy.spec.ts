@@ -58,10 +58,10 @@ describe('needsRefresh', () => {
 describe('buildRefreshUpdate', () => {
   const entry: HiscoreEntry = { scrapingOffset: 0, date: NOW, skills: [], activities: [] };
 
-  it('resumes a paused player, adds the offset and prepends the initial entry', () => {
+  it('resumes a paused player, adds the offset and prepends the initial entry when the offset is new', () => {
     const refreshed = player({ username: 'toxsick', lastModified: NOW });
 
-    expect(buildRefreshUpdate(refreshed, entry, 3, true)).toEqual([
+    expect(buildRefreshUpdate(refreshed, entry, 3)).toEqual([
       {
         $set: {
           username: { $literal: 'toxsick' },
@@ -73,23 +73,28 @@ describe('buildRefreshUpdate', () => {
           scrapingOffsets: {
             $setUnion: [{ $ifNull: ['$scrapingOffsets', []] }, { $ifNull: ['$pausedScrapingOffsets', []] }, [3]],
           },
-          hiscoreEntries: { $concatArrays: [[{ $literal: entry }], { $ifNull: ['$hiscoreEntries', []] }] },
+          hiscoreEntries: {
+            $cond: [
+              { $in: [3, { $ifNull: ['$scrapingOffsets', []] }] },
+              '$hiscoreEntries',
+              { $concatArrays: [[{ $literal: entry }], { $ifNull: ['$hiscoreEntries', []] }] },
+            ],
+          },
         },
       },
       { $unset: ['pausedScrapingOffsets', 'hiscoreNotFoundSince', 'hiscoreNotFoundCount'] },
     ]);
   });
 
-  it('leaves the stored entries alone when not an initial scrape', () => {
-    const [{ $set }, unset] = buildRefreshUpdate(player(), entry, 0, false);
+  it('always unsets the pause fields', () => {
+    const [{ $set }, unset] = buildRefreshUpdate(player(), entry, 0);
 
-    expect($set).not.toHaveProperty('hiscoreEntries');
     expect($set.scrapingOffsets.$setUnion).toContainEqual({ $ifNull: ['$pausedScrapingOffsets', []] });
     expect(unset).toEqual({ $unset: ['pausedScrapingOffsets', 'hiscoreNotFoundSince', 'hiscoreNotFoundCount'] });
   });
 
   it("wraps every player value in $literal, so '$' strings aren't read as field paths", () => {
-    const [{ $set }] = buildRefreshUpdate(player({ username: '$hiscoreEntries' }), entry, 0, false);
+    const [{ $set }] = buildRefreshUpdate(player({ username: '$hiscoreEntries' }), entry, 0);
 
     expect($set.username).toEqual({ $literal: '$hiscoreEntries' });
   });
