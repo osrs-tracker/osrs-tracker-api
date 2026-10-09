@@ -31,7 +31,9 @@
   error logged with a stack no longer also prints it as plain lines on stderr (which Loki read as separate lines without
   a level), extra fields passed to a log call (`logger.warn('…', { username })`) are written as fields instead of
   dropped, and an object logged as the message reads as the object instead of `[object Object]`. Mongo's connect and
-  close lines now have the context `MongoDB` (was `MongoProvider` and `MongoModule`).
+  close lines now have the context `MongoDB` (was `MongoProvider` and `MongoModule`). An error's `error` field now also
+  has its cause (as `Caused by: …` after the stack, from `@osrs-tracker/logger` 0.1.1), so an unhandled `fetch failed`
+  says why it failed.
 - Requests the API makes (Jagex's hiscores, the news feed and news images) are now logged as `type: "outgoing"` with
   their status, URL and duration, carrying the `requestId` of the request that made them.
 - Every request gets an ID, logged as `requestId` on its request line and on every line logged while handling it (such

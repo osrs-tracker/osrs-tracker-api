@@ -103,6 +103,15 @@ describe('NestLogger', () => {
     expect(line()).toMatchObject({ level: 'error', message: 'fetch failed', error: error.stack });
   });
 
+  it("writes error(new Error()) with its cause after the stack, so fetch's reason isn't lost", () => {
+    const cause = new Error('connect ECONNREFUSED 127.0.0.1:443');
+    const error = new TypeError('fetch failed', { cause });
+
+    logger.error(error, 'ExceptionsHandler');
+
+    expect(line()).toMatchObject({ type: 'uncaught', error: `${error.stack}\nCaused by: ${cause.stack}` });
+  });
+
   it("writes the request's ID inside its context, and none outside", () => {
     const cls = ClsServiceManager.getClsService();
 
