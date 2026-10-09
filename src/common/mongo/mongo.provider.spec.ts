@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'v
 import { connectWithRetry, MAX_CONNECT_ATTEMPTS, RETRY_DELAY_MS } from './mongo.provider';
 
 /** Clients whose `connect` fails the first `failures` times, counting created and closed clients. */
-function clientFactory(failures: number) {
+function clientFactory(failures: number, { closeFails = false } = {}) {
   const stats = { created: 0, closed: 0 };
   const createClient = () => {
     const attempt = ++stats.created;
@@ -13,7 +13,10 @@ function clientFactory(failures: number) {
         if (attempt <= failures) throw new Error('querySrv ENOTFOUND');
         return client;
       },
-      close: async () => void stats.closed++,
+      close: async () => {
+        stats.closed++;
+        if (closeFails) throw new Error('close failed');
+      },
     };
     return client as unknown as MongoClient;
   };
@@ -60,5 +63,15 @@ describe('connectWithRetry', () => {
     expect(stats).toEqual({ created: MAX_CONNECT_ATTEMPTS, closed: MAX_CONNECT_ATTEMPTS });
     expect(warn).toHaveBeenCalledTimes(MAX_CONNECT_ATTEMPTS - 1);
     expect(warn).toHaveBeenLastCalledWith('MongoDB connect attempt 11/12 failed, retrying: Error: querySrv ENOTFOUND');
+  });
+
+  it('keeps the connect error when closing the failed client fails too', async () => {
+    const { createClient } = clientFactory(Infinity, { closeFails: true });
+    const connecting = connectWithRetry(createClient).catch((e: unknown) => e);
+
+    await vi.advanceTimersByTimeAsync((MAX_CONNECT_ATTEMPTS - 1) * RETRY_DELAY_MS);
+
+    expect(await connecting).toEqual(new Error('querySrv ENOTFOUND'));
+    expect(warn).toHaveBeenCalledTimes(MAX_CONNECT_ATTEMPTS - 1);
   });
 });

@@ -26,6 +26,10 @@ export default defineConfig(
     rules: {
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-unsafe-argument': 'warn',
+      // Misses reads in parameter decorators: a module constant only used as `@Query('size', new
+      // ParseIntRangePipe(SIZE))` in a class's last method is reported as useless. `no-unused-vars` still catches unused
+      // ones.
+      'no-useless-assignment': 'off',
       // The web app's SSR transfer cache drops `no-store`, `no-cache` and `private` responses (see the skill's
       // Cache-Control section). Regex literals don't match, so a spec can still test for them.
       'no-restricted-syntax': [

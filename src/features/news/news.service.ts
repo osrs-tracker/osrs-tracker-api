@@ -14,6 +14,7 @@ import { LRUCache } from 'lru-cache';
 import sharp from 'sharp';
 import { Agent, errors, fetch } from 'undici';
 import { AGENT, IMAGE_AGENT, MAX_IMAGE_BYTES } from '../../common/agent/agent.provider';
+import { ThrottledWarning } from '../../common/logger/throttled-warning';
 import { XML_PARSER } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
 import { MAX_IMAGE_PIXELS, NEWS_IMAGES } from './news.config';
@@ -29,10 +30,7 @@ export class NewsService {
   private readonly IMAGE_FETCH_TIMEOUT_MS = 20_000; // covers the body too, which can be up to MAX_IMAGE_BYTES
 
   private readonly IMAGE_CACHE_MAX_BYTES = 50 * 1024 * 1024; // 50 MB
-  private readonly EVICTION_WARNING_INTERVAL_MS = 60_000; // at most one warning per minute
-
-  private evictionsSinceWarning = 0;
-  private lastEvictionWarning = 0;
+  private readonly evictionWarning = new ThrottledWarning();
 
   private readonly imagesPolicy: ResiliencePolicy;
 
@@ -121,17 +119,15 @@ export class NewsService {
 
   /**
    * The image cache's `fetchMethod`: fetches and converts in a `NEWS_IMAGES` slot, so only a few images are in memory at
-   * once. A conversion that gets no slot (queue full or waited too long) answers 503 without fetching.
+   * once. A conversion that gets no slot (queue full or waited too long) answers 503 without fetching; it isn't logged
+   * per URL (`ResilienceEventsListener` logs rejections, throttled, and counts them).
    */
   private async convertImage(url: string): Promise<Buffer> {
     try {
       return await this.imagesPolicy.execute(({ signal }) => this.fetchImageAsWebp(url, signal));
     } catch (error) {
-      if (!(error instanceof BulkheadFullError)) throw error;
-
-      const reason = error.reason === 'full' ? 'too many images queued' : 'timed out waiting for a conversion slot';
-      this.logger.warn(`Image request rejected for ${url}: ${reason}`);
-      throw new ServiceUnavailableException('Failed to fetch image');
+      if (error instanceof BulkheadFullError) throw new ServiceUnavailableException('Failed to fetch image');
+      throw error;
     }
   }
 
@@ -157,6 +153,11 @@ export class NewsService {
         this.logger.warn(`Image request returned content-type ${response.headers.get('content-type')} for ${url}`);
         throw new BadGatewayException('Failed to fetch image');
       }
+      // Refused before downloading when the CDN says it's too large; `maxResponseSize` covers a missing or wrong length
+      if (Number(response.headers.get('content-length')) > MAX_IMAGE_BYTES) {
+        await response.body?.cancel();
+        throw new ImageTooLargeError();
+      }
 
       imageBuffer = Buffer.from(await response.arrayBuffer());
     } catch (error) {
@@ -164,7 +165,7 @@ export class NewsService {
 
       // Network errors, timeouts, redirects and bodies over the size limit (a `terminated` TypeError from the body read)
       const reason =
-        (error as Error).cause instanceof errors.ResponseExceededMaxSizeError
+        error instanceof ImageTooLargeError || (error as Error).cause instanceof errors.ResponseExceededMaxSizeError
           ? `Body larger than ${MAX_IMAGE_BYTES} bytes`
           : (error as Error).message;
       this.logger.warn(`Image request failed for ${url}: ${reason}`);
@@ -188,20 +189,15 @@ export class NewsService {
    * requesting many large CDN images). Throttled, so a flood of requests can't flood the logs too.
    */
   private warnImageCacheEviction(url: string): void {
-    this.evictionsSinceWarning++;
-
-    const now = Date.now();
-    if (now - this.lastEvictionWarning < this.EVICTION_WARNING_INTERVAL_MS) return;
+    const evictions = this.evictionWarning.hit();
+    if (evictions === undefined) return;
 
     const cacheMb = (this.imageCache.calculatedSize / 1024 / 1024).toFixed(1);
     const maxMb = this.IMAGE_CACHE_MAX_BYTES / 1024 / 1024;
     this.logger.warn(
-      `Image cache full (${cacheMb}/${maxMb} MB, ${this.imageCache.size} images), evicted ${this.evictionsSinceWarning} ` +
-        `image(s) since the last warning, last evicted: ${url}`,
+      `Image cache full (${cacheMb}/${maxMb} MB, ${this.imageCache.size} images), evicted ${evictions} image(s) ` +
+        `since the last warning, last evicted: ${url}`,
     );
-
-    this.evictionsSinceWarning = 0;
-    this.lastEvictionWarning = now;
   }
 
   /** Throws when the feed isn't RSS (e.g. an error page), so the caller can fall back to the cached copy. */
@@ -227,6 +223,9 @@ export class NewsService {
       }));
   }
 }
+
+/** An image whose `content-length` is over `MAX_IMAGE_BYTES`, refused before its body is read. */
+class ImageTooLargeError extends Error {}
 
 /** An `<item>` as fast-xml-parser parses it: `pubDate` is still a string. */
 type RssItem = Omit<OsrsNewsItem, 'pubDate'> & { pubDate: string };

@@ -1,11 +1,13 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ResilienceModule, ResilienceService } from '@nestjs/resilience';
 import { Test } from '@nestjs/testing';
 import { fetch } from 'undici';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
 import { AGENT } from '../../common/agent/agent.provider';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import {
+  HISCORE_QUEUE_TIMEOUT_MS,
   JAGEX_HISCORES,
   JAGEX_HISCORES_PRESET,
   MAX_CONCURRENT_HISCORE_REQUESTS,
@@ -73,9 +75,11 @@ async function answerHeld(held: ReturnType<typeof holdRequests>['held'], from: n
 describe('PlayersService hiscore lookups', () => {
   let service: PlayersService;
   let resilience: ResilienceService;
+  let warn: MockInstance<Logger['warn']>;
 
   beforeEach(async () => {
     mockFetch.mockReset();
+    warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     // The same module options and preset as AppModule, so the limits tested are production's
     const moduleRef = await Test.createTestingModule({
       imports: [ResilienceModule.forRoot({ mapErrors: false, presets: { [JAGEX_HISCORES]: JAGEX_HISCORES_PRESET } })],
@@ -89,6 +93,8 @@ describe('PlayersService hiscore lookups', () => {
     service = moduleRef.get(PlayersService);
     resilience = moduleRef.get(ResilienceService);
   });
+
+  afterEach(() => vi.restoreAllMocks());
 
   it("asks only the normal table for a name that isn't on the hiscores, or when it fails", async () => {
     answerWith('notFound');
@@ -174,10 +180,34 @@ describe('PlayersService hiscore lookups', () => {
 
     expect(await service.previewPlayer('one-too-many', 0, false)).toEqual({ status: 'failed' });
     expect(mockFetch).toHaveBeenCalledTimes(MAX_CONCURRENT_HISCORE_REQUESTS);
+    expect(warn).not.toHaveBeenCalled(); // ResilienceEventsListener logs rejections, throttled
 
     await answerHeld(held, 0, waiting, 'notFound');
     expect((await previews).every((result) => result.status === 'notFound')).toBe(true);
     expect(held.map(({ name }) => name)).not.toContain('one-too-many');
+  });
+
+  it('fails a request that waits longer than the queue timeout for a slot, without asking Jagex', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { held } = holdRequests();
+      const previews = Promise.all(
+        Array.from({ length: MAX_CONCURRENT_HISCORE_REQUESTS }, (_, i) =>
+          service.previewPlayer(`player${i}`, 0, false),
+        ),
+      );
+      await vi.waitFor(() => expect(held).toHaveLength(MAX_CONCURRENT_HISCORE_REQUESTS));
+      const queued = service.previewPlayer('waits-too-long', 0, false);
+
+      await vi.advanceTimersByTimeAsync(HISCORE_QUEUE_TIMEOUT_MS);
+      expect(await queued).toEqual({ status: 'failed' });
+      expect(held.map(({ name }) => name)).not.toContain('waits-too-long');
+
+      await answerHeld(held, 0, MAX_CONCURRENT_HISCORE_REQUESTS, 'notFound');
+      await previews;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('stops asking Jagex once enough requests failed', async () => {
@@ -188,8 +218,10 @@ describe('PlayersService hiscore lookups', () => {
     }
     expect(resilience.circuitBreaker(JAGEX_HISCORES).state).toBe('open');
 
+    warn.mockClear();
     expect(await service.previewPlayer('toxsick', 0, false)).toEqual({ status: 'failed' });
     expect(mockFetch).toHaveBeenCalledTimes(minimumCalls);
+    expect(warn).not.toHaveBeenCalled(); // An open circuit isn't logged per lookup
   });
 
   it('counts players that are not on the hiscores as successes, not failures', async () => {

@@ -25,7 +25,8 @@ keep code rules here, not in the agent.
 - News images use `IMAGE_AGENT` instead, whose `maxResponseSize` (`MAX_IMAGE_BYTES`) caps the body as read off the wire:
   request them with `accept-encoding: identity` so decompression can't exceed it, and don't set it on `AGENT` or count
   bytes by hand. undici rejects the body read with a `terminated` `TypeError` whose `cause` is a
-  `ResponseExceededMaxSizeError`.
+  `ResponseExceededMaxSizeError`. It only counts bytes as they arrive, so an image whose `content-length` is already
+  over the limit is refused before its body is read, rather than downloaded up to 10 MB in a conversion slot.
 - Jagex data cached in memory (the news feed, images) is an `lru-cache` with a `fetchMethod`, read with `forceFetch`: it
   shares the fetch in flight per key and doesn't cache a rejection, so don't add a pending map beside it; to keep a
   stale value on failure, return it from `fetchMethod` (setting `options.ttl` for the retry delay).
@@ -59,8 +60,9 @@ keep code rules here, not in the agent.
   with the memory arithmetic) for every image fetch and conversion, run inside the image cache's `fetchMethod` so a
   shared conversion takes one slot and a cache hit none. Resilience errors are mapped explicitly: `AppModule` sets
   `mapErrors: false`, so its global interceptor never turns them into 503/504s; `PlayersService` turns a refusal
-  (`BulkheadFullError`, `CircuitOpenError`) into a `failed` result and `NewsService` a full bulkhead into its image 503.
-  A failure the breaker should count has to throw inside `execute()`; a not-found player is a success.
+  (`BulkheadFullError`, `CircuitOpenError`) into a `failed` result and `NewsService` a full bulkhead into its image 503,
+  without a warning per call: the listener below logs refusals, so an outage doesn't log a line per lookup. A failure
+  the breaker should count has to throw inside `execute()`; a not-found player is a success.
   `common/resilience/resilience-events.ts` logs breaker changes and (throttled) rejections, and serves the
   `resilience_*` metrics on `/metrics`. The package is young: keep it pinned exactly and read its release notes on every
   bump. Not used on purpose: no `@Retry`/`@Timeout`/`@CircuitBreaker` on controllers (GETs are cheap Mongo reads,
@@ -77,16 +79,17 @@ keep code rules here, not in the agent.
   `info`, `warn` or `error` (Loki keeps a level it doesn't know, like Nest's `log` or a number, as its own
   `detected_level`), and `route` on request lines (Grafana's Express dashboard filters on it). The app logger is Nest's
   `ConsoleLogger` in JSON mode (`common/logger/json-logger.ts`, set in `main.ts`), only renaming `log` to `info`; log
-  through Nest's `Logger`, never `console`. Request logs (`logger.middleware.ts`): 5xx `error`, 4xx `warn`, else `info`.
-  A client that disconnects before the response is `warn` with `aborted: true` and no `status`; keep that shape,
-  osrs-tracker-web logs the same.
-- Request IDs: `nestjs-cls` (`common/logger/request-id.ts`) gives each request a context with a UUID (an incoming
-  `X-Request-Id` only if it's a UUID), sent back as `X-Request-Id`. The request line and every app line logged while
-  handling it carry it as top-level `requestId`; lines outside a request (startup, shutdown) have none. Find a request's
-  lines with `{app="osrs-tracker-api"} | json | requestId="<id>"`; never make it a Loki label (one stream per request).
-  `LoggerMiddleware` reads the ID when the request starts (the context isn't guaranteed in morgan's callback), so the
-  CLS middleware must run first: it does because `ClsModule` is global, and Nest applies global modules' middleware
-  first.
+  through Nest's `Logger`, never `console`. A warning that can repeat per request (evictions, rejections) goes through
+  `ThrottledWarning` (`common/logger/throttled-warning.ts`): at most one per key and minute, with the count since.
+  Request logs (`logger.middleware.ts`): 5xx `error`, 4xx `warn`, else `info`. A client that disconnects before the
+  response is `warn` with `aborted: true` and no `status`; keep that shape, osrs-tracker-web logs the same.
+- Request IDs: `nestjs-cls` (`common/logger/request-id.ts`) gives each request a context with a new UUID (never a
+  client's `X-Request-Id`: nothing upstream sends one, and a client could reuse one), sent back as `X-Request-Id`. The
+  request line and every app line logged while handling it carry it as top-level `requestId`; lines outside a request
+  (startup, shutdown) have none. Find a request's lines with `{app="osrs-tracker-api"} | json | requestId="<id>"`; never
+  make it a Loki label (one stream per request). `LoggerMiddleware` reads the ID when the request starts (the context
+  isn't guaranteed in morgan's callback), so the CLS middleware must run first: it does because `ClsModule` is global,
+  and Nest applies global modules' middleware first.
 - Traefik compresses JSON for browsers (the `osrs-tracker-api-compress` Middleware in `osrs-tracker-api.yaml`, last in
   the Ingress's chain), adding `Vary: Accept-Encoding`; the web's SSR calls the Service directly and gets it plain.
   Don't add Nest's `compression`. The request log's `contentLength` is the uncompressed size.
@@ -174,7 +177,7 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   `tsconfig.json`, so no SWC plugin is needed.
 - Covered (changing one of these means changing its spec):
   - `config/env.spec.ts`: the env validation (`validateEnv`).
-  - `common/logger/json-logger.spec.ts`: the app logger's line shape and `requestId`.
+  - `common/logger/`: the app logger's line shape and `requestId` (`json-logger.spec.ts`), `ThrottledWarning`.
   - `players/`: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's
     pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`); combat level, type and status (`PlayerUtils`; a
     hiscore without the combat skills counts as failed, `hasCombatSkills`).
@@ -182,15 +185,17 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     `limit`, `size`, `skip` and IDs).
   - `players.service.spec.ts` (real `ResilienceModule` with production's preset, `undici`'s `fetch` mocked): normal
     table first, shared in-flight lookups, the preview's not-found cache, the concurrency cap in FIFO order, the queue
-    bound, the breaker opening on failures but not on not-found players.
+    bound and queue timeout (no warning per refusal), the breaker opening on failures but not on not-found players.
   - `news.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock): shared in-flight
     fetches, the stale feed's 60s retry, the 503 and a 404 not cached; the image size limit against a local server with
-    the real `fetch` and `IMAGE_AGENT` (503, its log line, `identity`); the `news-images` bulkhead (queue bound and 503
-    without fetching, one slot per shared conversion, none for a cache hit).
-  - `mongo.provider.spec.ts` (fake timers): the connect retry's constant 10s delay, warn lines, giving up after 12.
+    the real `fetch` and `IMAGE_AGENT` (503, its log line, `identity`), and an oversized `content-length` refused
+    without reading the body; the `news-images` bulkhead (queue bound and timeout, 503 without fetching, one slot per
+    shared conversion, none for a cache hit).
+  - `mongo.provider.spec.ts` (fake timers): the connect retry's constant 10s delay, warn lines, giving up after 12 with
+    the connect error (also when closing the failed client fails).
   - `app.e2e.spec.ts`: per GET route its `Cache-Control` and that it never writes (a route's header or a new GET route
     means changing `CASES`), that no route overlaps another, that shutdown closes the Mongo client, and the request ID
-    (`X-Request-Id` matching the request line's `requestId`, an incoming one reused only if a UUID).
+    (`X-Request-Id` matching the request line's `requestId`, a client's own ignored).
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.

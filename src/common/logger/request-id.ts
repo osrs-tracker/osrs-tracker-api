@@ -1,8 +1,6 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { ClsModuleOptions } from 'nestjs-cls';
 import { randomUUID } from 'node:crypto';
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * A request context (`AsyncLocalStorage`) per request, holding its ID: the request log line and every app line logged
@@ -14,15 +12,11 @@ export const CLS_OPTIONS: ClsModuleOptions = {
   middleware: {
     mount: true,
     generateId: true,
-    idGenerator: requestId,
+    // Always a new one: nothing upstream sends an ID (Traefik sets none, the web's SSR forwards none), and a client's
+    // own would let it give unrelated requests the same `requestId`
+    idGenerator: () => randomUUID(),
     setup: (cls, _req, res: Response) => {
       res.setHeader('X-Request-Id', cls.getId());
     },
   },
 };
-
-/** An incoming `X-Request-Id` only when it's a UUID (clients send what they like; Traefik sets none), else a new one. */
-export function requestId(req: Request): string {
-  const incoming = req.get('x-request-id');
-  return incoming && UUID.test(incoming) ? incoming : randomUUID();
-}

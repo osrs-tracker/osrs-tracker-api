@@ -37,7 +37,8 @@ export function connectWithRetry(createClient: () => MongoClient): Promise<Mongo
     try {
       return await client.connect();
     } catch (error) {
-      await client.close();
+      // A failing close mustn't replace the connect error (logged and, after the last attempt, thrown)
+      await client.close().catch(() => undefined);
       if (attempt < MAX_CONNECT_ATTEMPTS) {
         logger.warn(`MongoDB connect attempt ${attempt}/${MAX_CONNECT_ATTEMPTS} failed, retrying: ${error}`);
       }
