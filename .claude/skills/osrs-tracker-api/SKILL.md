@@ -104,6 +104,8 @@ keep code rules here, not in the agent.
 - Traefik compresses JSON for browsers (the `osrs-tracker-api-compress` Middleware in `osrs-tracker-api.yaml`, last in
   the Ingress's chain), adding `Vary: Accept-Encoding`; the web's SSR calls the Service directly and gets it plain.
   Don't add Nest's `compression`. The request log's `contentLength` is the uncompressed size.
+- Traefik reuses idle connections to the pods for up to 90s, so `main.ts` sets the API server's `keepAliveTimeout` to 95s
+  (Node's 5s default would close connections Traefik is about to reuse: 502s). Keep it above Traefik's.
 
 ## Validating params
 

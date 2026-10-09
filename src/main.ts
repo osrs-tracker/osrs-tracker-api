@@ -38,6 +38,9 @@ async function bootstrap() {
     app.listen(config.get('PORT', { infer: true })),
     appMetrics.listen(config.get('METRICS_PORT', { infer: true })),
   ]);
+  // Traefik reuses idle backend connections for up to 90s; with Node's 5s default it could send a request on a
+  // connection Node is just closing, a 502. Not on the metrics app: the kubelet's probes don't reuse connections.
+  app.getHttpServer().keepAliveTimeout = 95_000;
 }
 
 void bootstrap();
