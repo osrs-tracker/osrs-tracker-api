@@ -70,6 +70,13 @@ keep code rules here, not in the agent.
   through Nest's `Logger`, never `console`. Request logs (`logger.middleware.ts`): 5xx `error`, 4xx `warn`, else `info`.
   A client that disconnects before the response is `warn` with `aborted: true` and no `status`; keep that shape,
   osrs-tracker-web logs the same.
+- Request IDs: `nestjs-cls` (`common/logger/request-id.ts`) gives each request a context with a UUID (an incoming
+  `X-Request-Id` only if it's a UUID), sent back as `X-Request-Id`. The request line and every app line logged while
+  handling it carry it as top-level `requestId`; lines outside a request (startup, shutdown) have none. Find a request's
+  lines with `{app="osrs-tracker-api"} | json | requestId="<id>"`; never make it a Loki label (one stream per request).
+  `LoggerMiddleware` reads the ID when the request starts (the context isn't guaranteed in morgan's callback), so the
+  CLS middleware must run first: it does because `ClsModule` is global, and Nest applies global modules' middleware
+  first.
 - Traefik compresses JSON for browsers (the `osrs-tracker-api-compress` Middleware in `osrs-tracker-api.yaml`, last in
   the Ingress's chain), adding `Vary: Accept-Encoding`; the web's SSR calls the Service directly and gets it plain.
   Don't add Nest's `compression`. The request log's `contentLength` is the uncompressed size.
@@ -155,7 +162,7 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   `@nestjs/resilience` policy, tested in a `Test.createTestingModule` with a real `ResilienceModule` and the production
   preset, not mocks (`players.service.spec.ts`). Vite's transformer emits Nest's decorator metadata from
   `tsconfig.json`, so no SWC plugin is needed.
-- Covered: the env validation (`validateEnv`, `config/env.spec.ts`), the app logger's line shape
+- Covered: the env validation (`validateEnv`, `config/env.spec.ts`), the app logger's line shape and `requestId`
   (`common/logger/json-logger.spec.ts`), the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the
   refresh update's pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status
   (`PlayerUtils`; a hiscore without the combat skills counts as failed, `hasCombatSkills`), the validation pipes
@@ -166,7 +173,8 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   news feed and image caches (`news.service.spec.ts` with `undici`'s `fetch` mocked and `performance.now` as lru-cache's
   clock: shared in-flight fetches, the stale feed's 60s retry, the 503 and a 404 not cached; the image size limit
   against a local server with the real `fetch` and `IMAGE_AGENT`: 503, its log line, `identity`), and per GET route its
-  `Cache-Control` and that it never writes, that no route overlaps another and that shutdown closes the Mongo client
+  `Cache-Control` and that it never writes, that no route overlaps another, that shutdown closes the Mongo client, and
+  the request ID (`X-Request-Id` matching the request line's `requestId`, an incoming one reused only if a UUID)
   (`app.e2e.spec.ts`; a route's header or a new GET route means changing its `CASES`). Changing one of those means
   changing its spec.
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.

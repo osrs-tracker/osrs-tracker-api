@@ -20,7 +20,12 @@
   one. They keep one JSON object per line with `level` `info`, `warn` or `error`, so Loki's level detection is
   unchanged; the time is now `timestamp` (epoch ms) with the `pid`, `context` is the logging class's name, an error
   logged as an `Error` gets a structured `error` field (name, message, stack, cause), and errors go to stderr. Request
-  log lines are unchanged.
+  log lines keep their format.
+- Every request gets an ID, logged as `requestId` on its request line and on every line logged while handling it (such
+  as a hiscores warning), so a warning can be tied to the request that caused it: in Grafana,
+  `{app="osrs-tracker-api"} | json | requestId="<id>"`. Responses send it back as `X-Request-Id`; a client's own
+  `X-Request-Id` is kept when it's a UUID. Lines outside a request (startup, shutdown) have none, and every other field
+  is unchanged.
 
 ### Behind the scenes
 
