@@ -82,18 +82,27 @@ keep code rules here, not in the agent.
   bump with `--prefer-online` (dist-tags lag).
 - Logs go to Loki unparsed, so their shape is a contract: one JSON object per line with a top-level string `level` of
   `info`, `warn` or `error` (Loki keeps a level it doesn't know, like Nest's `log` or a number, as its own
-  `detected_level`), and `route` on request lines (Grafana's Express dashboard filters on it). The app logger is Nest's
-  `ConsoleLogger` in JSON mode (`common/logger/json-logger.ts`, set in `main.ts`), only renaming `log` to `info`; log
-  through Nest's `Logger`, never `console`. A warning that can repeat per request (evictions, rejections) goes through
-  `ThrottledWarning` (`common/logger/throttled-warning.ts`): at most one per key and minute, with the count since.
-  Request logs (`logger.middleware.ts`): 5xx `error`, 4xx `warn`, else `info`. A client that disconnects before the
-  response is `warn` with `aborted: true` and no `status`; keep that shape, osrs-tracker-web logs the same.
+  `detected_level`), an ISO `time`, a `type`, and `route` on request lines (Grafana's Express dashboard filters on it).
+  The format comes from `@osrs-tracker/logger` (pino, published from osrs-tracker-aws and shared with osrs-tracker-web:
+  a format change is an issue there). `common/logger/logger.ts` creates the one logger (`logger`; specs build their own
+  with `createApiLogger(destination)`, since pino doesn't write through `process.stdout.write`). `NestLogger`
+  (`common/logger/nest-logger.ts`, set in `main.ts`) passes Nest's and the app's lines to it, with `log` as `info`, the
+  class name as `context`, an error's stack as one string under `error`, and `type` from the context: `lifecycle` (Nest's
+  startup classes and Mongo's connect and close, `LIFECYCLE_CONTEXTS`), `uncaught` (`ExceptionsHandler`), else `app`
+  (`ApiLogType`). It's a `ConsoleLogger` that only overrides `printMessages`, so Nest still parses the arguments and
+  filters the levels: `debug` and `verbose` are off, `fatal` stays on (Loki knows it). Log through Nest's `Logger`, never `console`. A warning that can repeat
+  per request (evictions, rejections) goes through `ThrottledWarning` (`common/logger/throttled-warning.ts`): at most one
+  per key and minute, with the count since. The request log (the package's `requestLogger`, applied in `AppModule`) is
+  `type: 'incoming'`: 5xx `error`, 4xx `warn`, else `info`; a client that disconnects before the response is `warn` with
+  `aborted: true` and no `status`. `main.ts` calls `logOutgoingRequests` once (twice would log every request twice), so
+  every `fetch` (hiscores, news feed, images) is logged as `type: 'outgoing'` with its status and duration (covered by
+  the package's tests, not ours; `requestId` comes from the same `context` as every other line).
 - Request IDs: `nestjs-cls` (`common/logger/request-id.ts`) gives each request a context with a new UUID (never a
-  client's `X-Request-Id`: nothing upstream sends one, and a client could reuse one), sent back as `X-Request-Id`. The
-  request line and every app line logged while handling it carry it as top-level `requestId`; lines outside a request
-  (startup, shutdown) have none. Find a request's lines with `{app="osrs-tracker-api"} | json | requestId="<id>"`; never
-  make it a Loki label (one stream per request). `LoggerMiddleware` reads the ID when the request starts (the context
-  isn't guaranteed in morgan's callback), so the CLS middleware must run first: it does because `ClsModule` is global,
+  client's `X-Request-Id`: nothing upstream sends one, and a client could reuse one), sent back as `X-Request-Id`. Every
+  line logged while handling a request carries it as top-level `requestId` (the logger's `context`): the request line,
+  app lines and its outgoing requests; lines outside a request (startup, shutdown) have none. Find a request's lines with
+  `{app="osrs-tracker-api"} | json | requestId="<id>"`; never make it a Loki label (one stream per request). The request
+  log reads the ID when the request starts, so the CLS middleware must run first: it does because `ClsModule` is global,
   and Nest applies global modules' middleware first.
 - Metrics: `/metrics` on `METRICS_PORT` comes from `@osrs-tracker/express-metrics` (HTTP durations and `up`, shared with
   osrs-tracker-web, plus Node's `nodejs_*`/`process_*`). Import `Counter`, `Gauge`, `Histogram` and `register` from it,
@@ -192,7 +201,8 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   `tsconfig.json`, so no SWC plugin is needed.
 - Covered (changing one of these means changing its spec):
   - `config/env.spec.ts`: the env validation (`validateEnv`).
-  - `common/logger/`: the app logger's line shape and `requestId` (`json-logger.spec.ts`), `ThrottledWarning`.
+  - `common/logger/`: Nest's and the app's line shape, `type` and `requestId` (`nest-logger.spec.ts`),
+    `ThrottledWarning`.
   - `players/`: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's
     pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`); combat level, type and status (`PlayerUtils`; a
     hiscore without the combat skills counts as failed, `hasCombatSkills`).
@@ -208,9 +218,10 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     shared conversion, none for a cache hit).
   - `mongo.provider.spec.ts` (fake timers): the connect retry's constant 10s delay, warn lines, giving up after 12 with
     the connect error (also when closing the failed client fails).
-  - `app.e2e.spec.ts`: per GET route its `Cache-Control` and that it never writes (a route's header or a new GET route
-    means changing `CASES`), that no route overlaps another, that shutdown closes the Mongo client, and the request ID
-    (`X-Request-Id` matching the request line's `requestId`, a client's own ignored).
+  - `app.e2e.spec.ts` (`logger` mocked to collect the lines): per GET route its `Cache-Control` and that it never
+    writes (a route's header or a new GET route means changing `CASES`), that no route overlaps another, that shutdown
+    closes the Mongo client, and the request ID (`X-Request-Id` matching the `incoming` line's `requestId`, a client's
+    own ignored).
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.

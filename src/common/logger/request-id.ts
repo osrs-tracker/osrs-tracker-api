@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 /**
  * A request context (`AsyncLocalStorage`) per request, holding its ID: the request log line and every app line logged
  * while handling it carry it as `requestId`, and the response sends it back as `X-Request-Id`. The module is global, so
- * Nest applies its middleware before `AppModule`'s `LoggerMiddleware`, which reads the ID when the request starts.
+ * Nest applies its middleware before `AppModule`'s request log, which reads the ID when the request starts.
  */
 export const CLS_OPTIONS: ClsModuleOptions = {
   global: true,

@@ -1,19 +1,24 @@
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { metricsMiddleware } from '@osrs-tracker/express-metrics';
+import { logOutgoingRequests } from '@osrs-tracker/logger';
 import { Request } from 'express';
 import { AppMetricsModule } from './app-metrics.module';
 import { AppModule } from './app.module';
-import { JsonLogger } from './common/logger/json-logger';
+import { NestLogger } from './common/logger/nest-logger';
+import { logger } from './common/logger/logger';
 import { routeLabel } from './common/route/route-label';
 import { ROUTE_CONFLICT_POLICY } from './config/app-options';
 import { corsOptions } from './config/cors';
 import { Env } from './config/env';
 
 async function bootstrap() {
+  // The hiscores, news feed and image fetches, as `type: 'outgoing'` with the `requestId` of the request that made them
+  logOutgoingRequests({ logger });
+
   // No shutdown hooks here: /healthy keeps answering until the main app has drained and Nest exits the process, so the
   // kubelet's probes don't get `connection refused` (Unhealthy events) while a terminating pod shuts down
-  const appMetrics = await NestFactory.create(AppMetricsModule, { logger: new JsonLogger() });
+  const appMetrics = await NestFactory.create(AppMetricsModule, { logger: new NestLogger(logger) });
   // Created before AppModule: it clears the default registry, which ResilienceEventsListener registers its metrics on
   const metrics = metricsMiddleware({
     metricsApp: appMetrics.getHttpAdapter().getInstance(),
@@ -21,7 +26,7 @@ async function bootstrap() {
   });
 
   const app = await NestFactory.create(AppModule, {
-    logger: new JsonLogger(),
+    logger: new NestLogger(logger),
     routeConflictPolicy: ROUTE_CONFLICT_POLICY,
   });
   const config = app.get<ConfigService<Env, true>>(ConfigService);
