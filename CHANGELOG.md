@@ -33,6 +33,10 @@
 
 ### Behind the scenes
 
+- `/metrics` (port 9090, not public) now comes from the shared `@osrs-tracker/express-metrics`, like the web server's,
+  instead of the unmaintained `express-prom-bundle` and the deprecated `prom-client` (its `npm ci` warning is gone).
+  `http_request_duration_seconds`, `up` and the `resilience_*` series are unchanged; new are Node's process metrics
+  (`nodejs_*`, `process_*`: event-loop lag, heap, GC).
 - Removed the Swagger docs (`/swagger`, only served locally and no longer used) and `@nestjs/swagger` with them, which
   also drops `swagger-ui-dist` and `@scarf/scarf` from the dependencies. What the docs said about each route (its
   statuses, their `Cache-Control` and the params' meaning) is now a short comment on the route's handler. Routes,
