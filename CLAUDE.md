@@ -29,8 +29,9 @@ release steps. Keep detail there, not in this file.
 
 - `src/features/<feature>/` (items, news, players): controller, service and module per feature; the player refresh and
   `max-age` rules in `players/player.policy.ts`, its intervals and Jagex limits (the `jagex-hiscores` resilience preset,
-  registered in `app.module.ts`) in `players/player.config.ts`, param pipes in `parse-*.pipe.ts`. Specs (`*.spec.ts`)
-  sit next to the code; `src/app.e2e.spec.ts` boots the app on fakes and lists every GET route's `Cache-Control`.
+  registered in `app.module.ts`) in `players/player.config.ts`, the news image limits (the `news-images` preset) in
+  `news/news.config.ts`, param pipes in `parse-*.pipe.ts`. Specs (`*.spec.ts`) sit next to the code;
+  `src/app.e2e.spec.ts` boots the app on fakes and lists every GET route's `Cache-Control`.
 - `src/common/` shared providers, injected by the token constant exported from their provider file (Mongo, the `undici`
   HTTP agents, XML parser), plus the JSON logger and request IDs (`logger/`), bot detection, route labels, the
   `Cache-Control` values (`http/cache-control.ts`), `ParseIntRangePipe` (`pipes/`) and the resilience policies' logs and

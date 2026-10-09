@@ -13,6 +13,10 @@
   player that isn't on the hiscores never counts as a failure. Built on `@nestjs/resilience` (pinned to 0.0.2), which
   replaces the hand-written request limiter; breaker changes and rejections are logged as warnings, and `/metrics` shows
   the `resilience_*` gauges and rejection counts.
+- News images are converted at most two at a time per pod, with up to 10 more waiting up to 10s for a turn; beyond that
+  `/news/image` answers 503 at once (without `Cache-Control`, so it's retried), so a burst of large CDN images can no
+  longer run the pod out of memory. Concurrent requests for one image still share one conversion, and cached images
+  never wait. The `news-images` bulkhead shows up in the `resilience_*` metrics and rejection warnings.
 
 ### Logging
 
@@ -44,6 +48,8 @@
   feed requests stay unlimited), replacing the hand-written byte counting. An image over it still answers 503, also when
   it doesn't send its size up front, and is now always requested uncompressed, so the limit holds for what is actually
   read.
+- The MongoDB connect retry at startup uses `@nestjs/resilience`'s `RetryPolicy` instead of a hand-written loop, with
+  the same timing (12 attempts, 10s apart) and log lines; now covered by tests.
 
 ## 2026/10/08
 

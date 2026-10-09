@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { BulkheadFullError, ResiliencePolicy, ResilienceService } from '@nestjs/resilience';
 import { OsrsNewsItem } from '@osrs-tracker/models';
 import { XMLParser } from 'fast-xml-parser';
 import { LRUCache } from 'lru-cache';
@@ -15,6 +16,7 @@ import { Agent, errors, fetch } from 'undici';
 import { AGENT, IMAGE_AGENT, MAX_IMAGE_BYTES } from '../../common/agent/agent.provider';
 import { XML_PARSER } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
+import { MAX_IMAGE_PIXELS, NEWS_IMAGES } from './news.config';
 
 @Injectable()
 export class NewsService {
@@ -25,13 +27,14 @@ export class NewsService {
   private readonly NEWS_RETRY_MS = 60_000; // after a failed refresh, serve the stale copy this long before retrying
 
   private readonly IMAGE_FETCH_TIMEOUT_MS = 20_000; // covers the body too, which can be up to MAX_IMAGE_BYTES
-  private readonly MAX_IMAGE_PIXELS = 25_000_000; // e.g. 5000x5000
 
   private readonly IMAGE_CACHE_MAX_BYTES = 50 * 1024 * 1024; // 50 MB
   private readonly EVICTION_WARNING_INTERVAL_MS = 60_000; // at most one warning per minute
 
   private evictionsSinceWarning = 0;
   private lastEvictionWarning = 0;
+
+  private readonly imagesPolicy: ResiliencePolicy;
 
   /**
    * The parsed feed, so `/news` doesn't fetch Jagex on every request (SSR calls the API directly, not via a cache).
@@ -45,7 +48,8 @@ export class NewsService {
 
   /**
    * WebP images by URL, capped by total size so memory stays bounded whatever images are requested. `fetch` shares one
-   * conversion per URL between concurrent requests; a failure rejects every waiting request and isn't cached.
+   * conversion per URL between concurrent requests, so they take one `NEWS_IMAGES` slot (a cache hit takes none); a
+   * failure rejects every waiting request and isn't cached.
    */
   private readonly imageCache = new LRUCache<string, Buffer>({
     maxSize: this.IMAGE_CACHE_MAX_BYTES,
@@ -53,7 +57,7 @@ export class NewsService {
     dispose: (_webp, url, reason) => {
       if (reason === 'evict') this.warnImageCacheEviction(url);
     },
-    fetchMethod: (url) => this.fetchImageAsWebp(url),
+    fetchMethod: (url) => this.convertImage(url),
     // An eviction aborts a conversion in flight: finish it for the waiting requests instead of answering them nothing
     ignoreFetchAbort: true,
   });
@@ -63,7 +67,10 @@ export class NewsService {
     @Inject(IMAGE_AGENT) private readonly imageAgent: Agent,
     @Inject(XML_PARSER) private readonly xmlParser: XMLParser,
     private readonly config: ConfigService<Env, true>,
-  ) {}
+    resilience: ResilienceService,
+  ) {
+    this.imagesPolicy = resilience.preset(NEWS_IMAGES);
+  }
 
   async getRecentNews(limit: number): Promise<OsrsNewsItem[]> {
     const osrsNewsItems = await this.newsCache.forceFetch('news');
@@ -112,7 +119,23 @@ export class NewsService {
     }
   }
 
-  private async fetchImageAsWebp(url: string): Promise<Buffer> {
+  /**
+   * The image cache's `fetchMethod`: fetches and converts in a `NEWS_IMAGES` slot, so only a few images are in memory at
+   * once. A conversion that gets no slot (queue full or waited too long) answers 503 without fetching.
+   */
+  private async convertImage(url: string): Promise<Buffer> {
+    try {
+      return await this.imagesPolicy.execute(({ signal }) => this.fetchImageAsWebp(url, signal));
+    } catch (error) {
+      if (!(error instanceof BulkheadFullError)) throw error;
+
+      const reason = error.reason === 'full' ? 'too many images queued' : 'timed out waiting for a conversion slot';
+      this.logger.warn(`Image request rejected for ${url}: ${reason}`);
+      throw new ServiceUnavailableException('Failed to fetch image');
+    }
+  }
+
+  private async fetchImageAsWebp(url: string, signal: AbortSignal): Promise<Buffer> {
     // Redirects are refused so the request can't leave the CDN. `IMAGE_AGENT` caps the body at `MAX_IMAGE_BYTES` as
     // read off the wire, so `identity` keeps a compressed body from decompressing past it.
     this.logger.log(`Fetching image from URL: ${url}`);
@@ -122,7 +145,7 @@ export class NewsService {
         dispatcher: this.imageAgent,
         headers: { 'accept-encoding': 'identity' },
         redirect: 'error',
-        signal: AbortSignal.timeout(this.IMAGE_FETCH_TIMEOUT_MS),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(this.IMAGE_FETCH_TIMEOUT_MS)]),
       });
 
       if (response.status === 404) throw new NotFoundException('Image not found');
@@ -151,9 +174,7 @@ export class NewsService {
     // Convert to WebP
     let webpBuffer: Buffer;
     try {
-      webpBuffer = await sharp(imageBuffer, { limitInputPixels: this.MAX_IMAGE_PIXELS })
-        .webp({ quality: 80 })
-        .toBuffer();
+      webpBuffer = await sharp(imageBuffer, { limitInputPixels: MAX_IMAGE_PIXELS }).webp({ quality: 80 }).toBuffer();
     } catch (error) {
       this.logger.warn(`Image conversion failed for ${url}: ${(error as Error).message}`);
       throw new BadGatewayException('Failed to convert image');

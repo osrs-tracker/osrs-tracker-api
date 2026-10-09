@@ -1,14 +1,22 @@
 import { Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ResilienceModule, ResilienceService } from '@nestjs/resilience';
+import { Test } from '@nestjs/testing';
 import { XMLParser } from 'fast-xml-parser';
 import { createServer, IncomingHttpHeaders, Server } from 'node:http';
 import { AddressInfo } from 'node:net';
 import sharp from 'sharp';
 import { Agent, fetch, Response } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
-import { imageAgentProvider, MAX_IMAGE_BYTES } from '../../common/agent/agent.provider';
-import { XMLParserProvider } from '../../common/xml/xml.provider';
+import { AGENT, IMAGE_AGENT, imageAgentProvider, MAX_IMAGE_BYTES } from '../../common/agent/agent.provider';
+import { XML_PARSER, XMLParserProvider } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
+import {
+  MAX_CONCURRENT_IMAGE_CONVERSIONS,
+  MAX_QUEUED_IMAGE_CONVERSIONS,
+  NEWS_IMAGES,
+  NEWS_IMAGES_PRESET,
+} from './news.config';
 import { NewsService } from './news.service';
 
 vi.mock('undici', async (importOriginal) => ({ ...(await importOriginal<typeof import('undici')>()), fetch: vi.fn() }));
@@ -29,8 +37,35 @@ function answerWith(respond: () => Response) {
   });
 }
 
+/** A `NewsService` with the same resilience module options and preset as AppModule, so the limits tested are production's. */
+async function createNewsService(
+  imageAgent: Agent | undefined,
+  xmlParser: XMLParser,
+  config: ConfigService<Env, true>,
+): Promise<{ service: NewsService; resilience: ResilienceService }> {
+  const moduleRef = await Test.createTestingModule({
+    imports: [ResilienceModule.forRoot({ mapErrors: false, presets: { [NEWS_IMAGES]: NEWS_IMAGES_PRESET } })],
+    providers: [
+      NewsService,
+      { provide: AGENT, useValue: {} },
+      { provide: IMAGE_AGENT, useValue: imageAgent ?? {} },
+      { provide: XML_PARSER, useValue: xmlParser },
+      { provide: ConfigService, useValue: config },
+    ],
+  }).compile();
+  return { service: moduleRef.get(NewsService), resilience: moduleRef.get(ResilienceService) };
+}
+
+/** A 2x2 PNG. */
+function createPng(): Promise<Buffer> {
+  return sharp({ create: { width: 2, height: 2, channels: 3, background: '#f00' } })
+    .png()
+    .toBuffer();
+}
+
 describe('NewsService caches', () => {
   let service: NewsService;
+  let resilience: ResilienceService;
   let warn: MockInstance<Logger['warn']>;
   let now: number;
 
@@ -40,7 +75,7 @@ describe('NewsService caches', () => {
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockFetch.mockReset();
     now = 1_000_000;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
@@ -49,7 +84,7 @@ describe('NewsService caches', () => {
 
     const config = { get: () => 'https://secure.runescape.com' } as unknown as ConfigService<Env, true>;
     const xmlParser = XMLParserProvider.useFactory() as XMLParser;
-    service = new NewsService(undefined as unknown as Agent, undefined as unknown as Agent, xmlParser, config);
+    ({ service, resilience } = await createNewsService(undefined, xmlParser, config));
   });
 
   afterEach(() => vi.restoreAllMocks());
@@ -107,9 +142,7 @@ describe('NewsService caches', () => {
 
   describe('getImageAsWebp', () => {
     it('fetches and converts an image once for concurrent requests and caches it', async () => {
-      const png = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#f00' } })
-        .png()
-        .toBuffer();
+      const png = await createPng();
       answerWith(() => new Response(png, { headers: { 'content-type': 'image/png' } }));
 
       const results = await Promise.all([1, 2, 3].map(() => service.getImageAsWebp(IMAGE_URL)));
@@ -132,6 +165,77 @@ describe('NewsService caches', () => {
 
       await expect(service.getImageAsWebp(IMAGE_URL)).rejects.toBeInstanceOf(NotFoundException);
       expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('getImageAsWebp conversion limit', () => {
+    let png: Buffer;
+    let held: { url: string; answer: () => void }[];
+
+    const imageUrl = (i: number) => `https://cdn.runescape.com/news/${i}.png`;
+
+    beforeEach(async () => {
+      png = await createPng();
+      held = [];
+      // Holds every image request open until the test answers it
+      mockFetch.mockImplementation(
+        (url) =>
+          new Promise((resolve) =>
+            held.push({
+              url: String(url),
+              answer: () => resolve(new Response(png, { headers: { 'content-type': 'image/png' } })),
+            }),
+          ),
+      );
+    });
+
+    it('converts a few distinct images at once, queues some and answers 503 to the rest without fetching', async () => {
+      const max = MAX_CONCURRENT_IMAGE_CONVERSIONS + MAX_QUEUED_IMAGE_CONVERSIONS;
+      const requests = Array.from({ length: max }, (_, i) => service.getImageAsWebp(imageUrl(i)));
+      await vi.waitFor(() => expect(held).toHaveLength(MAX_CONCURRENT_IMAGE_CONVERSIONS));
+      expect(resilience.bulkhead(NEWS_IMAGES)).toMatchObject({
+        active: MAX_CONCURRENT_IMAGE_CONVERSIONS,
+        queued: MAX_QUEUED_IMAGE_CONVERSIONS,
+      });
+
+      const error = await service.getImageAsWebp(imageUrl(max)).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ServiceUnavailableException);
+      expect((error as ServiceUnavailableException).message).toBe('Failed to fetch image');
+      expect(warn).toHaveBeenCalledWith(`Image request rejected for ${imageUrl(max)}: too many images queued`);
+      expect(mockFetch).toHaveBeenCalledTimes(MAX_CONCURRENT_IMAGE_CONVERSIONS);
+
+      // A finished conversion lets the next queued one fetch
+      held[0].answer();
+      await vi.waitFor(() => expect(held).toHaveLength(MAX_CONCURRENT_IMAGE_CONVERSIONS + 1));
+      expect(held.at(-1)?.url).toBe(imageUrl(MAX_CONCURRENT_IMAGE_CONVERSIONS));
+
+      for (let i = 1; i < max; i++) {
+        await vi.waitFor(() => expect(held.length).toBeGreaterThan(i));
+        held[i].answer();
+      }
+      await Promise.all(requests);
+      expect(resilience.bulkhead(NEWS_IMAGES)).toMatchObject({ active: 0, queued: 0 });
+    });
+
+    it('takes one slot for concurrent requests for one image, and none for a cached one', async () => {
+      const requests = [1, 2, 3].map(() => service.getImageAsWebp(imageUrl(0)));
+      await vi.waitFor(() => expect(held).toHaveLength(1));
+      expect(resilience.bulkhead(NEWS_IMAGES)).toMatchObject({ active: 1, queued: 0 });
+
+      held[0].answer();
+      await Promise.all(requests);
+      expect(resilience.bulkhead(NEWS_IMAGES)).toMatchObject({ active: 0, queued: 0 });
+
+      // Cache hits don't wait for a slot, even with every slot taken
+      const others = Array.from({ length: MAX_CONCURRENT_IMAGE_CONVERSIONS }, (_, i) =>
+        service.getImageAsWebp(imageUrl(i + 1)),
+      );
+      await vi.waitFor(() => expect(held).toHaveLength(1 + MAX_CONCURRENT_IMAGE_CONVERSIONS));
+      await service.getImageAsWebp(imageUrl(0));
+      expect(mockFetch).toHaveBeenCalledTimes(1 + MAX_CONCURRENT_IMAGE_CONVERSIONS);
+
+      for (const request of held.slice(1)) request.answer();
+      await Promise.all(others);
     });
   });
 
@@ -159,7 +263,7 @@ describe('NewsService caches', () => {
       requests = [];
       imageAgent = imageAgentProvider.useFactory() as Agent;
       const config = { get: () => '' } as unknown as ConfigService<Env, true>;
-      service = new NewsService(undefined as unknown as Agent, imageAgent, {} as XMLParser, config);
+      ({ service } = await createNewsService(imageAgent, {} as XMLParser, config));
     });
 
     afterEach(async () => {
