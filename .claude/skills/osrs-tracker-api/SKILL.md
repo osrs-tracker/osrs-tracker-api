@@ -52,8 +52,13 @@ keep code rules here, not in the agent.
 - `@osrs-tracker/models` (the stored shapes) and `@osrs-tracker/hiscores` (the hiscore client, also used by
   process-players) are published from osrs-tracker-aws: a change to either is an issue there. Right after a publish,
   bump with `--prefer-online` (dist-tags lag).
-- Request logs (`logger.middleware.ts`, JSON to Loki): 5xx `error`, 4xx `warn`, else `info`. A client that disconnects
-  before the response is `warn` with `aborted: true` and no `status`; keep that shape, osrs-tracker-web logs the same.
+- Logs go to Loki unparsed, so their shape is a contract: one JSON object per line with a top-level string `level` of
+  `info`, `warn` or `error` (Loki keeps a level it doesn't know, like Nest's `log` or a number, as its own
+  `detected_level`), and `route` on request lines (Grafana's Express dashboard filters on it). The app logger is Nest's
+  `ConsoleLogger` in JSON mode (`common/logger/json-logger.ts`, set in `main.ts`), only renaming `log` to `info`; log
+  through Nest's `Logger`, never `console`. Request logs (`logger.middleware.ts`): 5xx `error`, 4xx `warn`, else `info`.
+  A client that disconnects before the response is `warn` with `aborted: true` and no `status`; keep that shape,
+  osrs-tracker-web logs the same.
 - Traefik compresses JSON for browsers (the `osrs-tracker-api-compress` Middleware in `osrs-tracker-api.yaml`, last in
   the Ingress's chain), adding `Vary: Accept-Encoding`; the web's SSR calls the Service directly and gets it plain.
   Don't add Nest's `compression`. The request log's `contentLength` is the uncompressed size.
@@ -129,17 +134,18 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   `src/app.e2e.spec.ts`, which boots `AppModule` with the Mongo and agent providers overridden by a fake database that
   records every collection call, and `undici`'s `fetch` mocked as a fake Jagex (no network). Vite's transformer emits
   Nest's decorator metadata from `tsconfig.json`, so no SWC plugin is needed.
-- Covered: the env validation (`validateEnv`, `config/env.spec.ts`), the stored player's `max-age`, when a lookup
-  refreshes (`needsRefresh`), the refresh update's pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`),
-  combat level, type and status (`PlayerUtils`; a hiscore without the combat skills counts as failed,
-  `hasCombatSkills`), the validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe`
-  (`common/pipes/`, for `limit`, `size`, `skip` and IDs), the hiscore fan-out limits (`players.service.spec.ts` with
-  `@osrs-tracker/hiscores` mocked: normal table first, shared in-flight lookups, the preview's not-found cache, the
-  concurrency cap; `Semaphore` in `common/concurrency/`), the news feed and image caches (`news.service.spec.ts` with
-  `undici`'s `fetch` mocked and `performance.now` as lru-cache's clock: shared in-flight fetches, the stale feed's 60s
-  retry, the 503 and a 404 not cached), and per GET route its `Cache-Control` and that it never writes, and that
-  shutdown closes the Mongo client (`app.e2e.spec.ts`; a route's header or a new GET route means changing its `CASES`).
-  Changing one of those means changing its spec.
+- Covered: the env validation (`validateEnv`, `config/env.spec.ts`), the app logger's line shape
+  (`common/logger/json-logger.spec.ts`), the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the
+  refresh update's pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status
+  (`PlayerUtils`; a hiscore without the combat skills counts as failed, `hasCombatSkills`), the validation pipes
+  `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip`
+  and IDs), the hiscore fan-out limits (`players.service.spec.ts` with `@osrs-tracker/hiscores` mocked: normal table
+  first, shared in-flight lookups, the preview's not-found cache, the concurrency cap; `Semaphore` in
+  `common/concurrency/`), the news feed and image caches (`news.service.spec.ts` with `undici`'s `fetch` mocked and
+  `performance.now` as lru-cache's clock: shared in-flight fetches, the stale feed's 60s retry, the 503 and a 404 not
+  cached), and per GET route its `Cache-Control` and that it never writes, and that shutdown closes the Mongo client
+  (`app.e2e.spec.ts`; a route's header or a new GET route means changing its `CASES`). Changing one of those means
+  changing its spec.
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.

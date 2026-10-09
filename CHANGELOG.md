@@ -12,6 +12,11 @@
   expiry and in-flight bookkeeping. Behaviour is unchanged: the feed is cached for 5 minutes and, while Jagex fails,
   served stale and retried every 60s (503 only when nothing is cached); concurrent requests for the feed or for one
   image share one fetch, and failed image requests aren't cached. Both are now covered by tests.
+- The app's own log lines (startup, warnings, errors) come from Nest's built-in JSON logger instead of a hand-written
+  one. They keep one JSON object per line with `level` `info`, `warn` or `error`, so Loki's level detection is
+  unchanged; the time is now `timestamp` (epoch ms) with the `pid`, `context` is the logging class's name, an error
+  logged as an `Error` gets a structured `error` field (name, message, stack, cause), and errors go to stderr. Request
+  log lines are unchanged.
 
 ## 2026/10/08
 
