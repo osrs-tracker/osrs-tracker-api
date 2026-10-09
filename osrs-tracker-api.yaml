@@ -161,8 +161,10 @@ spec:
   inFlightReq:
     amount: 50
 ---
-# Compresses JSON for browsers (gzip, br or zstd per Accept-Encoding, bodies of 1024 bytes and up). Only JSON, so
-# /news/image's WebP isn't compressed twice. The web's SSR calls the Service directly and gets plain JSON.
+# Compresses JSON for browsers (bodies of 1024 bytes and up). Only JSON, so /news/image's WebP isn't compressed twice.
+# The web's SSR calls the Service directly and gets plain JSON. Browsers send Accept-Encoding without weights, so
+# Traefik picks by the order of `encodings`: Brotli first (smallest), then gzip; no zstd, Traefik's is no smaller than
+# gzip.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -170,5 +172,8 @@ metadata:
   namespace: osrs-tracker
 spec:
   compress:
+    encodings:
+      - br
+      - gzip
     includedContentTypes:
       - application/json

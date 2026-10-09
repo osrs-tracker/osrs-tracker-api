@@ -102,10 +102,12 @@ keep code rules here, not in the agent.
   `onModuleInit` (like `ResilienceEventsListener`), never at import time, and remove them on shutdown so the e2e spec
   can boot the app again. Keep labels low-cardinality: route patterns (`routeLabel`), never usernames or IDs.
 - Traefik compresses JSON for browsers (the `osrs-tracker-api-compress` Middleware in `osrs-tracker-api.yaml`, last in
-  the Ingress's chain), adding `Vary: Accept-Encoding`; the web's SSR calls the Service directly and gets it plain.
-  Don't add Nest's `compression`. The request log's `contentLength` is the uncompressed size.
-- Traefik reuses idle connections to the pods for up to 90s, so `main.ts` sets the API server's `keepAliveTimeout` to 95s
-  (Node's 5s default would close connections Traefik is about to reuse: 502s). Keep it above Traefik's.
+  the Ingress's chain), adding `Vary: Accept-Encoding`; the web's SSR calls the Service directly and gets it plain. Its
+  `encodings` are `br, gzip`: browsers send `Accept-Encoding` unweighted, so Traefik picks by that list's order, and its
+  default (`gzip, br, zstd`) gave every browser gzip; zstd is left out, Traefik's is no smaller than gzip. Don't add
+  Nest's `compression`. The request log's `contentLength` is the uncompressed size.
+- Traefik reuses idle connections to the pods for up to 90s, so `main.ts` sets the API server's `keepAliveTimeout` to
+  95s (Node's 5s default would close connections Traefik is about to reuse: 502s). Keep it above Traefik's.
 
 ## Validating params
 
