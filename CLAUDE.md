@@ -11,8 +11,8 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 
 - Verify: `npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build && npm test`.
 - Dev server: `npm run start:dev` on port 3000. `.env` points at production data.
-- A `git push` blocked by the pre-push hook: run `npm run lint` and `npm run prettier` (both fix what they can), fix the
-  rest by hand, commit and push again.
+- A `git push` blocked by Claude's pre-push hook (a Claude Code hook, not a git hook): run `npm run lint` and
+  `npm run prettier` (both fix what they can), fix the rest by hand, commit and push again.
 - Worktrees in `.claude/worktrees/` use the main checkout's `node_modules` (found in a parent folder); run `npm ci` in
   one only when its `package.json` changes. They have no `.env` (`start:dev` then fails listing the missing vars): link
   the main checkout's with `ln -s ../../../.env .env` and remove the link when done. Other sessions share port 3000:

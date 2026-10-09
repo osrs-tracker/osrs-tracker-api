@@ -22,8 +22,8 @@
 
 - Usernames match the way Jagex matches them: `_` and `-` count as spaces and leading or trailing ones are ignored, so
   `/players/Lynx_Titan`, `/players/lynx-titan` and `/players/lynx titan` are one player (`lynx titan`), stored and
-  scraped once, instead of up to three separate players. Players already stored under an `_` or `-` name need a one-off
-  rename (or a merge, if both spellings are stored), which isn't part of this change.
+  scraped once, instead of up to three separate players. The 12 players stored under an `_` or `-` name were renamed the
+  same day, and the 3 of them also stored under the normalized name (with the same history) removed.
 - Two lookups of one player at the same moment (two tabs, a double request) no longer answer one of them with a 500, and
   a player's first entry for a time zone (`scrapingOffset`) is no longer stored twice when that happens.
 - `GET /players/:username/hiscores` answers 400 for a `skip` over 10,000, instead of a 500 from MongoDB for one that
@@ -90,6 +90,9 @@
 - The MongoDB connect retry at startup uses `@nestjs/resilience`'s `RetryPolicy` instead of a hand-written loop, with
   the same timing (12 attempts, 10s apart) and log lines; now covered by tests. A failing cleanup of a failed attempt no
   longer hides the connect error.
+- Docs: the skill now spells out the stored username form, the race-safe refresh update rules (decide in the pipeline,
+  check `matchedCount`), and how Atlas writes are handed over (`use('osrs-tracker')` first, with the counts to expect)
+  and checked (read-only MongoDB MCP); `CLAUDE.md` says the pre-push hook is Claude's, not git's.
 - `NODE_ENV` is no longer one of the API's own settings (nothing read it after the Swagger docs went); the image still
   sets it to `production` for Express and the libraries that read it.
 - ESLint's `no-useless-assignment` is off: it reported constants used only in a handler's parameter decorators as

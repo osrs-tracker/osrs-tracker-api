@@ -130,6 +130,10 @@ Validate query and route params in pipes, not with checks in the handler: `Parse
 add `DefaultValuePipe` + `ParseIntPipe` + a range check, or an `isNaN` check after a parse pipe. Keep existing status
 codes and messages: the web may show them. A new pipe gets a spec.
 
+Stored usernames are Jagex's matching form: lowercase, `_` and `-` as spaces, trimmed (`PlayerUtils.normalizeUsername`,
+which `ParseUsernamePipe` applies), so one player is one document. Anything that stores, looks up or compares a name
+takes it through that function; never store a name as typed.
+
 ## Route doc comments
 
 The API is read from the controllers. Each handler has a short JSDoc comment with what the code doesn't show: which
@@ -148,6 +152,11 @@ e2e spec: `ROUTE_CONFLICT_POLICY` (`config/app-options.ts`, `error` for both kin
 Wrap player data and user input in `$literal` (strings starting with `$` read as field paths). Prepend `hiscoreEntries`
 with `$concatArrays` (stored newest first), merge offsets with `$setUnion`, keep `upsert`/`hint`. The refresh update is
 built by `buildRefreshUpdate` in `players/player.policy.ts`, so it can be tested without Mongo.
+
+Concurrent lookups of one name share one hiscore result and then each run the update, so: decide anything that depends
+on the stored document inside the pipeline (like prepending the initial entry only when `$scrapingOffsets` lacks the
+offset), never from a read made before the update, and treat `matchedCount` (or `upsertedCount`) as success, never
+`modifiedCount`, which is 0 when the second update writes the same values.
 
 ## Pausing and resuming players
 
@@ -209,8 +218,8 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     (`nest-logger.spec.ts`); outgoing lines' `type` and `requestId` (`logger.spec.ts`, a local server and `undici`'s
     real `fetch`); `ThrottledWarning`.
   - `players/`: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's
-    pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`); combat level, type and status (`PlayerUtils`; a
-    hiscore without the combat skills counts as failed, `hasCombatSkills`).
+    pause/resume, `$literal`, and the initial entry prepended only for a new offset (`buildRefreshUpdate`); combat
+    level, type and status (`PlayerUtils`; a hiscore without the combat skills counts as failed, `hasCombatSkills`).
   - The validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for
     `limit`, `size`, `skip` and IDs).
   - `players.service.spec.ts` (real `ResilienceModule` with production's preset, `undici`'s `fetch` mocked): normal
@@ -239,9 +248,13 @@ a local run uses production data, so stick to GETs, which never write. When a ch
 `GET /players/ToxSick/hiscores?scrapingOffset=<n>` for each of its `scrapingOffsets` to the scratchpad (GETs never
 write; the first page is enough, since entries are prepended). A lookup overwrites the stored player fields, merges
 `scrapingOffsets` and may prepend a hiscore entry (`buildRefreshUpdate`). Restoring that is a write to Atlas the user
-does, never Claude: give them the `updateOne` that puts back the changed fields and removes a prepended entry.
-`POST /items/:id/lookup` only sets the item's `lastFetch` (it moves to the top of `GET /items`), so it needs nothing
-restored. Automated tests never need a database: they run on fakes (Tests).
+does, never Claude: give them the `updateOne` that puts back the changed fields and removes a prepended entry. Every
+mongosh snippet handed over starts with `use('osrs-tracker')` (mongosh starts in `test`, where a write silently matches
+nothing) and says the counts to expect (`deletedCount`, `modifiedCount`), so a no-op shows. To check live data, use the
+MongoDB MCP server (Atlas project `osrs-tracker`, cluster `shared-cluster`, database `osrs-tracker`) for reads only,
+before and after the user's write; its writes are blocked in auto mode. `POST /items/:id/lookup` only sets the item's
+`lastFetch` (it moves to the top of `GET /items`), so it needs nothing restored. Automated tests never need a database:
+they run on fakes (Tests).
 
 ## Deploy
 
