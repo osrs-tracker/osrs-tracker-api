@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { CircuitState, ResilienceEvent, ResilienceEvents, ResilienceService } from '@nestjs/resilience';
-import { Counter, Gauge, register } from 'prom-client';
+import { Counter, Gauge, register } from '@osrs-tracker/express-metrics';
 import { Subscription } from 'rxjs';
 import { ThrottledWarning } from '../logger/throttled-warning';
 
