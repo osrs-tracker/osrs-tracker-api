@@ -2,8 +2,8 @@
 name: conventions-reviewer
 description:
   Reviews a diff in osrs-tracker-api against the project's own conventions (Cache-Control, param validation pipes, Mongo
-  pipeline updates, the player pause/resume contract), not general bugs. Use after implementing a change, before opening
-  or merging a PR, or when asked to check conventions.
+  pipeline updates, the player pause/resume contract, the log contract, resilience presets), not general bugs. Use after
+  implementing a change, before opening or merging a PR, or when asked to check conventions.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

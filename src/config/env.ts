@@ -10,10 +10,7 @@ export interface Env {
   CORS_ORIGIN?: string;
   PORT: number;
   METRICS_PORT: number;
-  NODE_ENV?: 'production' | 'development' | 'test';
 }
-
-const NODE_ENVS: readonly NonNullable<Env['NODE_ENV']>[] = ['production', 'development', 'test'];
 
 /**
  * `ConfigModule`'s `validate`: checks `.env` merged with `process.env` and throws one error listing every problem, so a
@@ -44,12 +41,6 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     if (!/^\d+$/.test(value) || parsed < 1 || parsed > 65535) errors.push(`${name} must be a port (1-65535).`);
     return parsed;
   };
-  const nodeEnv = (): Env['NODE_ENV'] => {
-    const value = optional('NODE_ENV');
-    if (value !== undefined && !NODE_ENVS.includes(value as never))
-      errors.push(`NODE_ENV must be one of ${NODE_ENVS.join(', ')}.`);
-    return value as Env['NODE_ENV'];
-  };
 
   const env: Env = {
     MONGODB_URI: url('MONGODB_URI', required('MONGODB_URI'), ['mongodb://', 'mongodb+srv://']),
@@ -60,7 +51,6 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     CORS_ORIGIN: url('CORS_ORIGIN', optional('CORS_ORIGIN'), ['https://', 'http://']),
     PORT: port('PORT', 3000),
     METRICS_PORT: port('METRICS_PORT', 9090),
-    NODE_ENV: nodeEnv(),
   };
 
   if (errors.length) throw new Error(`Invalid environment (see .env.example):\n- ${errors.join('\n- ')}`);

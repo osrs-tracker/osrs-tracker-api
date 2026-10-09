@@ -2,10 +2,11 @@
 name: osrs-tracker-api
 description: >-
   Repo-specific rules for the osrs-tracker-api NestJS/MongoDB service: Cache-Control rules for the web app's SSR
-  transfer cache, param validation pipes, Mongo pipeline-update pitfalls, the player pause/resume contract, unit tests
-  (Vitest), production testing, and the GitHub Actions → Flux deploy. Use when adding or changing endpoints, query or
-  route params, Cache-Control headers or player/item writes, writing or running tests, testing against production data,
-  or building, deploying, committing, pushing, releasing or shipping this repo.
+  transfer cache, param validation pipes, Mongo pipeline-update pitfalls, the player pause/resume contract, the log
+  contract with Loki, the @nestjs/resilience presets, unit tests (Vitest), production testing, and the GitHub Actions →
+  Flux deploy. Use when adding or changing endpoints, query or route params, Cache-Control headers, logging, outgoing
+  requests or player/item writes, writing or running tests, testing against production data, or building, deploying,
+  committing, pushing, releasing or shipping this repo.
 ---
 
 # osrs-tracker-api
@@ -18,18 +19,20 @@ keep code rules here, not in the agent.
 
 - `src/common/` providers are injected by string token, exported as constants from their provider file
   (`MONGODB_DATABASE`, `MONGO_CLIENT`, `AGENT`, `IMAGE_AGENT`, `XML_PARSER`): use the constant in `provide`, `@Inject`
-  and `overrideProvider`, never the string. Outgoing requests use `fetch` from `undici` with `AGENT` (an `undici`
-  `Agent`) as `dispatcher` and a timeout: an `AbortSignal.timeout` (news feed 10s, images 20s), or for hiscores the
-  shared client's own (10s). News images use `IMAGE_AGENT` instead, whose `maxResponseSize` (`MAX_IMAGE_BYTES`) caps the
-  body as read off the wire: request them with `accept-encoding: identity` so decompression can't exceed it, and don't
-  set it on `AGENT` or count bytes by hand. undici rejects the body read with a `terminated` `TypeError` whose `cause`
-  is a `ResponseExceededMaxSizeError`. Jagex data cached in memory (the news feed, images) is an `lru-cache` with a
-  `fetchMethod`, read with `forceFetch`: it shares the fetch in flight per key and doesn't cache a rejection, so don't
-  add a pending map beside it; to keep a stale value on failure, return it from `fetchMethod` (setting `options.ttl` for
-  the retry delay). `MongoModule` is global, retries the initial connect (12 x 10s, a standalone `RetryPolicy`, sized
-  against the `startupProbe` in `osrs-tracker-api.yaml`: change both together) and closes the client on shutdown
-  (bounded to 5s); new indexes go in `mongo.provider.ts`, the only place the API creates indexes (never per request).
-  `/healthy` stays liveness only and never checks Mongo.
+  and `overrideProvider`, never the string.
+- Outgoing requests use `fetch` from `undici` with `AGENT` (an `undici` `Agent`) as `dispatcher` and a timeout: an
+  `AbortSignal.timeout` (news feed 10s, images 20s), or for hiscores the shared client's own (10s).
+- News images use `IMAGE_AGENT` instead, whose `maxResponseSize` (`MAX_IMAGE_BYTES`) caps the body as read off the wire:
+  request them with `accept-encoding: identity` so decompression can't exceed it, and don't set it on `AGENT` or count
+  bytes by hand. undici rejects the body read with a `terminated` `TypeError` whose `cause` is a
+  `ResponseExceededMaxSizeError`.
+- Jagex data cached in memory (the news feed, images) is an `lru-cache` with a `fetchMethod`, read with `forceFetch`: it
+  shares the fetch in flight per key and doesn't cache a rejection, so don't add a pending map beside it; to keep a
+  stale value on failure, return it from `fetchMethod` (setting `options.ttl` for the retry delay).
+- `MongoModule` is global, retries the initial connect (12 x 10s, a standalone `RetryPolicy`, sized against the
+  `startupProbe` in `osrs-tracker-api.yaml`: change both together) and closes the client on shutdown (bounded to 5s).
+  New indexes go in `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy` stays
+  liveness only and never checks Mongo.
 - The `players` and `items` collections, their fields, writers and index owners are described in osrs-tracker-aws's
   [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new or changed index or
   stored field also needs an update there: open an issue in osrs-tracker-aws.
@@ -163,29 +166,31 @@ Vitest, only for complex or important logic, never for coverage. Break the prote
 fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
 
 - Specs sit next to the code as `src/**/*.spec.ts` and import from `vitest`. They don't need Nest, Express or Mongo:
-  move a rule into a pure function first (like `player.policy.ts`), then test that. The exception is
-  `src/app.e2e.spec.ts`, which boots `AppModule` with the Mongo and agent providers overridden by a fake database that
-  records every collection call, and `undici`'s `fetch` mocked as a fake Jagex (no network); and code behind a
-  `@nestjs/resilience` policy, tested in a `Test.createTestingModule` with a real `ResilienceModule` and the production
-  preset, not mocks (`players.service.spec.ts`, `news.service.spec.ts`). Vite's transformer emits Nest's decorator
-  metadata from `tsconfig.json`, so no SWC plugin is needed.
-- Covered: the env validation (`validateEnv`, `config/env.spec.ts`), the app logger's line shape and `requestId`
-  (`common/logger/json-logger.spec.ts`), the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the
-  refresh update's pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`), combat level, type and status
-  (`PlayerUtils`; a hiscore without the combat skills counts as failed, `hasCombatSkills`), the validation pipes
-  `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip`
-  and IDs), the hiscore fan-out limits (`players.service.spec.ts`, on a real `ResilienceModule` with production's preset
-  and `undici`'s `fetch` mocked: normal table first, shared in-flight lookups, the preview's not-found cache, the
-  concurrency cap in FIFO order, the queue bound, the breaker opening on failures but not on not-found players), the
-  news feed and image caches (`news.service.spec.ts` with `undici`'s `fetch` mocked and `performance.now` as lru-cache's
-  clock: shared in-flight fetches, the stale feed's 60s retry, the 503 and a 404 not cached; the image size limit
-  against a local server with the real `fetch` and `IMAGE_AGENT`: 503, its log line, `identity`; the `news-images`
-  bulkhead: queue bound and 503 without fetching, one slot per shared conversion, none for a cache hit), the Mongo
-  connect retry (`mongo.provider.spec.ts`, fake timers: constant 10s delay, warn lines, gives up after 12), and per GET
-  route its `Cache-Control` and that it never writes, that no route overlaps another, that shutdown closes the Mongo
-  client, and the request ID (`X-Request-Id` matching the request line's `requestId`, an incoming one reused only if a
-  UUID) (`app.e2e.spec.ts`; a route's header or a new GET route means changing its `CASES`). Changing one of those means
-  changing its spec.
+  move a rule into a pure function first (like `player.policy.ts`), then test that. Two exceptions:
+  `src/app.e2e.spec.ts` boots `AppModule` with the Mongo and agent providers overridden by a fake database that records
+  every collection call, and `undici`'s `fetch` mocked as a fake Jagex (no network); code behind a `@nestjs/resilience`
+  policy is tested in a `Test.createTestingModule` with a real `ResilienceModule` and the production preset, not mocks
+  (`players.service.spec.ts`, `news.service.spec.ts`). Vite's transformer emits Nest's decorator metadata from
+  `tsconfig.json`, so no SWC plugin is needed.
+- Covered (changing one of these means changing its spec):
+  - `config/env.spec.ts`: the env validation (`validateEnv`).
+  - `common/logger/json-logger.spec.ts`: the app logger's line shape and `requestId`.
+  - `players/`: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's
+    pause/resume, `$literal` and `$concatArrays` (`buildRefreshUpdate`); combat level, type and status (`PlayerUtils`; a
+    hiscore without the combat skills counts as failed, `hasCombatSkills`).
+  - The validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for
+    `limit`, `size`, `skip` and IDs).
+  - `players.service.spec.ts` (real `ResilienceModule` with production's preset, `undici`'s `fetch` mocked): normal
+    table first, shared in-flight lookups, the preview's not-found cache, the concurrency cap in FIFO order, the queue
+    bound, the breaker opening on failures but not on not-found players.
+  - `news.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock): shared in-flight
+    fetches, the stale feed's 60s retry, the 503 and a 404 not cached; the image size limit against a local server with
+    the real `fetch` and `IMAGE_AGENT` (503, its log line, `identity`); the `news-images` bulkhead (queue bound and 503
+    without fetching, one slot per shared conversion, none for a cache hit).
+  - `mongo.provider.spec.ts` (fake timers): the connect retry's constant 10s delay, warn lines, giving up after 12.
+  - `app.e2e.spec.ts`: per GET route its `Cache-Control` and that it never writes (a route's header or a new GET route
+    means changing `CASES`), that no route overlaps another, that shutdown closes the Mongo client, and the request ID
+    (`X-Request-Id` matching the request line's `requestId`, an incoming one reused only if a UUID).
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.

@@ -11,12 +11,11 @@ const VALID = {
 
 describe('validateEnv', () => {
   it('applies the defaults and treats empty optional values as unset', () => {
-    expect(validateEnv({ ...VALID, CORS_ORIGIN: '', PORT: '', NODE_ENV: '' })).toEqual({
+    expect(validateEnv({ ...VALID, CORS_ORIGIN: '', PORT: '' })).toEqual({
       ...VALID,
       CORS_ORIGIN: undefined,
       PORT: 3000,
       METRICS_PORT: 9090,
-      NODE_ENV: undefined,
     });
   });
 
@@ -27,7 +26,6 @@ describe('validateEnv', () => {
         CORS_ORIGIN: 'https://osrs-tracker.freekmencke.com',
         PORT: '8080',
         METRICS_PORT: '9091',
-        NODE_ENV: 'production',
       }),
     ).toMatchObject({ CORS_ORIGIN: 'https://osrs-tracker.freekmencke.com', PORT: 8080, METRICS_PORT: 9091 });
   });
@@ -38,9 +36,7 @@ describe('validateEnv', () => {
   });
 
   it('lists every problem at once', () => {
-    expect(() =>
-      validateEnv({ MONGODB_URI: 'localhost:27017', PORT: '3000abc', METRICS_PORT: '70000', NODE_ENV: 'prod' }),
-    ).toThrow(
+    expect(() => validateEnv({ MONGODB_URI: 'localhost:27017', PORT: '3000abc', METRICS_PORT: '70000' })).toThrow(
       [
         'Invalid environment (see .env.example):',
         '- MONGODB_URI must start with mongodb:// or mongodb+srv://.',
@@ -50,7 +46,6 @@ describe('validateEnv', () => {
         '- OSRS_API_BASE_URL is required.',
         '- PORT must be a port (1-65535).',
         '- METRICS_PORT must be a port (1-65535).',
-        '- NODE_ENV must be one of production, development, test.',
       ].join('\n'),
     );
   });
