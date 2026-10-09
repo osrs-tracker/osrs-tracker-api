@@ -1,19 +1,22 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { BulkheadFullError, CircuitOpenError, ResiliencePolicy, ResilienceService } from '@nestjs/resilience';
 import { getHiscore, HiscoreResult } from '@osrs-tracker/hiscores';
 import { HiscoreEntry, Player, PlayerType } from '@osrs-tracker/models';
 import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
 import { Agent, fetch } from 'undici';
 import { AGENT } from '../../common/agent/agent.provider';
-import { Semaphore } from '../../common/concurrency/semaphore';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { Env } from '../../config/env';
-import { MAX_CONCURRENT_HISCORE_REQUESTS, NOT_FOUND_CACHE_MAX, NOT_FOUND_CACHE_TTL_MS } from './player.config';
+import { JAGEX_HISCORES, NOT_FOUND_CACHE_MAX, NOT_FOUND_CACHE_TTL_MS } from './player.config';
 import { buildRefreshUpdate } from './player.policy';
 import { PlayerUtils } from './player.utils';
 
 type PartialHiscoreEntry = Pick<HiscoreEntry, 'skills' | 'activities'>;
+
+/** A hiscore request that answered `failed`, thrown inside the policy so its circuit breaker counts it. */
+class HiscoreFailedError extends Error {}
 
 export type RefreshResult = 'refreshed' | 'notFound' | 'failed';
 
@@ -26,8 +29,11 @@ export class PlayersService {
   private readonly COLLECTION_NAME = 'players';
   private readonly logger = new Logger(PlayersService.name);
 
-  /** Caps the requests to Jagex, so a burst of lookups can't get the proxy (shared with process-players) throttled. */
-  private readonly hiscoreRequests = new Semaphore(MAX_CONCURRENT_HISCORE_REQUESTS);
+  /**
+   * Caps the requests to Jagex, so a burst of lookups can't get the proxy (shared with process-players) throttled, and
+   * stops asking while Jagex is down (`JAGEX_HISCORES_PRESET`).
+   */
+  private readonly hiscoresPolicy: ResiliencePolicy;
   /** Hiscore lookups in flight by username, shared by concurrent previews and refreshes of one name. */
   private readonly pendingLookups = new Map<string, Promise<PlayerStatusAndType>>();
   /** Names recently not on the hiscores, so repeated previews (crawlers, SSR) don't ask Jagex again. */
@@ -44,7 +50,10 @@ export class PlayersService {
     @Inject(AGENT) private readonly agent: Agent,
     @Inject(MONGODB_DATABASE) private readonly db: Db,
     private readonly config: ConfigService<Env, true>,
-  ) {}
+    resilience: ResilienceService,
+  ) {
+    this.hiscoresPolicy = resilience.preset(JAGEX_HISCORES);
+  }
 
   async getPlayer(
     username: string,
@@ -313,27 +322,45 @@ export class PlayersService {
 
   /**
    * Fetches one hiscore table with the shared client from `@osrs-tracker/hiscores` (see its `HiscoreResult`), through
-   * the shared agent and within the concurrency cap, and logs why it failed.
+   * the shared agent and the `jagex-hiscores` policy, and logs why it failed. A request the policy refuses (queue full,
+   * circuit open) is `failed` too, without asking Jagex.
    */
   private async getHiscore(username: string, type: PlayerType): Promise<HiscoreResult> {
-    const result = await this.hiscoreRequests.run(() =>
-      getHiscore({
-        baseUrl: this.config.get('OSRS_API_BASE_URL', { infer: true }),
-        username,
-        table: PlayerUtils.getHiscoreTable(type),
-        fetch: (url, init) => fetch(url, { ...init, dispatcher: this.agent }),
-      }),
-    );
+    const result = await this.hiscoresPolicy
+      .execute(async ({ signal }): Promise<HiscoreResult> => {
+        const result = await getHiscore({
+          baseUrl: this.config.get('OSRS_API_BASE_URL', { infer: true }),
+          username,
+          table: PlayerUtils.getHiscoreTable(type),
+          fetch: (url, init) =>
+            fetch(url, { ...init, dispatcher: this.agent, signal: AbortSignal.any([init.signal, signal]) }),
+        });
 
-    // The package only checks that `skills` is an array: a truncated hiscore would break the combat level (500) or store
-    // a wrong one, so it counts as failed like any other bad response
-    const checked: HiscoreResult =
-      result.status === 'found' && !PlayerUtils.hasCombatSkills(result.hiscore.skills)
-        ? { status: 'failed', reason: `${result.hiscore.skills.length} skills, missing combat skills` }
-        : result;
+        // The package only checks that `skills` is an array: a truncated hiscore would break the combat level (500) or
+        // store a wrong one, so it counts as failed like any other bad response
+        if (result.status === 'found' && !PlayerUtils.hasCombatSkills(result.hiscore.skills)) {
+          throw new HiscoreFailedError(`${result.hiscore.skills.length} skills, missing combat skills`);
+        }
+        if (result.status === 'failed') throw new HiscoreFailedError(result.reason);
 
-    if (checked.status === 'failed') this.logger.warn(`Hiscores (${type}) failed for '${username}': ${checked.reason}`);
+        return result; // Found or not found: both mean Jagex answered
+      })
+      .catch((error: unknown): HiscoreResult => ({ status: 'failed', reason: this.describeHiscoreFailure(error) }));
 
-    return checked;
+    if (result.status === 'failed') this.logger.warn(`Hiscores (${type}) failed for '${username}': ${result.reason}`);
+
+    return result;
+  }
+
+  /** The reason of a hiscore request that threw inside the policy or that the policy refused. Rethrows anything else. */
+  private describeHiscoreFailure(error: unknown): string {
+    if (error instanceof HiscoreFailedError) return error.message;
+    if (error instanceof BulkheadFullError) {
+      return error.reason === 'full' ? 'too many requests queued' : 'timed out waiting for a request slot';
+    }
+    if (error instanceof CircuitOpenError) {
+      return `circuit open, Jagex is asked again in ${Math.ceil(error.retryAfterMs / 1000)}s`;
+    }
+    throw error;
   }
 }
