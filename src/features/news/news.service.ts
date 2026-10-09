@@ -11,8 +11,8 @@ import { OsrsNewsItem } from '@osrs-tracker/models';
 import { XMLParser } from 'fast-xml-parser';
 import { LRUCache } from 'lru-cache';
 import sharp from 'sharp';
-import { Agent, fetch, Response } from 'undici';
-import { AGENT } from '../../common/agent/agent.provider';
+import { Agent, errors, fetch } from 'undici';
+import { AGENT, IMAGE_AGENT, MAX_IMAGE_BYTES } from '../../common/agent/agent.provider';
 import { XML_PARSER } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
 
@@ -25,7 +25,6 @@ export class NewsService {
   private readonly NEWS_RETRY_MS = 60_000; // after a failed refresh, serve the stale copy this long before retrying
 
   private readonly IMAGE_FETCH_TIMEOUT_MS = 20_000; // covers the body too, which can be up to MAX_IMAGE_BYTES
-  private readonly MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
   private readonly MAX_IMAGE_PIXELS = 25_000_000; // e.g. 5000x5000
 
   private readonly IMAGE_CACHE_MAX_BYTES = 50 * 1024 * 1024; // 50 MB
@@ -61,6 +60,7 @@ export class NewsService {
 
   constructor(
     @Inject(AGENT) private readonly agent: Agent,
+    @Inject(IMAGE_AGENT) private readonly imageAgent: Agent,
     @Inject(XML_PARSER) private readonly xmlParser: XMLParser,
     private readonly config: ConfigService<Env, true>,
   ) {}
@@ -113,12 +113,14 @@ export class NewsService {
   }
 
   private async fetchImageAsWebp(url: string): Promise<Buffer> {
-    // Redirects are refused so the request can't leave the CDN.
+    // Redirects are refused so the request can't leave the CDN. `IMAGE_AGENT` caps the body at `MAX_IMAGE_BYTES` as
+    // read off the wire, so `identity` keeps a compressed body from decompressing past it.
     this.logger.log(`Fetching image from URL: ${url}`);
     let imageBuffer: Buffer;
     try {
       const response = await fetch(url, {
-        dispatcher: this.agent,
+        dispatcher: this.imageAgent,
+        headers: { 'accept-encoding': 'identity' },
         redirect: 'error',
         signal: AbortSignal.timeout(this.IMAGE_FETCH_TIMEOUT_MS),
       });
@@ -133,12 +135,16 @@ export class NewsService {
         throw new BadGatewayException('Failed to fetch image');
       }
 
-      imageBuffer = await this.readBody(response, this.MAX_IMAGE_BYTES);
+      imageBuffer = Buffer.from(await response.arrayBuffer());
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadGatewayException) throw error;
 
-      // Network errors, timeouts, redirects and bodies over the size limit
-      this.logger.warn(`Image request failed for ${url}: ${(error as Error).message}`);
+      // Network errors, timeouts, redirects and bodies over the size limit (a `terminated` TypeError from the body read)
+      const reason =
+        (error as Error).cause instanceof errors.ResponseExceededMaxSizeError
+          ? `Body larger than ${MAX_IMAGE_BYTES} bytes`
+          : (error as Error).message;
+      this.logger.warn(`Image request failed for ${url}: ${reason}`);
       throw new ServiceUnavailableException('Failed to fetch image');
     }
 
@@ -154,26 +160,6 @@ export class NewsService {
     }
 
     return webpBuffer;
-  }
-
-  /** Reads the body, rejecting it as soon as it's larger than `maxBytes` (whatever `content-length` says). */
-  private async readBody(response: Response, maxBytes: number): Promise<Buffer> {
-    const tooLarge = () => new Error(`Body larger than ${maxBytes} bytes`);
-    if (Number(response.headers.get('content-length')) > maxBytes) {
-      await response.body?.cancel();
-      throw tooLarge();
-    }
-
-    if (!response.body) return Buffer.alloc(0);
-
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
-      size += chunk.byteLength;
-      if (size > maxBytes) throw tooLarge(); // leaving the loop cancels the stream
-      chunks.push(chunk);
-    }
-    return Buffer.concat(chunks, size);
   }
 
   /**

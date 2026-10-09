@@ -5,7 +5,7 @@ import { AddressInfo } from 'node:net';
 import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from './app.module';
-import { AGENT } from './common/agent/agent.provider';
+import { AGENT, IMAGE_AGENT } from './common/agent/agent.provider';
 import { CACHE_CONTROL } from './common/http/cache-control';
 import { MONGO_CLIENT, MONGODB_DATABASE } from './common/mongo/mongo.provider';
 import { ROUTE_CONFLICT_POLICY } from './config/app-options';
@@ -181,6 +181,8 @@ describe('GET routes', () => {
       .overrideProvider(MONGODB_DATABASE)
       .useValue(fakeDb)
       .overrideProvider(AGENT)
+      .useValue(undefined)
+      .overrideProvider(IMAGE_AGENT)
       .useValue(undefined)
       .compile();
 

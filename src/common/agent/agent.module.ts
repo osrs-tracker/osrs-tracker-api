@@ -1,9 +1,9 @@
 import { Global, Module } from '@nestjs/common';
-import { agentProvider } from './agent.provider';
+import { agentProvider, imageAgentProvider } from './agent.provider';
 
 @Global()
 @Module({
-  providers: [agentProvider],
-  exports: [agentProvider],
+  providers: [agentProvider, imageAgentProvider],
+  exports: [agentProvider, imageAgentProvider],
 })
 export class AgentModule {}

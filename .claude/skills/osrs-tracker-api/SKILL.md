@@ -17,14 +17,18 @@ keep code rules here, not in the agent.
 ## Setup gotchas
 
 - `src/common/` providers are injected by string token, exported as constants from their provider file
-  (`MONGODB_DATABASE`, `MONGO_CLIENT`, `AGENT`, `XML_PARSER`): use the constant in `provide`, `@Inject` and
-  `overrideProvider`, never the string. Outgoing requests use `fetch` from `undici` with `AGENT` (an `undici` `Agent`)
-  as `dispatcher` and a timeout: an `AbortSignal.timeout` (news feed 10s, images 20s), or for hiscores the shared
-  client's own (10s). Jagex data cached in memory (the news feed, images) is an `lru-cache` with a `fetchMethod`, read
-  with `forceFetch`: it shares the fetch in flight per key and doesn't cache a rejection, so don't add a pending map
-  beside it; to keep a stale value on failure, return it from `fetchMethod` (setting `options.ttl` for the retry delay).
-  `MongoModule` is global and closes the client on shutdown (bounded to 5s); new indexes go in `mongo.provider.ts`, the
-  only place the API creates indexes (never per request). `/healthy` stays liveness only and never checks Mongo.
+  (`MONGODB_DATABASE`, `MONGO_CLIENT`, `AGENT`, `IMAGE_AGENT`, `XML_PARSER`): use the constant in `provide`, `@Inject`
+  and `overrideProvider`, never the string. Outgoing requests use `fetch` from `undici` with `AGENT` (an `undici`
+  `Agent`) as `dispatcher` and a timeout: an `AbortSignal.timeout` (news feed 10s, images 20s), or for hiscores the
+  shared client's own (10s). News images use `IMAGE_AGENT` instead, whose `maxResponseSize` (`MAX_IMAGE_BYTES`) caps the
+  body as read off the wire: request them with `accept-encoding: identity` so decompression can't exceed it, and don't
+  set it on `AGENT` or count bytes by hand. undici rejects the body read with a `terminated` `TypeError` whose `cause`
+  is a `ResponseExceededMaxSizeError`. Jagex data cached in memory (the news feed, images) is an `lru-cache` with a
+  `fetchMethod`, read with `forceFetch`: it shares the fetch in flight per key and doesn't cache a rejection, so don't
+  add a pending map beside it; to keep a stale value on failure, return it from `fetchMethod` (setting `options.ttl` for
+  the retry delay). `MongoModule` is global and closes the client on shutdown (bounded to 5s); new indexes go in
+  `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy` stays liveness only and
+  never checks Mongo.
 - The `players` and `items` collections, their fields, writers and index owners are described in osrs-tracker-aws's
   [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new or changed index or
   stored field also needs an update there: open an issue in osrs-tracker-aws.
@@ -160,7 +164,8 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   and `undici`'s `fetch` mocked: normal table first, shared in-flight lookups, the preview's not-found cache, the
   concurrency cap in FIFO order, the queue bound, the breaker opening on failures but not on not-found players), the
   news feed and image caches (`news.service.spec.ts` with `undici`'s `fetch` mocked and `performance.now` as lru-cache's
-  clock: shared in-flight fetches, the stale feed's 60s retry, the 503 and a 404 not cached), and per GET route its
+  clock: shared in-flight fetches, the stale feed's 60s retry, the 503 and a 404 not cached; the image size limit
+  against a local server with the real `fetch` and `IMAGE_AGENT`: 503, its log line, `identity`), and per GET route its
   `Cache-Control` and that it never writes, that no route overlaps another and that shutdown closes the Mongo client
   (`app.e2e.spec.ts`; a route's header or a new GET route means changing its `CASES`). Changing one of those means
   changing its spec.
