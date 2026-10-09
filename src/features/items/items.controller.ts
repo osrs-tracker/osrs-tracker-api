@@ -61,7 +61,7 @@ export class ItemsController {
   @Header('Cache-Control', CACHE_CONTROL.ITEM_SEARCH)
   async searchItems(@Param('query') query: string) {
     if (!query) throw new BadRequestException('No search query provided');
-    if (query.length > 64) throw new BadRequestException('Search query must be at 64 characters or less');
+    if (query.length > 64) throw new BadRequestException('Search query must be 64 characters or less');
 
     return this.itemsService.searchItems(query);
   }

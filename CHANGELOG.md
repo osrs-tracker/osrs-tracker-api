@@ -18,6 +18,18 @@
   longer run the pod out of memory. Concurrent requests for one image still share one conversion, and cached images
   never wait. The `news-images` bulkhead shows up in the `resilience_*` metrics and rejection warnings.
 
+### Players and items
+
+- Usernames match the way Jagex matches them: `_` and `-` count as spaces and leading or trailing ones are ignored, so
+  `/players/Lynx_Titan`, `/players/lynx-titan` and `/players/lynx titan` are one player (`lynx titan`), stored and
+  scraped once, instead of up to three separate players. Players already stored under an `_` or `-` name need a one-off
+  rename (or a merge, if both spellings are stored), which isn't part of this change.
+- Two lookups of one player at the same moment (two tabs, a double request) no longer answer one of them with a 500, and
+  a player's first entry for a time zone (`scrapingOffset`) is no longer stored twice when that happens.
+- `GET /players/:username/hiscores` answers 400 for a `skip` over 10,000, instead of a 500 from MongoDB for one that
+  doesn't fit in 32 bits.
+- The item search's 400 for a long query reads "Search query must be 64 characters or less" (was "must be at 64").
+
 ### Logging
 
 - All log lines now come from the shared `@osrs-tracker/logger` (pino), the same format as the web server's, replacing
@@ -115,7 +127,7 @@
   real cause instead of crashing the logger with a `TypeError`. A failed shutdown now exits the way Nest intends. An
   error's stack trace is part of its JSON log line (`stack`) instead of being written to the output separately.
 
-### Players
+### Players and items
 
 - Hiscore entries no longer have a `sourceString` (`@osrs-tracker/models` 0.10.0 removed it): the API stops writing
   `'LEGACY'` into new entries and returns stored entries as they are, now that none has a real one left. Responses get
@@ -245,7 +257,7 @@
   404/503/`refreshFailed` responses) and also sets `lastHiscoreFetch`. Bots (detected with `isbot`) and requests without
   a user agent get a 204 and write nothing. The GETs still write until the web app uses the POSTs.
 
-### Players
+### Players and items
 
 - `GET /players/:username` (and the new lookup POST) return `pausedScrapingOffsets` for players whose tracking the
   hiscores-scraper paused, so the web app can still show their history.

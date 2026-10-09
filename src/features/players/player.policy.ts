@@ -27,18 +27,15 @@ export function needsRefresh(player: Player | null, scrapingOffset: number, now:
 /**
  * The aggregation pipeline update `refreshPlayerInfo` upserts after a successful refresh. It resumes a paused player
  * (merges `pausedScrapingOffsets` back and unsets the pause fields, see the pause/resume contract there), adds
- * `scrapingOffset`, and prepends `hiscoreEntry` when `initialScrape`.
+ * `scrapingOffset`, and prepends `hiscoreEntry` when the stored `scrapingOffsets` don't have it yet (the initial entry).
+ * Deciding that in the update rather than from an earlier read means concurrent lookups prepend it once.
  *
  * Values are wrapped in `$literal`, so strings starting with '$' aren't read as field paths.
  */
-export function buildRefreshUpdate(
-  player: Player,
-  hiscoreEntry: HiscoreEntry,
-  scrapingOffset: number,
-  initialScrape: boolean,
-): Document[] {
+export function buildRefreshUpdate(player: Player, hiscoreEntry: HiscoreEntry, scrapingOffset: number): Document[] {
   return [
     {
+      // Field paths in one `$set` read the document as it was before it, so `$scrapingOffsets` is the stored value
       $set: {
         ...Object.fromEntries(Object.entries(player).map(([key, value]) => [key, { $literal: value }])),
         scrapingOffsets: {
@@ -48,14 +45,14 @@ export function buildRefreshUpdate(
             [scrapingOffset],
           ],
         },
-        ...(initialScrape
-          ? {
-              // Prepend, entries are stored newest first.
-              hiscoreEntries: {
-                $concatArrays: [[{ $literal: hiscoreEntry }], { $ifNull: ['$hiscoreEntries', []] }],
-              },
-            }
-          : {}),
+        hiscoreEntries: {
+          $cond: [
+            { $in: [scrapingOffset, { $ifNull: ['$scrapingOffsets', []] }] },
+            '$hiscoreEntries',
+            // Prepend, entries are stored newest first.
+            { $concatArrays: [[{ $literal: hiscoreEntry }], { $ifNull: ['$hiscoreEntries', []] }] },
+          ],
+        },
       },
     },
     { $unset: ['pausedScrapingOffsets', 'hiscoreNotFoundSince', 'hiscoreNotFoundCount'] },
