@@ -52,7 +52,7 @@ export class PlayersController {
 
   /**
    * Read-only: never refreshes or stores the player (the browser's `POST .../lookup` does). The username is
-   * case-insensitive. A stored player as stored (stale or not), with `trackedSince` (its oldest entry for
+   * matched like Jagex does: case-insensitive, `_` and `-` as spaces, leading and trailing ones ignored. A stored player as stored (stale or not), with `trackedSince` (its oldest entry for
    * `scrapingOffset`, or `null`) and a `max-age` of the time left until it may be refreshed (0 to
    * `PLAYER_MAX_AGE_SECONDS`, `playerMaxAgeSeconds`). An unknown player is a live preview from the hiscores, not stored
    * (`scrapingOffsets: []`, `trackedSince: null`); 404 when not on the hiscores (or with `skipRefresh`, which skips the

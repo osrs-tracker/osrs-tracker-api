@@ -127,7 +127,7 @@
   real cause instead of crashing the logger with a `TypeError`. A failed shutdown now exits the way Nest intends. An
   error's stack trace is part of its JSON log line (`stack`) instead of being written to the output separately.
 
-### Players and items
+### Players
 
 - Hiscore entries no longer have a `sourceString` (`@osrs-tracker/models` 0.10.0 removed it): the API stops writing
   `'LEGACY'` into new entries and returns stored entries as they are, now that none has a real one left. Responses get
@@ -257,7 +257,7 @@
   404/503/`refreshFailed` responses) and also sets `lastHiscoreFetch`. Bots (detected with `isbot`) and requests without
   a user agent get a 204 and write nothing. The GETs still write until the web app uses the POSTs.
 
-### Players and items
+### Players
 
 - `GET /players/:username` (and the new lookup POST) return `pausedScrapingOffsets` for players whose tracking the
   hiscores-scraper paused, so the web app can still show their history.
