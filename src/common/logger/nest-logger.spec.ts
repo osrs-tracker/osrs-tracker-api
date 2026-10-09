@@ -109,7 +109,13 @@ describe('NestLogger', () => {
 
     logger.error(error, 'ExceptionsHandler');
 
-    expect(line()).toMatchObject({ type: 'uncaught', error: `${error.stack}\nCaused by: ${cause.stack}` });
+    // Node's inspect, which collapses the frames the error shares with its cause.
+    const logged = line();
+    expect(logged).toMatchObject({
+      type: 'uncaught',
+      error: expect.stringContaining('[cause]: Error: connect ECONNREFUSED'),
+    });
+    expect(String(logged.error).startsWith(error.stack!.split('\n', 2).join('\n'))).toBe(true);
   });
 
   it("writes the request's ID inside its context, and none outside", () => {
