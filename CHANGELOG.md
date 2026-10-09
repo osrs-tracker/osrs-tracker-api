@@ -2,10 +2,10 @@
 
 ### Responses
 
-- API responses to browsers are compressed (Brotli, gzip or zstd, whichever the browser asks for):
-  `GET /players?limit=50` and a 50-entry hiscores page were about 350 KB each. Traefik compresses JSON responses of 1 KB
-  and up; `/news/image` stays as it is (WebP is already compressed), and so do the web server's own calls to the API
-  inside the cluster. `Cache-Control` is unchanged; responses now also vary on `Accept-Encoding`.
+- API responses to browsers are compressed, with Brotli when the browser supports it (every current one does), else
+  gzip: `GET /players?limit=50` and a 50-entry hiscores page were about 350 KB each. Traefik compresses JSON responses
+  of 1 KB and up; `/news/image` stays as it is (WebP is already compressed), and so do the web server's own calls to the
+  API inside the cluster. `Cache-Control` is unchanged; responses now also vary on `Accept-Encoding`.
 - Player lookups answer at once when Jagex's hiscores are down or swamped, instead of each waiting for its own 10s
   timeout: after half of the last 20 hiscore requests failed, the API stops asking Jagex for 30s and answers a lookup as
   failed right away (503 for an unknown player, the stored player with `refreshFailed` otherwise), and requests that
