@@ -92,7 +92,7 @@ keep code rules here, not in the agent.
   (`ApiLogType`). It's a `ConsoleLogger` that only overrides `printMessages`, so Nest still parses the arguments and
   filters the levels: `debug` and `verbose` are off, `fatal` stays on (Loki knows it). Log through Nest's `Logger`, never `console`. A warning that can repeat
   per request (evictions, rejections) goes through `ThrottledWarning` (`common/logger/throttled-warning.ts`): at most one
-  per key and minute, with the count since. The request log (`logger.middleware.ts`, the package's `requestLogger`) is
+  per key and minute, with the count since. The request log (the package's `requestLogger`, applied in `AppModule`) is
   `type: 'incoming'`: 5xx `error`, 4xx `warn`, else `info`; a client that disconnects before the response is `warn` with
   `aborted: true` and no `status`. `main.ts` calls `logOutgoingRequests` once (twice would log every request twice), so
   every `fetch` (hiscores, news feed, images) is logged as `type: 'outgoing'` with its status and duration (covered by

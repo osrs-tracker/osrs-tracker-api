@@ -38,7 +38,7 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 - `src/common/` shared providers, injected by the token constant exported from their provider file (Mongo, the `undici`
   HTTP agents, XML parser), plus the logger and request IDs (`logger/`), bot detection, route labels, the
   `Cache-Control` values (`http/cache-control.ts`), `ParseIntRangePipe` (`pipes/`) and the resilience policies' logs and
-  metrics (`resilience/`); `src/middleware/` request logging and robots.
+  metrics (`resilience/`); `src/middleware/` robots.
 - `src/config/`: the env, validated at startup (`env.ts`, read through `ConfigService`), CORS and the app options shared
   by `main.ts` and the e2e spec (`app-options.ts`, the route conflict policy).
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.
