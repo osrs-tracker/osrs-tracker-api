@@ -26,7 +26,7 @@ type NestLogType = Extract<ApiLogType, 'lifecycle' | 'uncaught' | 'app'>;
  * Nest's and the app's lines (`new Logger(...)`) in the shared log format (`logger.ts`). Nest's `ConsoleLogger` still
  * splits the arguments into message, context, stack and structured params (plain objects after the message) and
  * filters the levels; only the printing is replaced. `log` is written as `info`, the logger's context (the class name)
- * as `context`, the params as fields, an error's stack under `error` as one string, and `type` comes from the context:
+ * as `context`, the params as fields, an error under `error` as one string (Node's `util.inspect`, with its cause), and `type` comes from the context:
  * `lifecycle` for startup and shutdown, `uncaught` for Nest's `ExceptionsHandler`, else `app`.
  */
 export class NestLogger extends ConsoleLogger {

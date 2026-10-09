@@ -88,18 +88,19 @@ keep code rules here, not in the agent.
   with `createApiLogger(destination)`, since pino doesn't write through `process.stdout.write`). `NestLogger`
   (`common/logger/nest-logger.ts`, set in `main.ts`) passes Nest's and the app's lines to it, with `log` as `info`, the
   class name as `context`, structured params (`logger.warn('…', { username })`) as fields, except the format's own
-  (`level`, `time`, `type`, `message`, `requestId`), an error's stack as one string under `error`, and `type` from the
-  context: `lifecycle` (Nest's startup classes and `MONGO_LOG_CONTEXT`, the Mongo connect and close;
-  `LIFECYCLE_CONTEXTS`), `uncaught` (`ExceptionsHandler`), else `app` (`ApiLogType`). A new startup or shutdown logger
-  gets its context from a constant in that list, never a copied string. It's a `ConsoleLogger` that overrides only
-  `printMessages` and `printStackTrace` (which would write the stack again as plain lines on stderr), so Nest still
-  parses the arguments and filters the levels: `debug` and `verbose` are off, `fatal` stays on (Loki knows it). Log
-  through Nest's `Logger`, never `console`. A warning that can repeat per request (evictions, rejections) goes through
-  `ThrottledWarning` (`common/logger/throttled-warning.ts`): at most one per key and minute, with the count since. The
-  request log (the package's `requestLogger`, applied in `AppModule`) is `type: 'incoming'`: 5xx `error`, 4xx `warn`,
-  else `info`; a client that disconnects before the response is `warn` with `aborted: true` and no `status`. `main.ts`
-  calls `logOutgoingRequests` once (twice would log every request twice), so every `fetch` (hiscores, news feed, images)
-  is logged as `type: 'outgoing'` with its status and duration, and the `requestId` read when the `fetch` starts.
+  (`level`, `time`, `type`, `message`, `requestId`), an error as one string under `error` (Node's `util.inspect`: the
+  stack, the error's own fields such as `code`, and its cause as `[cause]: …`), and `type` from the context: `lifecycle`
+  (Nest's startup classes and `MONGO_LOG_CONTEXT`, the Mongo connect and close; `LIFECYCLE_CONTEXTS`), `uncaught`
+  (`ExceptionsHandler`), else `app` (`ApiLogType`). A new startup or shutdown logger gets its context from a constant in
+  that list, never a copied string. It's a `ConsoleLogger` that overrides only `printMessages` and `printStackTrace`
+  (which would write the stack again as plain lines on stderr), so Nest still parses the arguments and filters the
+  levels: `debug` and `verbose` are off, `fatal` stays on (Loki knows it). Log through Nest's `Logger`, never `console`.
+  A warning that can repeat per request (evictions, rejections) goes through `ThrottledWarning`
+  (`common/logger/throttled-warning.ts`): at most one per key and minute, with the count since. The request log (the
+  package's `requestLogger`, applied in `AppModule`) is `type: 'incoming'`: 5xx `error`, 4xx `warn`, else `info`; a
+  client that disconnects before the response is `warn` with `aborted: true` and no `status`. `main.ts` calls
+  `logOutgoingRequests` once (twice would log every request twice), so every `fetch` (hiscores, news feed, images) is
+  logged as `type: 'outgoing'` with its status and duration, and the `requestId` read when the `fetch` starts.
 - Request IDs: `nestjs-cls` (`common/logger/request-id.ts`) gives each request a context with a new UUID (never a
   client's `X-Request-Id`: nothing upstream sends one, and a client could reuse one), sent back as `X-Request-Id`. Every
   line logged while handling a request carries it as top-level `requestId` (the logger's `context`): the request line,
