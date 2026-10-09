@@ -1,11 +1,7 @@
 module.exports = (options, rspack) => {
-  // Optional packages Nest and Swagger import lazily and tolerate missing (Swagger only loads @fastify/static on
-  // Fastify). Nest CLI's rspack defaults list them without the `.js` that Nest 12's ESM imports use, so they'd fail
-  const lazyImports = [
-    '@nestjs/microservices/microservices-module.js',
-    '@nestjs/websockets/socket-module.js',
-    '@fastify/static',
-  ];
+  // Optional packages Nest imports lazily and tolerates missing. Nest CLI's rspack defaults list them without the `.js`
+  // that Nest 12's ESM imports use, so they'd fail
+  const lazyImports = ['@nestjs/microservices/microservices-module.js', '@nestjs/websockets/socket-module.js'];
 
   // The CLI adds the type check only when fork-ts-checker-webpack-plugin is installed, and skips it silently otherwise.
   // CI's build is the only type check, so fail instead

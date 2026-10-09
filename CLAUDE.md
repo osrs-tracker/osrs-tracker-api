@@ -4,13 +4,13 @@ NestJS + MongoDB Atlas (native driver) API, deployed to Kubernetes at https://os
 consumer: the Angular SSR app in `../osrs-tracker-web`; `../osrs-tracker-aws` Lambdas also write to the same database.
 
 **Load the `osrs-tracker-api` skill before writing, reviewing, running, deploying or committing anything here.** It
-holds the Cache-Control, param validation, Swagger, Mongo, player pause/resume and test rules, plus deploy and release
-steps. Keep detail there, not in this file.
+holds the Cache-Control, param validation, route doc comment, Mongo, player pause/resume and test rules, plus deploy and
+release steps. Keep detail there, not in this file.
 
 ## Commands
 
 - Verify: `npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build && npm test`.
-- Dev server: `npm run start:dev` on port 3000, Swagger at `/swagger`. `.env` points at production data.
+- Dev server: `npm run start:dev` on port 3000. `.env` points at production data.
 - Worktrees in `.claude/worktrees/` use the main checkout's `node_modules` (found in a parent folder); run `npm ci` in
   one only when its `package.json` changes. They have no `.env` (`start:dev` then fails listing the missing vars): link
   the main checkout's with `ln -s ../../../.env .env` and remove the link when done. Other sessions share port 3000:
@@ -33,9 +33,9 @@ steps. Keep detail there, not in this file.
   lists every GET route's `Cache-Control`.
 - `src/common/` shared providers, injected by the token constant exported from their provider file (Mongo, the `undici`
   HTTP agent, XML parser), plus bot detection, route labels, the `Cache-Control` values (`http/cache-control.ts`),
-  `ParseIntRangePipe` (`pipes/`) and its Swagger counterpart `ApiIntRangeQuery` (`swagger/`), and the `Semaphore`
-  capping Jagex requests (`concurrency/`); `src/middleware/` request logging and robots.
-- `src/config/`: the env, validated at startup (`env.ts`, read through `ConfigService`), CORS and the Swagger document.
+  `ParseIntRangePipe` (`pipes/`) and the `Semaphore` capping Jagex requests (`concurrency/`); `src/middleware/` request
+  logging and robots.
+- `src/config/`: the env, validated at startup (`env.ts`, read through `ConfigService`), and CORS.
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.
 - Build and runtime: `rspack.config.js` (bundling), `Dockerfile` (image, `sharp` beside the bundle), `vitest.config.mjs`
   (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies, with the Traefik rate-limit and compress
