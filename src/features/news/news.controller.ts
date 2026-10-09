@@ -31,7 +31,8 @@ export class NewsController {
    * The image at `url` (a plain `https://cdn.runescape.com/` URL of at most 512 characters: no credentials, query or
    * hash) as WebP, with `NEWS_IMAGE`. 400 for a missing, too long or other URL, 404 when the CDN has no such image, 502
    * when it answers another error or something that isn't an image or the image can't be converted, 503 when it can't
-   * be reached, times out, redirects or sends an image that's too large. Errors have no `Cache-Control`.
+   * be reached, times out, redirects or sends an image that's too large, or too many images are being converted.
+   * Errors have no `Cache-Control`.
    */
   @Get('image')
   async getImageAsWebp(@Res() res: Response, @Query('url') url: string) {
