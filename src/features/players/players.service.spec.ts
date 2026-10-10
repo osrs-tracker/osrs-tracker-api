@@ -7,6 +7,7 @@ import {
   encodeHiscoreEntry,
   HiscoreEntry,
   levelForXp,
+  SkillEnum,
   StoredHiscoreEntry,
   stripUnchangedValues,
 } from '@osrs-tracker/models';
@@ -24,7 +25,7 @@ import {
 } from './player.config';
 import { HISCORE_LAYOUTS_COLLECTION, HiscoreLayoutsService } from './hiscore-layouts.service';
 import { COMBAT_SKILLS } from './player.utils';
-import { PlayersService } from './players.service';
+import { PlayersService, RECENT_PLAYERS_ENTRY } from './players.service';
 
 vi.mock('undici', async (importOriginal) => ({
   ...(await importOriginal<typeof import('undici')>()),
@@ -269,8 +270,13 @@ describe('PlayersService stored hiscore entries', () => {
     const players = {
       aggregate: (stages: Document[]) => {
         pipeline = stages;
-        const [, position, n] = stages[1].$project.hiscoreEntries.$slice as [unknown, number, number]; // What MongoDB's `$slice` returns
-        return { next: async () => ({ hiscoreEntries: storedEntries.slice(position, position + n) }) };
+        return {
+          next: async () => {
+            const [, position, n] = stages[1].$project.hiscoreEntries.$slice as [unknown, number, number]; // What MongoDB's `$slice` returns
+            return { hiscoreEntries: storedEntries.slice(position, position + n) };
+          },
+          toArray: async () => [{ username: 'toxsick', hiscoreEntries: storedEntries.slice(0, 1) }], // The recent players
+        };
       },
       updateOne: async () => {
         calls.push('players.updateOne');
@@ -313,6 +319,27 @@ describe('PlayersService stored hiscore entries', () => {
 
     expect(pipeline[1].$project.hiscoreEntries.$slice.slice(1)).toEqual([0, 2]);
     expect(page).toEqual([entry(2, 2000, 10)]);
+  });
+
+  it('returns the recent players with their newest entry whole, or only its Overall with `entry=overall`', async () => {
+    storedEntries = [encodeHiscoreEntry(entry(3, 2000, 10), layout)];
+
+    expect(await service.getLastFetchedPlayers(5)).toEqual([
+      { username: 'toxsick', hiscoreEntries: [entry(3, 2000, 10)] },
+    ]);
+    expect(await service.getLastFetchedPlayers(5, 0, RECENT_PLAYERS_ENTRY.Overall)).toEqual([
+      {
+        username: 'toxsick',
+        hiscoreEntries: [
+          {
+            date: new Date(3 * DAY_MS),
+            scrapingOffset: 0,
+            skills: { [SkillEnum.Overall]: { rank: 5, level: levelForXp(2000), xp: 2000 } },
+            activities: {},
+          },
+        ],
+      },
+    ]);
   });
 
   it('stores the layout before the entry that uses it', async () => {

@@ -87,7 +87,17 @@ const storedEntry = encodeHiscoreEntry(
  * until it's added here, and a new `CACHE_CONTROL` value fails "expects every GET Cache-Control value".
  */
 const CASES: Record<string, Case[]> = {
-  '/players': [{ url: '/players', status: 200, cacheControl: CACHE_CONTROL.REVALIDATE }],
+  '/players': [
+    { url: '/players', status: 200, cacheControl: CACHE_CONTROL.REVALIDATE },
+    {
+      name: 'Overall only',
+      url: '/players?entry=overall',
+      docs: [{ ...storedPlayer, hiscoreEntries: [storedEntry] }],
+      status: 200,
+      cacheControl: CACHE_CONTROL.REVALIDATE,
+    },
+    { name: 'invalid entry', url: '/players?entry=all', status: 400, cacheControl: CACHE_CONTROL.REVALIDATE },
+  ],
   '/players/:username': [
     { name: 'stored', url: '/players/toxsick', docs: [storedPlayer], status: 200, cacheControl: 'max-age=900' },
     {
