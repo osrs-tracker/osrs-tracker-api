@@ -15,6 +15,17 @@
   (osrs-tracker/osrs-tracker-aws#70, #126). Bots and `GET` requests still record nothing; responses are unchanged. Uses
   `@osrs-tracker/models` 2.3.0.
 
+### Items
+
+- `GET /items/search/:query` matches the start of words, so `drag` finds Dragon items and `dragon scim` puts Dragon
+  scimitar first; before, only whole words matched (`drag` found nothing). Every word of the query has to start a word
+  of the name, in any order, and whole-word matches rank higher. Runs on a new Atlas Search index (`name_autocomplete`,
+  created at startup when missing) instead of the `name_text` index, which the API no longer creates (#129). Responses
+  keep their shape; `score` is now Atlas Search's.
+- The recent items list (`GET /items`) only shows items visitors looked up: `lastFetch` was cleared on the 4,669 items
+  last looked up before 2026-10-08, nearly all of them by crawlers before lookups ignored bots (#128). A one-off data
+  fix, nothing deployed.
+
 ### Behind the scenes
 
 - The combat level and total xp read skills with `@osrs-tracker/models` 2.1.0's `skillLevel` and `overallOf` (with

@@ -232,6 +232,9 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     the layout cache, upsert and collision check (`hiscore-layouts.service.spec.ts`).
   - The validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for
     `limit`, `size`, `skip` and IDs).
+  - `items/item-search.spec.ts`: the item search's `$search` pipeline (`buildItemSearchPipeline`; `$search` doesn't run
+    on a plain `mongod`, so the pipeline is checked, not its results). The `name_autocomplete` Atlas Search index it
+    runs on is created in `mongo.provider.ts` only when missing: a changed definition is applied by hand.
   - `players.service.spec.ts` (real `ResilienceModule` with production's preset, `undici`'s `fetch` mocked): normal
     table first, shared in-flight lookups, the preview's not-found cache, the concurrency cap in FIFO order, the queue
     bound and queue timeout (no warning per refusal), the breaker opening on failures but not on not-found players; a
