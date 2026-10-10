@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Item } from '@osrs-tracker/models';
 import { Collection, Db } from 'mongodb';
-import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
+import { ITEM_NAME_COLLATION, MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
+import { buildItemBrowseFilter } from './item-browse';
 import { buildItemSearchPipeline } from './item-search';
 
 @Injectable()
@@ -37,6 +38,18 @@ export class ItemsService {
   /** Records a visitor's lookup for the recent items list. Doesn't create unknown items. */
   async recordLookup(id: number): Promise<void> {
     await this.collection.updateOne({ id: id }, { $set: { lastFetch: new Date() } }, { hint: { id: 1 } });
+  }
+
+  /** The items whose name starts with `letter` (see `buildItemBrowseFilter`), by name case-insensitively. */
+  browseItems(letter: string): Promise<Item[]> {
+    return this.collection
+      .find<Item>(buildItemBrowseFilter(letter), {
+        collation: ITEM_NAME_COLLATION, // The `{ name: 1 }` index's, or Mongo can't use it
+        hint: { name: 1 },
+        projection: { _id: 0, id: 1, icon: 1, name: 1 },
+      })
+      .sort({ name: 1 })
+      .toArray();
   }
 
   searchItems(query: string): Promise<Item[]> {

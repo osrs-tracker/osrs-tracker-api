@@ -14,8 +14,18 @@
   so the clean-hiscores Lambda can stop scraping an offset nobody has looked up for 180 days
   (osrs-tracker/osrs-tracker-aws#70, #126). Bots and `GET` requests still record nothing; responses are unchanged. Uses
   `@osrs-tracker/models` 2.3.0.
+- New `GET /sitemap/players` for the web app's player sitemap (#120, osrs-tracker/osrs-tracker-web#169):
+  `[{ username, lastEntry }]` by username, every tracked player that's still scraped (not paused), without a not-found
+  streak and with a hiscore entry in the last 30 days, with `lastEntry` the date of its newest entry (about 530
+  players). Not under `/players/`, where `sitemap` is a player's name. `Cache-Control: public, max-age=3600`.
 
 ### Items
+
+- New `GET /items/browse/:letter` for the web app's A–Z item pages (#119, osrs-tracker/osrs-tracker-web#168): every item
+  whose name starts with `letter` (`a`–`z`, or `0` for names starting with a digit or other character), sorted by name
+  case-insensitively, as `[{ id, icon, name }]`; 400 for any other letter. Up to 600 items (`s`) per letter, so no
+  pagination. Runs on a new case-insensitive index on `name`, created at startup.
+  `Cache-Control: public, max-age=86400`.
 
 - `GET /items/search/:query` matches the start of words, so `drag` finds Dragon items and `dragon scim` puts Dragon
   scimitar first; before, only whole words matched (`drag` found nothing). Every word of the query has to start a word

@@ -48,6 +48,12 @@ export function connectWithRetry(createClient: () => MongoClient): Promise<Mongo
   });
 }
 
+/**
+ * The collation of the `{ name: 1 }` index on items (case-insensitive, accents count). Item browse
+ * (`buildItemBrowseFilter`) queries and sorts with it: the index is only used by queries with the same collation.
+ */
+export const ITEM_NAME_COLLATION = { locale: 'en', strength: 2 } as const;
+
 /** The Atlas Search index item search runs on (`buildItemSearchPipeline`). */
 export const ITEM_SEARCH_INDEX = 'name_autocomplete';
 /** The shortest word prefix the index matches. */
@@ -124,6 +130,7 @@ export const mongoDBProvider: FactoryProvider = {
     await db
       .collection('items')
       .createIndex({ lastFetch: -1 }, { partialFilterExpression: { lastFetch: { $exists: true } } });
+    await db.collection('items').createIndex({ name: 1 }, { collation: ITEM_NAME_COLLATION });
     await ensureItemSearchIndex(db);
 
     return db;

@@ -16,6 +16,7 @@ import { isBotRequest } from '../../common/bot/is-bot-request';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ParseIntRangeOptions, ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
 import { ItemsService } from './items.service';
+import { ParseBrowseLetterPipe } from './parse-browse-letter.pipe';
 
 const ITEM_ID_PIPE = new ParseIntRangePipe({ min: 1, message: (id) => `Invalid item ID "${id}"` });
 const LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 5 };
@@ -65,5 +66,17 @@ export class ItemsController {
     if (query.length > 64) throw new BadRequestException('Search query must be 64 characters or less');
 
     return this.itemsService.searchItems(query);
+  }
+
+  /**
+   * Every item whose name starts with `letter` (`a` to `z`, case-insensitive, accents ignored; `0` for names starting
+   * with a digit or other character), sorted by name case-insensitively, with only `id`, `icon` and `name`; `[]` when
+   * none match. The largest letter is about 600 items (40 KB). 400 for any other `letter`, uppercase included.
+   * `ITEM_BROWSE` on every response.
+   */
+  @Get('browse/:letter')
+  @Header('Cache-Control', CACHE_CONTROL.ITEM_BROWSE)
+  browseItems(@Param('letter', ParseBrowseLetterPipe) letter: string) {
+    return this.itemsService.browseItems(letter);
   }
 }
