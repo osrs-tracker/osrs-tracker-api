@@ -1,5 +1,5 @@
 import { HiscoreTable } from '@osrs-tracker/hiscores';
-import { HiscoreEntry, PlayerStatus, PlayerType, SkillEnum } from '@osrs-tracker/models';
+import { HiscoreEntry, overallOf, PlayerStatus, PlayerType, SkillEnum, skillLevel } from '@osrs-tracker/models';
 
 /**
  * Total xp of a player who isn't on a table: higher than any real total, so a missing table never compares as less.
@@ -51,8 +51,8 @@ export class PlayerUtils {
 
   /** Calculates the combat level from the skills (`hasCombatSkills` must hold). */
   static getCombatLevel(skills: HiscoreEntry['skills']): number {
-    // a skill without xp (null) or missing counts as level 1
-    const levelOf = (name: SkillEnum): number => Math.max(1, skills[name]?.level ?? 1);
+    // A skill without xp (null) or missing counts as level 1
+    const levelOf = (name: SkillEnum): number => skillLevel(skills[name]);
     const attack = levelOf(SkillEnum.Attack);
     const defence = levelOf(SkillEnum.Defence);
     const strength = levelOf(SkillEnum.Strength);
@@ -107,6 +107,6 @@ export class PlayerUtils {
 
   /** Total xp of a hiscore entry, so we can compare hiscores; `NOT_ON_TABLE_XP` when the player isn't on the table. */
   static getTotalXp(hiscore: Pick<HiscoreEntry, 'skills'> | null): number {
-    return hiscore ? hiscore.skills[SkillEnum.Overall]!.xp : NOT_ON_TABLE_XP;
+    return hiscore ? overallOf(hiscore).xp : NOT_ON_TABLE_XP;
   }
 }
