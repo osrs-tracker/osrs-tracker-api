@@ -225,10 +225,11 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   - `common/logger/`: Nest's and the app's line shape, `type`, params and `requestId`, and nothing written around pino
     (`nest-logger.spec.ts`); outgoing lines' `type` and `requestId` (`logger.spec.ts`, a local server and `undici`'s
     real `fetch`); `ThrottledWarning`.
-  - `players/`: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's
-    pause/resume, `$literal`, and the initial entry written only for a new offset (`buildRefreshUpdate`); combat level,
-    type and status (`PlayerUtils`; a hiscore without a combat skill's key counts as failed, a `null` one doesn't,
-    `hasCombatSkills`); the layout cache, upsert and collision check (`hiscore-layouts.service.spec.ts`).
+  - `players/`: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the lookup's `lastHiscoreFetch`
+    and per-offset `scrapingOffsetLookups` date (`buildLookupUpdate`), the refresh update's pause/resume, `$literal`,
+    and the initial entry written only for a new offset (`buildRefreshUpdate`); combat level, type and status
+    (`PlayerUtils`; a hiscore without a combat skill's key counts as failed, a `null` one doesn't, `hasCombatSkills`);
+    the layout cache, upsert and collision check (`hiscore-layouts.service.spec.ts`).
   - The validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for
     `limit`, `size`, `skip` and IDs).
   - `players.service.spec.ts` (real `ResilienceModule` with production's preset, `undici`'s `fetch` mocked): normal
@@ -243,9 +244,9 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   - `mongo.provider.spec.ts` (fake timers): the connect retry's constant 10s delay, warn lines, giving up after 12 with
     the connect error (also when closing the failed client fails).
   - `app.e2e.spec.ts` (`logger` mocked to collect the lines): per GET route its `Cache-Control` and that it never writes
-    (a route's header or a new GET route means changing `CASES`), that no route overlaps another, that shutdown closes
-    the Mongo client, and the request ID (`X-Request-Id` matching the `incoming` line's `requestId`, a client's own
-    ignored).
+    (a route's header or a new GET route means changing `CASES`), that no route overlaps another, that the POST lookup
+    writes nothing for a bot and writes `players` for a visitor, that shutdown closes the Mongo client, and the request
+    ID (`X-Request-Id` matching the `incoming` line's `requestId`, a client's own ignored).
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.

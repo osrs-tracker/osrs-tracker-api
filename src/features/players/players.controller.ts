@@ -112,7 +112,7 @@ export class PlayersController {
     const player = await this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
     const result = await this.refreshIfNeeded(response, username, scrapingOffset, includeLatestHiscoreEntry, player);
 
-    await this.playersService.recordLookup(username); // Only reached when the player is stored
+    await this.playersService.recordLookup(username, scrapingOffset); // Only reached when the player is stored
 
     return result;
   }

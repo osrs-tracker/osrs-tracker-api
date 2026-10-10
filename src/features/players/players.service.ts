@@ -18,7 +18,7 @@ import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { Env } from '../../config/env';
 import { HiscoreLayoutsService } from './hiscore-layouts.service';
 import { JAGEX_HISCORES, NOT_FOUND_CACHE_MAX, NOT_FOUND_CACHE_TTL_MS } from './player.config';
-import { buildRefreshUpdate } from './player.policy';
+import { buildLookupUpdate, buildRefreshUpdate } from './player.policy';
 import { PlayerUtils } from './player.utils';
 
 type PartialHiscoreEntry = Pick<HiscoreEntry, 'skills' | 'activities'>;
@@ -159,13 +159,14 @@ export class PlayersService {
     return (await this.layouts.decode(player.hiscoreEntries)).slice(skip);
   }
 
-  /** Records a visitor's lookup for the recent players list. Doesn't create unknown players. */
-  async recordLookup(username: string): Promise<void> {
-    await this.collection.updateOne(
-      { username: username },
-      { $set: { lastHiscoreFetch: new Date() } },
-      { hint: { username: 1 } },
-    );
+  /**
+   * Records a visitor's lookup for the recent players list and for `scrapingOffset` (`buildLookupUpdate`). Doesn't
+   * create unknown players.
+   */
+  async recordLookup(username: string, scrapingOffset: number): Promise<void> {
+    await this.collection.updateOne({ username: username }, buildLookupUpdate(scrapingOffset, new Date()), {
+      hint: { username: 1 },
+    });
   }
 
   /**

@@ -6,7 +6,7 @@ import {
   StoredHiscoreEntry,
 } from '@osrs-tracker/models';
 import { describe, expect, it } from 'vitest';
-import { buildRefreshUpdate, needsRefresh, playerMaxAgeSeconds } from './player.policy';
+import { buildLookupUpdate, buildRefreshUpdate, needsRefresh, playerMaxAgeSeconds } from './player.policy';
 
 const NOW = new Date('2026-10-08T12:00:00Z');
 const minutesAgo = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000);
@@ -58,6 +58,24 @@ describe('needsRefresh', () => {
 
   it("doesn't refresh a fresh, tracked player", () => {
     expect(needsRefresh(player({ scrapingOffsets: [-5, 0] }), 0, NOW)).toBe(false);
+  });
+});
+
+describe('buildLookupUpdate', () => {
+  it('sets the lookup date for a negative offset, keyed by the offset as a string', () => {
+    expect(buildLookupUpdate(-12, NOW)).toEqual({
+      $set: { 'lastHiscoreFetch': NOW, 'scrapingOffsetLookups.-12': NOW },
+    });
+  });
+
+  it('sets the lookup date for offset 0', () => {
+    expect(buildLookupUpdate(0, NOW)).toEqual({ $set: { 'lastHiscoreFetch': NOW, 'scrapingOffsetLookups.0': NOW } });
+  });
+
+  it("only sets that offset's date (a dotted path), leaving the other offsets' dates alone", () => {
+    const { $set } = buildLookupUpdate(3, NOW);
+
+    expect(Object.keys($set ?? {})).toEqual(['lastHiscoreFetch', 'scrapingOffsetLookups.3']);
   });
 });
 

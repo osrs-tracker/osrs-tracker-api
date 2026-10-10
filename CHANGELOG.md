@@ -10,6 +10,10 @@
   under its name without an update. Entries are stored by position in a layout (the names Jagex used, in the new
   `hiscoreLayouts` collection, cached in memory) and a value that didn't change since the next newer entry as its bare
   rank. Uses `@osrs-tracker/models` 2.0.0 and `@osrs-tracker/hiscores` 4.0.0.
+- `POST /players/:username/lookup` also records when each scraping offset was last looked up (`scrapingOffsetLookups`),
+  so the clean-hiscores Lambda can stop scraping an offset nobody has looked up for 180 days
+  (osrs-tracker/osrs-tracker-aws#70, #126). Bots and `GET` requests still record nothing; responses are unchanged. Uses
+  `@osrs-tracker/models` 2.3.0.
 
 ### Behind the scenes
 
