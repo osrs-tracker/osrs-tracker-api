@@ -14,8 +14,9 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 - A `git push` blocked by Claude's pre-push hook (a Claude Code hook, not a git hook): run `npm run lint` and
   `npm run prettier` (both fix what they can), fix the rest by hand, commit and push again.
 - Worktrees in `.claude/worktrees/` use the main checkout's `node_modules` (found in a parent folder); run `npm ci` in
-  one only when its `package.json` changes. They have no `.env` (`start:dev` then fails listing the missing vars): link
-  the main checkout's with `ln -s ../../../.env .env` and remove the link when done. Other sessions share port 3000:
+  one only when its `package.json` changes, and in the main checkout after pulling a dependency change (else new
+  worktrees build against the old packages). Claude Code copies the main checkout's `.env` into the worktrees it creates
+  (`.worktreeinclude`); a copy, so later edits to `.env` don't reach existing ones. Other sessions share port 3000:
   check `ss -ltn | grep :3000` before `npm run start:dev`, and stop it when done.
 
 ## Hard rules
