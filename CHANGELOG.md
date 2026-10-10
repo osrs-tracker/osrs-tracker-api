@@ -16,7 +16,8 @@
 - The combat level and total xp read skills with `@osrs-tracker/models` 2.1.0's `skillLevel` and `overallOf` (with
   `@osrs-tracker/hiscores` 4.1.0) instead of the API's own copies of those rules. Nothing visible changes.
 - Claude Code copies `.env` into the worktrees it creates (`.worktreeinclude`), so a session in a worktree can run
-  `npm run start:dev` without linking it by hand (#122).
+  `npm run start:dev` without linking it by hand (#122). `CLAUDE.md` says where the sibling repos (`../<repo>`) are from
+  a worktree.
 
 ## 2026/10/09
 

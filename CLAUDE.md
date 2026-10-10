@@ -2,6 +2,8 @@
 
 NestJS + MongoDB Atlas (native driver) API, deployed to Kubernetes at https://osrs-tracker-api.freekmencke.com. Main
 consumer: the Angular SSR app in `../osrs-tracker-web`; `../osrs-tracker-aws` Lambdas also write to the same database.
+`../<repo>` in these docs (and the skill and agents) means a sibling of the main checkout; from a worktree in
+`.claude/worktrees/<name>/` that's `../../../../<repo>`.
 
 **Load the `osrs-tracker-api` skill before writing, reviewing, running, deploying or committing anything here.** It
 holds the Cache-Control, param validation, route doc comment, Mongo, player pause/resume, logging, resilience and test
