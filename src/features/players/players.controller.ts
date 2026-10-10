@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   DefaultValuePipe,
   Get,
@@ -9,6 +10,7 @@ import {
   NotFoundException,
   Param,
   ParseBoolPipe,
+  ParseEnumPipe,
   Post,
   Query,
   Req,
@@ -23,12 +25,16 @@ import { ParseIntRangeOptions, ParseIntRangePipe } from '../../common/pipes/pars
 import { ParseScrapingOffsetPipe } from './parse-scraping-offset.pipe';
 import { ParseUsernamePipe } from './parse-username.pipe';
 import { needsRefresh, playerMaxAgeSeconds } from './player.policy';
-import { PlayersService } from './players.service';
+import { PlayersService, RECENT_PLAYERS_ENTRY, type RecentPlayersEntry } from './players.service';
 
 const LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 5 };
 const SIZE: ParseIntRangeOptions = { min: 1, max: 100, default: 7 };
 // A cap far above a player's entries per offset (clean-hiscores keeps 60 days), and within the 32 bits `$slice` takes
 const SKIP: ParseIntRangeOptions = { min: 0, max: 10_000, default: 0 };
+const ENTRY = new ParseEnumPipe(RECENT_PLAYERS_ENTRY, {
+  optional: true,
+  exceptionFactory: () => new BadRequestException(`Entry must be 'overall'.`),
+});
 
 @Controller('players')
 export class PlayersController {
@@ -38,16 +44,18 @@ export class PlayersController {
 
   /**
    * The most recently looked up players, newest first, each with `hiscoreEntries` holding at most its newest entry (for
-   * `scrapingOffset` when given; any offset when absent). 400 when a param is out of range. `REVALIDATE` on every
-   * response.
+   * `scrapingOffset` when given; any offset when absent). `entry=overall` cuts that entry to its `date`,
+   * `scrapingOffset` and `skills.Overall`, with `activities: {}` (the web's recent players rows); without it, the entry
+   * is whole. 400 when a param is out of range or `entry` isn't `overall`. `REVALIDATE` on every response.
    */
   @Get('')
   @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
   getRecentPlayers(
     @Query('limit', new ParseIntRangePipe(LIMIT)) limit: number,
     @Query('scrapingOffset', new ParseScrapingOffsetPipe({ optional: true })) scrapingOffset?: number,
+    @Query('entry', ENTRY) entry?: RecentPlayersEntry,
   ) {
-    return this.playersService.getLastFetchedPlayers(limit, scrapingOffset);
+    return this.playersService.getLastFetchedPlayers(limit, scrapingOffset, entry);
   }
 
   /**

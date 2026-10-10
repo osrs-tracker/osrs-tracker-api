@@ -19,6 +19,11 @@
   streak and with a hiscore entry in the last 30 days, with `lastEntry` the date of its newest entry (about 530
   players). Not under `/players/`, where `sitemap` is a player's name. `Cache-Control: public, max-age=3600`.
 
+- `GET /players` takes `entry=overall` (#132, osrs-tracker/osrs-tracker-web#202): each player's newest entry comes back
+  with only its `date`, `scrapingOffset` and `skills.Overall` (`activities: {}`), about 2 KB for 6 players instead of 28
+  KB, for the web's recent players rows, which are embedded in the SSR pages. Without it the response is unchanged; any
+  other value is a 400.
+
 ### Items
 
 - New `GET /items/browse/:letter` for the web app's A–Z item pages (#119, osrs-tracker/osrs-tracker-web#168): every item

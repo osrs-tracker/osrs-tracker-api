@@ -8,6 +8,7 @@ import {
   HiscoreLayoutNames,
   Player,
   PlayerType,
+  SkillEnum,
   StoredPlayer,
 } from '@osrs-tracker/models';
 import { LRUCache } from 'lru-cache';
@@ -28,6 +29,21 @@ type PartialHiscoreEntry = Pick<HiscoreEntry, 'skills' | 'activities'>;
 class HiscoreFailedError extends Error {}
 
 export type RefreshResult = 'refreshed' | 'notFound' | 'failed';
+
+/** How much of each player's entry `getLastFetchedPlayers` returns: `overall` keeps only Overall (the web's rows). */
+export const RECENT_PLAYERS_ENTRY = { Overall: 'overall' } as const;
+export type RecentPlayersEntry = (typeof RECENT_PLAYERS_ENTRY)[keyof typeof RECENT_PLAYERS_ENTRY];
+
+/** The entry with only its Overall skill and no activities, still a valid `HiscoreEntry`. */
+export function toOverallEntry({ date, scrapingOffset, skills }: HiscoreEntry): HiscoreEntry {
+  const overall = skills[SkillEnum.Overall];
+  return {
+    date,
+    scrapingOffset,
+    skills: overall === undefined ? {} : { [SkillEnum.Overall]: overall },
+    activities: {},
+  };
+}
 
 type PlayerStatusAndType =
   | { status: 'found'; player: Player; partialHiscoreEntry: PartialHiscoreEntry; layout: HiscoreLayoutNames }
@@ -177,9 +193,9 @@ export class PlayersService {
 
   /**
    * Returns the most recently looked up players with their newest hiscore entry, for `scrapingOffset` when given or for
-   * any offset otherwise.
+   * any offset otherwise; with `entry`, cut to that part (`RECENT_PLAYERS_ENTRY`).
    */
-  async getLastFetchedPlayers(limit: number, scrapingOffset?: number): Promise<Player[]> {
+  async getLastFetchedPlayers(limit: number, scrapingOffset?: number, entry?: RecentPlayersEntry): Promise<Player[]> {
     const players = await this.collection
       .aggregate<StoredPlayer>(
         [
@@ -219,10 +235,13 @@ export class PlayersService {
 
     // Each player's first entry is the newest for its offset, so always stored in full
     return Promise.all(
-      players.map(async (player) => ({
-        ...player,
-        hiscoreEntries: await this.layouts.decode(player.hiscoreEntries ?? []),
-      })),
+      players.map(async (player) => {
+        const hiscoreEntries = await this.layouts.decode(player.hiscoreEntries ?? []);
+        return {
+          ...player,
+          hiscoreEntries: entry === RECENT_PLAYERS_ENTRY.Overall ? hiscoreEntries.map(toOverallEntry) : hiscoreEntries,
+        };
+      }),
     );
   }
 

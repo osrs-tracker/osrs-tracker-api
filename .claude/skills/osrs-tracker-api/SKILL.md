@@ -238,7 +238,8 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   - `players.service.spec.ts` (real `ResilienceModule` with production's preset, `undici`'s `fetch` mocked): normal
     table first, shared in-flight lookups, the preview's not-found cache, the concurrency cap in FIFO order, the queue
     bound and queue timeout (no warning per refusal), the breaker opening on failures but not on not-found players; a
-    hiscores page read from the newest entry so its bare values resolve, and the layout stored before the entry.
+    hiscores page read from the newest entry so its bare values resolve, the recent players' entry whole or Overall only
+    (`entry=overall`), and the layout stored before the entry.
   - `news.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock): shared in-flight
     fetches, the stale feed's 60s retry, the 503 and a 404 not cached; the image size limit against a local server with
     the real `fetch` and `IMAGE_AGENT` (503, its log line, `identity`), and an oversized `content-length` refused
