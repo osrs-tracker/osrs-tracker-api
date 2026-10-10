@@ -18,6 +18,7 @@ import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { Env } from '../../config/env';
 import { HiscoreLayoutsService } from './hiscore-layouts.service';
 import { JAGEX_HISCORES, NOT_FOUND_CACHE_MAX, NOT_FOUND_CACHE_TTL_MS } from './player.config';
+import { buildSitemapPlayersPipeline, SitemapPlayer } from './player-sitemap';
 import { buildLookupUpdate, buildRefreshUpdate } from './player.policy';
 import { PlayerUtils } from './player.utils';
 
@@ -167,6 +168,11 @@ export class PlayersService {
     await this.collection.updateOne({ username: username }, buildLookupUpdate(scrapingOffset, new Date()), {
       hint: { username: 1 },
     });
+  }
+
+  /** The tracked players for the web app's sitemap (`buildSitemapPlayersPipeline`). */
+  getSitemapPlayers(now: Date): Promise<SitemapPlayer[]> {
+    return this.collection.aggregate<SitemapPlayer>(buildSitemapPlayersPipeline(now)).toArray();
   }
 
   /**

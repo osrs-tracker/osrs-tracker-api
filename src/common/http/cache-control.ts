@@ -8,6 +8,10 @@ export const CACHE_CONTROL = {
   NEWS: 'public, max-age=300',
   NEWS_IMAGE: 'public, max-age=604800',
   ITEM_SEARCH: 'public, max-age=3600',
+  /** Item browse: the items collection changes at most daily. */
+  ITEM_BROWSE: 'public, max-age=86400',
+  /** The player sitemap, read by the web app's build. */
+  PLAYER_SITEMAP: 'public, max-age=3600',
   /** A player lookup that couldn't refresh the stored player: retry the refresh soon. */
   PLAYER_REFRESH_FAILED: 'max-age=60',
   /** A player lookup that just refreshed the player: 15 minutes, `PLAYER_MAX_AGE_SECONDS` in `player.policy.ts`. */
