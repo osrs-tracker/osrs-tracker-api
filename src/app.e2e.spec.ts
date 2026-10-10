@@ -16,7 +16,8 @@ import { COMBAT_SKILLS } from './features/players/player.utils';
 /**
  * Boots the whole app against a fake database and a fake Jagex, and checks the skill's Cache-Control rules for every
  * GET route: each sends a deliberate `Cache-Control` without `no-store`, `no-cache` or `private` (the web app's SSR
- * transfer cache drops those), and never writes to the database.
+ * transfer cache drops those), and never writes to the database. Also checks that the POST lookup records nothing for a
+ * bot, and the request IDs.
  */
 
 const { fakeFetch, logLines } = vi.hoisted(() => {
@@ -253,6 +254,32 @@ describe('GET routes', () => {
     expect(response.status).toBe(status);
     expect(response.headers.get('cache-control')).toBe(cacheControl);
     expect(collectionCalls.filter((call) => !READ_METHODS.has(call.split('.')[1]))).toEqual([]);
+  });
+
+  describe('POST /players/:username/lookup', () => {
+    const lookup = (userAgent?: string) =>
+      fetch(`${baseUrl}/players/toxsick/lookup?scrapingOffset=-12`, {
+        method: 'POST',
+        headers: userAgent ? { 'User-Agent': userAgent } : {},
+      });
+
+    it('records nothing for a bot', async () => {
+      fakes = { docs: [storedPlayer] };
+
+      const response = await lookup('Googlebot/2.1 (+http://www.google.com/bot.html)');
+
+      expect(response.status).toBe(204);
+      expect(collectionCalls).toEqual([]);
+    });
+
+    it("records a visitor's lookup of a stored player", async () => {
+      fakes = { docs: [{ ...storedPlayer, scrapingOffsets: [-12] }] };
+
+      const response = await lookup('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/140.0');
+
+      expect(response.status).toBe(200);
+      expect(collectionCalls).toContain('players.updateOne');
+    });
   });
 
   describe('request ID', () => {
