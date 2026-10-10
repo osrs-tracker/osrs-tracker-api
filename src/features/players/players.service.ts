@@ -170,15 +170,15 @@ export class PlayersService {
     });
   }
 
-  /**
-   * Returns the most recently looked up players with their newest hiscore entry, for `scrapingOffset` when given or for
-   * any offset otherwise.
-   */
   /** The tracked players for the web app's sitemap (`buildSitemapPlayersPipeline`). */
   getSitemapPlayers(now: Date): Promise<SitemapPlayer[]> {
     return this.collection.aggregate<SitemapPlayer>(buildSitemapPlayersPipeline(now)).toArray();
   }
 
+  /**
+   * Returns the most recently looked up players with their newest hiscore entry, for `scrapingOffset` when given or for
+   * any offset otherwise.
+   */
   async getLastFetchedPlayers(limit: number, scrapingOffset?: number): Promise<Player[]> {
     const players = await this.collection
       .aggregate<StoredPlayer>(
