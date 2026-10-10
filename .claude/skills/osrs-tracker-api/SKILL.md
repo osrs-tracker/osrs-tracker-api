@@ -149,9 +149,17 @@ e2e spec: `ROUTE_CONFLICT_POLICY` (`config/app-options.ts`, `error` for both kin
 
 ## Mongo pipeline updates
 
-Wrap player data and user input in `$literal` (strings starting with `$` read as field paths). Prepend `hiscoreEntries`
-with `$concatArrays` (stored newest first), merge offsets with `$setUnion`, keep `upsert`/`hint`. The refresh update is
-built by `buildRefreshUpdate` in `players/player.policy.ts`, so it can be tested without Mongo.
+Wrap player data and user input in `$literal` (strings starting with `$` read as field paths). Merge offsets with
+`$setUnion`, keep `upsert`/`hint`. The refresh update is built by `buildRefreshUpdate` in `players/player.policy.ts`, so
+it can be tested without Mongo.
+
+`hiscoreEntries` are stored compactly (`{ d, o, l, s, a }`, newest first; the format, layouts and bare values are in
+models and roadmap osrs-tracker-aws#52): write one only with models' `encodeHiscoreEntry` and
+`hiscoreEntriesWriteExpression` (prepends, and reduces unchanged values in the previous entry for that offset and layout
+to their bare rank), after `HiscoreLayoutsService.ensure` stored its layout; read them only through
+`HiscoreLayoutsService.decode` (loads and caches the `hiscoreLayouts` they use). Only the newest entry per offset is
+stored in full, so a page of entries is read from the newest (`$slice: [0, skip + size]`) and cut after decoding. Read
+skills by name (`SkillEnum`), never by position, and never loop over the enums.
 
 Concurrent lookups of one name share one hiscore result and then each run the update, so: decide anything that depends
 on the stored document inside the pipeline (like prepending the initial entry only when `$scrapingOffsets` lacks the
@@ -218,13 +226,15 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     (`nest-logger.spec.ts`); outgoing lines' `type` and `requestId` (`logger.spec.ts`, a local server and `undici`'s
     real `fetch`); `ThrottledWarning`.
   - `players/`: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the refresh update's
-    pause/resume, `$literal`, and the initial entry prepended only for a new offset (`buildRefreshUpdate`); combat
-    level, type and status (`PlayerUtils`; a hiscore without the combat skills counts as failed, `hasCombatSkills`).
+    pause/resume, `$literal`, and the initial entry written only for a new offset (`buildRefreshUpdate`); combat level,
+    type and status (`PlayerUtils`; a hiscore without a combat skill's key counts as failed, a `null` one doesn't,
+    `hasCombatSkills`); the layout cache, upsert and collision check (`hiscore-layouts.service.spec.ts`).
   - The validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for
     `limit`, `size`, `skip` and IDs).
   - `players.service.spec.ts` (real `ResilienceModule` with production's preset, `undici`'s `fetch` mocked): normal
     table first, shared in-flight lookups, the preview's not-found cache, the concurrency cap in FIFO order, the queue
-    bound and queue timeout (no warning per refusal), the breaker opening on failures but not on not-found players.
+    bound and queue timeout (no warning per refusal), the breaker opening on failures but not on not-found players; a
+    hiscores page read from the newest entry so its bare values resolve, and the layout stored before the entry.
   - `news.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock): shared in-flight
     fetches, the stale feed's 60s retry, the 503 and a 404 not cached; the image size limit against a local server with
     the real `fetch` and `IMAGE_AGENT` (503, its log line, `identity`), and an oversized `content-length` refused

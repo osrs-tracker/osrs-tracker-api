@@ -1,3 +1,16 @@
+## 2026/10/10
+
+### Players
+
+- Hiscore entries are stored in about an eighth of the space (roadmap osrs-tracker/osrs-tracker-aws#52), and the player
+  responses change shape with them: in `GET /players/:username`, `GET /players/:username/hiscores`, `GET /players` and
+  `POST /players/:username/lookup`, an entry's `skills` and `activities` are objects keyed by name (`"Attack"`,
+  `"Clue Scrolls (all)"`) instead of Jagex's arrays with `id`s; an unranked skill or activity with a value has
+  `rank: null` instead of `-1`, and one without a value is `null`. A skill or activity Jagex adds is stored and returned
+  under its name without an update. Entries are stored by position in a layout (the names Jagex used, in the new
+  `hiscoreLayouts` collection, cached in memory) and a value that didn't change since the next newer entry as its bare
+  rank. Uses `@osrs-tracker/models` 2.0.0 and `@osrs-tracker/hiscores` 4.0.0.
+
 ## 2026/10/09
 
 ### Responses

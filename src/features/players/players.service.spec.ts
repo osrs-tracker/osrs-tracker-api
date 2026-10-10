@@ -2,6 +2,15 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ResilienceModule, ResilienceService } from '@nestjs/resilience';
 import { Test } from '@nestjs/testing';
+import {
+  createHiscoreLayout,
+  encodeHiscoreEntry,
+  HiscoreEntry,
+  levelForXp,
+  StoredHiscoreEntry,
+  stripUnchangedValues,
+} from '@osrs-tracker/models';
+import { Document } from 'mongodb';
 import { fetch } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
 import { AGENT } from '../../common/agent/agent.provider';
@@ -13,6 +22,8 @@ import {
   MAX_CONCURRENT_HISCORE_REQUESTS,
   MAX_QUEUED_HISCORE_REQUESTS,
 } from './player.config';
+import { HISCORE_LAYOUTS_COLLECTION, HiscoreLayoutsService } from './hiscore-layouts.service';
+import { COMBAT_SKILLS } from './player.utils';
 import { PlayersService } from './players.service';
 
 vi.mock('undici', async (importOriginal) => ({
@@ -25,8 +36,8 @@ const mockFetch = vi.mocked(fetch);
 /** What the fake Jagex answers: a player on the table, a 404, or a 503. */
 type Answer = 'found' | 'notFound' | 'failed';
 
-/** Overall and the seven combat skills, enough for the combat level. */
-const skills = Array.from({ length: 8 }, (_, id) => ({ id, name: `Skill ${id}`, rank: 1, level: 10, xp: 1000 }));
+/** Jagex's JSON for Overall and the seven combat skills, enough for the combat level. */
+const skills = COMBAT_SKILLS.map((name, id) => ({ id, name, rank: 1, level: 10, xp: 1000 }));
 
 function response(answer: Answer, body: unknown = { name: 'player', skills, activities: [] }) {
   const status = { found: 200, notFound: 404, failed: 503 }[answer];
@@ -87,6 +98,7 @@ describe('PlayersService hiscore lookups', () => {
         PlayersService,
         { provide: AGENT, useValue: {} },
         { provide: MONGODB_DATABASE, useValue: {} }, // Previews never touch the database
+        { provide: HiscoreLayoutsService, useValue: {} }, // Nor its layouts
         { provide: ConfigService, useValue: { get: () => 'https://secure.runescape.com' } },
       ],
     }).compile();
@@ -232,5 +244,80 @@ describe('PlayersService hiscore lookups', () => {
 
     expect(resilience.circuitBreaker(JAGEX_HISCORES).state).toBe('closed');
     expect(resilience.circuitBreaker(JAGEX_HISCORES).stats).toMatchObject({ total: 20, failures: 9 });
+  });
+});
+
+describe('PlayersService stored hiscore entries', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const layout = createHiscoreLayout({ skills: [...COMBAT_SKILLS], activities: ['Clue Scrolls (all)'] }, new Date(0));
+  /** A domain entry where every skill has `xp` (levels as `decode` derives them) and the activity `score`. */
+  const entry = (day: number, xp: number, score: number): HiscoreEntry => ({
+    date: new Date(day * DAY_MS),
+    scrapingOffset: 0,
+    skills: Object.fromEntries(COMBAT_SKILLS.map((name) => [name, { rank: 5, level: levelForXp(xp), xp }])),
+    activities: { 'Clue Scrolls (all)': { rank: 7, score } },
+  });
+
+  let service: PlayersService;
+  let calls: string[];
+  let storedEntries: StoredHiscoreEntry[];
+  let pipeline: Document[];
+
+  beforeEach(async () => {
+    mockFetch.mockReset();
+    calls = [];
+    const players = {
+      aggregate: (stages: Document[]) => {
+        pipeline = stages;
+        const [, position, n] = stages[1].$project.hiscoreEntries.$slice as [unknown, number, number]; // What MongoDB's `$slice` returns
+        return { next: async () => ({ hiscoreEntries: storedEntries.slice(position, position + n) }) };
+      },
+      updateOne: async () => {
+        calls.push('players.updateOne');
+        return { upsertedCount: 1, matchedCount: 0 };
+      },
+    };
+    const layouts = {
+      findOne: async () => layout,
+      findOneAndUpdate: async ({ _id }: { _id: number }, { $setOnInsert }: Document) => {
+        calls.push('hiscoreLayouts.findOneAndUpdate');
+        return { _id, ...$setOnInsert };
+      },
+    };
+    const moduleRef = await Test.createTestingModule({
+      imports: [ResilienceModule.forRoot({ mapErrors: false, presets: { [JAGEX_HISCORES]: JAGEX_HISCORES_PRESET } })],
+      providers: [
+        PlayersService,
+        HiscoreLayoutsService,
+        { provide: AGENT, useValue: {} },
+        {
+          provide: MONGODB_DATABASE,
+          useValue: { collection: (name: string) => (name === HISCORE_LAYOUTS_COLLECTION ? layouts : players) },
+        },
+        { provide: ConfigService, useValue: { get: () => 'https://secure.runescape.com' } },
+      ],
+    }).compile();
+    service = moduleRef.get(PlayersService);
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('reads a page from the newest entry, so its bare values resolve from entries before the page', async () => {
+    const [newest, middle, oldest] = [entry(3, 2000, 10), entry(2, 2000, 10), entry(1, 1000, 10)].map((e) =>
+      encodeHiscoreEntry(e, layout),
+    );
+    // As the write expression leaves them: each older entry stripped against the one written after it
+    storedEntries = [newest, stripUnchangedValues(newest, middle), stripUnchangedValues(middle, oldest)];
+
+    const page = await service.getPlayerHiscores('toxsick', 0, 1, 1);
+
+    expect(pipeline[1].$project.hiscoreEntries.$slice.slice(1)).toEqual([0, 2]);
+    expect(page).toEqual([entry(2, 2000, 10)]);
+  });
+
+  it('stores the layout before the entry that uses it', async () => {
+    answerWith('found');
+    expect(await service.refreshPlayerInfo('toxsick', 0)).toBe('refreshed');
+    expect(calls).toEqual(['hiscoreLayouts.findOneAndUpdate', 'players.updateOne']);
   });
 });
