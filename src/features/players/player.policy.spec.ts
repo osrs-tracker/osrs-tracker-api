@@ -1,4 +1,10 @@
-import { HiscoreEntry, Player, PlayerStatus, PlayerType } from '@osrs-tracker/models';
+import {
+  hiscoreEntriesWriteExpression,
+  Player,
+  PlayerStatus,
+  PlayerType,
+  StoredHiscoreEntry,
+} from '@osrs-tracker/models';
 import { describe, expect, it } from 'vitest';
 import { buildRefreshUpdate, needsRefresh, playerMaxAgeSeconds } from './player.policy';
 
@@ -56,9 +62,9 @@ describe('needsRefresh', () => {
 });
 
 describe('buildRefreshUpdate', () => {
-  const entry: HiscoreEntry = { scrapingOffset: 0, date: NOW, skills: [], activities: [] };
+  const entry: StoredHiscoreEntry = { d: NOW, o: 0, l: 1, s: [], a: [] };
 
-  it('resumes a paused player, adds the offset and prepends the initial entry when the offset is new', () => {
+  it('resumes a paused player, adds the offset and writes the compact initial entry when the offset is new', () => {
     const refreshed = player({ username: 'toxsick', lastModified: NOW });
 
     expect(buildRefreshUpdate(refreshed, entry, 3)).toEqual([
@@ -77,7 +83,7 @@ describe('buildRefreshUpdate', () => {
             $cond: [
               { $in: [3, { $ifNull: ['$scrapingOffsets', []] }] },
               '$hiscoreEntries',
-              { $concatArrays: [[{ $literal: entry }], { $ifNull: ['$hiscoreEntries', []] }] },
+              hiscoreEntriesWriteExpression(entry),
             ],
           },
         },
