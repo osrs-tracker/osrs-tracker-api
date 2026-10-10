@@ -2,13 +2,21 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BulkheadFullError, CircuitOpenError, ResiliencePolicy, ResilienceService } from '@nestjs/resilience';
 import { getHiscore, HiscoreResult } from '@osrs-tracker/hiscores';
-import { HiscoreEntry, Player, PlayerType } from '@osrs-tracker/models';
+import {
+  encodeHiscoreEntry,
+  HiscoreEntry,
+  HiscoreLayoutNames,
+  Player,
+  PlayerType,
+  StoredPlayer,
+} from '@osrs-tracker/models';
 import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
 import { Agent, fetch } from 'undici';
 import { AGENT } from '../../common/agent/agent.provider';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { Env } from '../../config/env';
+import { HiscoreLayoutsService } from './hiscore-layouts.service';
 import { JAGEX_HISCORES, NOT_FOUND_CACHE_MAX, NOT_FOUND_CACHE_TTL_MS } from './player.config';
 import { buildRefreshUpdate } from './player.policy';
 import { PlayerUtils } from './player.utils';
@@ -21,7 +29,8 @@ class HiscoreFailedError extends Error {}
 export type RefreshResult = 'refreshed' | 'notFound' | 'failed';
 
 type PlayerStatusAndType =
-  { status: 'found'; player: Player; partialHiscoreEntry: PartialHiscoreEntry } | { status: 'notFound' | 'failed' };
+  | { status: 'found'; player: Player; partialHiscoreEntry: PartialHiscoreEntry; layout: HiscoreLayoutNames }
+  | { status: 'notFound' | 'failed' };
 
 /** Usernames passed in are expected normalized, as `ParseUsernamePipe` returns them. */
 @Injectable()
@@ -42,7 +51,7 @@ export class PlayersService {
     ttl: NOT_FOUND_CACHE_TTL_MS,
   });
 
-  get collection(): Collection<Player> {
+  get collection(): Collection<StoredPlayer> {
     return this.db.collection(this.COLLECTION_NAME);
   }
 
@@ -50,6 +59,7 @@ export class PlayersService {
     @Inject(AGENT) private readonly agent: Agent,
     @Inject(MONGODB_DATABASE) private readonly db: Db,
     private readonly config: ConfigService<Env, true>,
+    private readonly layouts: HiscoreLayoutsService,
     resilience: ResilienceService,
   ) {
     this.hiscoresPolicy = resilience.preset(JAGEX_HISCORES);
@@ -60,7 +70,7 @@ export class PlayersService {
     scrapingOffset: number,
     includeLatestHiscoreEntry: boolean,
   ): Promise<Player | null> {
-    const player = await this.collection.findOne<Player>(
+    const player = await this.collection.findOne<StoredPlayer>(
       { username: username },
       {
         hint: { username: 1 },
@@ -74,20 +84,20 @@ export class PlayersService {
           type: 1,
           scrapingOffsets: 1,
           pausedScrapingOffsets: 1, // Still tracked (they have a history), resumed by the next successful refresh
-          ...(includeLatestHiscoreEntry ? { hiscoreEntries: { $elemMatch: { scrapingOffset } } } : {}),
+          ...(includeLatestHiscoreEntry ? { hiscoreEntries: { $elemMatch: { o: scrapingOffset } } } : {}),
           // Date of the oldest stored entry for this offset (entries are stored newest first). The clean-hiscores Lambda
           // removes entries older than MAX_AGE_IN_DAYS, so this is where the history starts, not when tracking started.
           trackedSince: {
             $ifNull: [
               {
                 $getField: {
-                  field: 'date',
+                  field: 'd',
                   input: {
                     $last: {
                       $filter: {
                         input: { $ifNull: ['$hiscoreEntries', []] },
                         as: 'entry',
-                        cond: { $eq: ['$$entry.scrapingOffset', scrapingOffset] },
+                        cond: { $eq: ['$$entry.o', scrapingOffset] },
                       },
                     },
                   },
@@ -100,9 +110,13 @@ export class PlayersService {
       },
     );
 
-    if (includeLatestHiscoreEntry && player) return { ...player, hiscoreEntries: player.hiscoreEntries ?? [] };
+    if (!player) return null;
 
-    return player;
+    const { hiscoreEntries, ...rest } = player;
+    // The newest entry for an offset is always stored in full, so it decodes on its own
+    return includeLatestHiscoreEntry
+      ? { ...rest, hiscoreEntries: await this.layouts.decode(hiscoreEntries ?? []) }
+      : rest;
   }
 
   async getPlayerHiscores(
@@ -111,9 +125,8 @@ export class PlayersService {
     size: number,
     skip: number,
   ): Promise<HiscoreEntry[] | null> {
-    // Retrieve the player's hiscores
     const player = await this.collection
-      .aggregate<Player>(
+      .aggregate<StoredPlayer>(
         [
           { $match: { username: username } },
           {
@@ -126,11 +139,12 @@ export class PlayersService {
                     $filter: {
                       input: '$hiscoreEntries',
                       as: 'entry',
-                      cond: { $eq: ['$$entry.scrapingOffset', scrapingOffset] },
+                      cond: { $eq: ['$$entry.o', scrapingOffset] },
                     },
                   },
-                  skip,
-                  size,
+                  // From the newest: an unchanged value is stored as a bare rank, resolved from a newer entry
+                  0,
+                  skip + size,
                 ],
               },
             },
@@ -140,7 +154,9 @@ export class PlayersService {
       )
       .next();
 
-    return player?.hiscoreEntries ?? null;
+    if (!player?.hiscoreEntries) return null;
+
+    return (await this.layouts.decode(player.hiscoreEntries)).slice(skip);
   }
 
   /** Records a visitor's lookup for the recent players list. Doesn't create unknown players. */
@@ -158,7 +174,7 @@ export class PlayersService {
    */
   async getLastFetchedPlayers(limit: number, scrapingOffset?: number): Promise<Player[]> {
     const players = await this.collection
-      .aggregate<Player>(
+      .aggregate<StoredPlayer>(
         [
           { $match: { lastHiscoreFetch: { $exists: true } } }, // Ensure lastHiscoreFetch exists
           { $sort: { lastHiscoreFetch: -1 } }, // Sort by lastHiscoreFetch in descending order
@@ -181,7 +197,7 @@ export class PlayersService {
                         $filter: {
                           input: { $ifNull: ['$hiscoreEntries', []] },
                           as: 'entry',
-                          cond: { $eq: ['$$entry.scrapingOffset', scrapingOffset] },
+                          cond: { $eq: ['$$entry.o', scrapingOffset] },
                         },
                       },
                   1,
@@ -194,10 +210,13 @@ export class PlayersService {
       )
       .toArray();
 
-    return players.map((player) => ({
-      ...player,
-      hiscoreEntries: player.hiscoreEntries ?? [],
-    }));
+    // Each player's first entry is the newest for its offset, so always stored in full
+    return Promise.all(
+      players.map(async (player) => ({
+        ...player,
+        hiscoreEntries: await this.layouts.decode(player.hiscoreEntries ?? []),
+      })),
+    );
   }
 
   /**
@@ -255,17 +274,19 @@ export class PlayersService {
 
     if (result.status !== 'found') return result.status;
 
-    const { player, partialHiscoreEntry } = result;
+    const { player, partialHiscoreEntry, layout } = result;
 
     const hiscoreEntry: HiscoreEntry = {
       scrapingOffset,
       date: new Date(),
       ...partialHiscoreEntry,
     };
+    // Stores the layout before the entry that refers to it
+    const storedEntry = encodeHiscoreEntry(hiscoreEntry, await this.layouts.ensure(layout));
 
     const { upsertedCount, matchedCount } = await this.collection.updateOne(
       { username: player.username },
-      buildRefreshUpdate(player, hiscoreEntry, scrapingOffset),
+      buildRefreshUpdate(player, storedEntry, scrapingOffset),
       {
         upsert: true,
         hint: { username: 1 },
@@ -318,8 +339,8 @@ export class PlayersService {
         diedAsHardcore: PlayerUtils.getTotalXp(hardcore) < PlayerUtils.getTotalXp(ironman),
         lastModified: new Date(),
       } as Player,
-      // Only what the model stores, like process-players (the hiscores JSON also echoes the queried `name`).
       partialHiscoreEntry: { skills: normal.skills, activities: normal.activities },
+      layout: normalResult.layout,
     };
   }
 
@@ -340,10 +361,10 @@ export class PlayersService {
             fetch(url, { ...init, dispatcher: this.agent, signal: AbortSignal.any([init.signal, signal]) }),
         });
 
-        // The package only checks that `skills` is an array: a truncated hiscore would break the combat level (500) or
-        // store a wrong one, so it counts as failed like any other bad response
+        // The package only checks that `skills` is an array: a truncated hiscore would store a wrong combat level, so it
+        // counts as failed like any other bad response
         if (result.status === 'found' && !PlayerUtils.hasCombatSkills(result.hiscore.skills)) {
-          throw new HiscoreFailedError(`${result.hiscore.skills.length} skills, missing combat skills`);
+          throw new HiscoreFailedError('missing combat skills');
         }
         if (result.status === 'failed') throw new HiscoreFailedError(result.reason);
 

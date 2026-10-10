@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { createHiscoreLayout, encodeHiscoreEntry } from '@osrs-tracker/models';
 import { Server } from 'node:http';
 import { AddressInfo } from 'node:net';
 import sharp from 'sharp';
@@ -9,6 +10,8 @@ import { AGENT, IMAGE_AGENT } from './common/agent/agent.provider';
 import { CACHE_CONTROL } from './common/http/cache-control';
 import { MONGO_CLIENT, MONGODB_DATABASE } from './common/mongo/mongo.provider';
 import { ROUTE_CONFLICT_POLICY } from './config/app-options';
+import { HISCORE_LAYOUTS_COLLECTION } from './features/players/hiscore-layouts.service';
+import { COMBAT_SKILLS } from './features/players/player.utils';
 
 /**
  * Boots the whole app against a fake database and a fake Jagex, and checks the skill's Cache-Control rules for every
@@ -45,7 +48,7 @@ const READ_METHODS = new Set(['find', 'findOne', 'aggregate', 'countDocuments', 
 
 /** What the fake database and fake Jagex answer for one request. */
 interface Fakes {
-  /** Documents every `find`, `findOne` and `aggregate` returns, whatever the collection or query. */
+  /** Documents every `find`, `findOne` and `aggregate` returns, whatever the query (`hiscoreLayouts` answers `LAYOUT`). */
   docs?: object[];
   /** The four hiscore tables: all found, or all failing. */
   hiscores?: 'found' | 'failed';
@@ -65,6 +68,17 @@ const storedPlayer = {
   scrapingOffsets: [0],
 };
 const item = { id: 4151, name: 'Abyssal whip', icon: 'whip.png' };
+const LAYOUT = createHiscoreLayout({ skills: [...COMBAT_SKILLS], activities: [] }, new Date(0));
+/** A stored hiscore entry, so reading it also loads its layout. */
+const storedEntry = encodeHiscoreEntry(
+  {
+    date: new Date(),
+    scrapingOffset: 0,
+    skills: Object.fromEntries(COMBAT_SKILLS.map((name) => [name, { rank: 1, level: 10, xp: 1200 }])),
+    activities: {},
+  },
+  LAYOUT,
+);
 
 /**
  * One or more requests per GET route, keyed by the route's path as Nest registers it: one per outcome that sends its
@@ -93,7 +107,7 @@ const CASES: Record<string, Case[]> = {
   '/players/:username/hiscores': [
     {
       url: '/players/toxsick/hiscores',
-      docs: [{ hiscoreEntries: [] }],
+      docs: [{ hiscoreEntries: [storedEntry] }],
       status: 200,
       cacheControl: CACHE_CONTROL.REVALIDATE,
     },
@@ -133,7 +147,7 @@ const cursor = (docs: object[]) => {
 /** Only closed, by `MongoModule` on shutdown. */
 const fakeMongoClient = { close: vi.fn(async () => undefined) };
 
-/** Records every method called on any collection, and answers reads with `fakes.docs`. */
+/** Records every method called on any collection, and answers reads with `fakes.docs` (or `LAYOUT`). */
 const fakeDb = {
   collection: (name: string) =>
     new Proxy(
@@ -141,7 +155,7 @@ const fakeDb = {
       {
         get: (_target, method: string) => (): unknown => {
           collectionCalls.push(`${name}.${method}`);
-          const docs = fakes.docs ?? [];
+          const docs = name === HISCORE_LAYOUTS_COLLECTION ? [LAYOUT] : (fakes.docs ?? []);
           if (method === 'findOne') return Promise.resolve(docs[0] ?? null);
           if (method === 'find' || method === 'aggregate') return cursor(docs);
           return Promise.resolve({ acknowledged: true, matchedCount: 0, modifiedCount: 0, upsertedCount: 0 });
@@ -157,7 +171,7 @@ const RSS = `<rss><channel><item>
 </item></channel></rss>`;
 
 const HISCORE = {
-  skills: Array.from({ length: 24 }, (_, id) => ({ id, name: `Skill ${id}`, rank: 1, level: 10, xp: 1000 })),
+  skills: COMBAT_SKILLS.map((name, id) => ({ id, name, rank: 1, level: 10, xp: 1200 })),
   activities: [],
 };
 
