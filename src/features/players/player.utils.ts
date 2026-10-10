@@ -51,7 +51,7 @@ export class PlayerUtils {
 
   /** Calculates the combat level from the skills (`hasCombatSkills` must hold). */
   static getCombatLevel(skills: HiscoreEntry['skills']): number {
-    // a null (unranked) or missing skill counts as level 1
+    // a skill without xp (null) or missing counts as level 1
     const levelOf = (name: SkillEnum): number => Math.max(1, skills[name]?.level ?? 1);
     const attack = levelOf(SkillEnum.Attack);
     const defence = levelOf(SkillEnum.Defence);
@@ -69,7 +69,7 @@ export class PlayerUtils {
     return Math.floor(base + Math.max(melee, range, mage));
   }
 
-  /** Whether a hiscore has every `COMBAT_SKILLS` key, each null (unranked) or with a numeric level. */
+  /** Whether a hiscore has every `COMBAT_SKILLS` key, each null (no xp) or with a numeric level. */
   static hasCombatSkills(skills: HiscoreEntry['skills']): boolean {
     return COMBAT_SKILLS.every(
       (name) => name in skills && (skills[name] === null || typeof skills[name]?.level === 'number'),
