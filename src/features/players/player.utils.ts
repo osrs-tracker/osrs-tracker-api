@@ -1,5 +1,5 @@
 import { HiscoreTable } from '@osrs-tracker/hiscores';
-import { HiscoreEntry, HiscoreSkill, PlayerStatus, PlayerType } from '@osrs-tracker/models';
+import { HiscoreEntry, PlayerStatus, PlayerType, SkillEnum } from '@osrs-tracker/models';
 
 /**
  * Total xp of a player who isn't on a table: higher than any real total, so a missing table never compares as less.
@@ -7,8 +7,17 @@ import { HiscoreEntry, HiscoreSkill, PlayerStatus, PlayerType } from '@osrs-trac
  */
 export const NOT_ON_TABLE_XP = Number.MAX_SAFE_INTEGER;
 
-/** Overall plus the seven combat skills `getCombatLevel` reads by position. */
-export const MIN_HISCORE_SKILLS = 8;
+/** Overall and the seven combat skills: a hiscore without one of these keys is truncated (counts as failed). */
+export const COMBAT_SKILLS = [
+  SkillEnum.Overall,
+  SkillEnum.Attack,
+  SkillEnum.Defence,
+  SkillEnum.Strength,
+  SkillEnum.Hitpoints,
+  SkillEnum.Ranged,
+  SkillEnum.Prayer,
+  SkillEnum.Magic,
+] as const;
 
 export class PlayerUtils {
   /** OSRS display names: 1-12 letters, numbers, spaces, hyphens and underscores (`normalizeUsername` leaves no `_-`). */
@@ -41,15 +50,16 @@ export class PlayerUtils {
   }
 
   /** Calculates the combat level from the skills (`hasCombatSkills` must hold). */
-  static getCombatLevel(skills: HiscoreSkill[]): number {
-    // default to level 1 when not found (-1)
-    const attack = Math.max(1, skills[1].level);
-    const defence = Math.max(1, skills[2].level);
-    const strength = Math.max(1, skills[3].level);
-    const hitpoints = Math.max(1, skills[4].level);
-    const ranged = Math.max(1, skills[5].level);
-    const prayer = Math.max(1, skills[6].level);
-    const magic = Math.max(1, skills[7].level);
+  static getCombatLevel(skills: HiscoreEntry['skills']): number {
+    // a null (unranked) or missing skill counts as level 1
+    const levelOf = (name: SkillEnum): number => Math.max(1, skills[name]?.level ?? 1);
+    const attack = levelOf(SkillEnum.Attack);
+    const defence = levelOf(SkillEnum.Defence);
+    const strength = levelOf(SkillEnum.Strength);
+    const hitpoints = levelOf(SkillEnum.Hitpoints);
+    const ranged = levelOf(SkillEnum.Ranged);
+    const prayer = levelOf(SkillEnum.Prayer);
+    const magic = levelOf(SkillEnum.Magic);
 
     const base = 0.25 * (defence + hitpoints + Math.floor(prayer / 2));
     const melee = 0.325 * (attack + strength);
@@ -59,19 +69,18 @@ export class PlayerUtils {
     return Math.floor(base + Math.max(melee, range, mage));
   }
 
-  /** Whether a hiscore has overall and the combat skills with a numeric level, as `getCombatLevel` reads them. */
-  static hasCombatSkills(skills: Pick<HiscoreSkill, 'level'>[]): boolean {
-    return (
-      skills.length >= MIN_HISCORE_SKILLS &&
-      skills.slice(0, MIN_HISCORE_SKILLS).every((skill) => typeof skill?.level === 'number')
+  /** Whether a hiscore has every `COMBAT_SKILLS` key, each null (unranked) or with a numeric level. */
+  static hasCombatSkills(skills: HiscoreEntry['skills']): boolean {
+    return COMBAT_SKILLS.every(
+      (name) => name in skills && (skills[name] === null || typeof skills[name]?.level === 'number'),
     );
   }
 
   /** Determines the original playerType from the tables the player is on. Only works when the player has enough xp to appear in the hiscores. */
   static determineType(
-    ironman: Partial<HiscoreEntry> | null,
-    ultimate: Partial<HiscoreEntry> | null,
-    hardcore: Partial<HiscoreEntry> | null,
+    ironman: Pick<HiscoreEntry, 'skills'> | null,
+    ultimate: Pick<HiscoreEntry, 'skills'> | null,
+    hardcore: Pick<HiscoreEntry, 'skills'> | null,
   ): PlayerType {
     if (ultimate) return PlayerType.Ultimate;
     if (hardcore) return PlayerType.Hardcore;
@@ -81,9 +90,9 @@ export class PlayerUtils {
 
   /** Determines the current playerStatus by comparing total xp across tables. Only works when the player has enough xp to appear in the hiscores. */
   static determineStatus(
-    normal: Partial<HiscoreEntry> | null,
-    ironman: Partial<HiscoreEntry> | null,
-    ultimate: Partial<HiscoreEntry> | null,
+    normal: Pick<HiscoreEntry, 'skills'> | null,
+    ironman: Pick<HiscoreEntry, 'skills'> | null,
+    ultimate: Pick<HiscoreEntry, 'skills'> | null,
   ): PlayerStatus {
     if (PlayerUtils.getTotalXp(ironman) < PlayerUtils.getTotalXp(normal)) return PlayerStatus.DeIroned;
     if (PlayerUtils.getTotalXp(ultimate) < PlayerUtils.getTotalXp(ironman)) return PlayerStatus.DeUltimated;
@@ -91,7 +100,7 @@ export class PlayerUtils {
   }
 
   /** Total xp of a hiscore entry, so we can compare hiscores; `NOT_ON_TABLE_XP` when the player isn't on the table. */
-  static getTotalXp(hiscoreEntry: Partial<HiscoreEntry> | null): number {
-    return hiscoreEntry?.skills?.[0]?.xp ?? NOT_ON_TABLE_XP;
+  static getTotalXp(hiscore: Pick<HiscoreEntry, 'skills'> | null): number {
+    return hiscore ? hiscore.skills[SkillEnum.Overall]!.xp : NOT_ON_TABLE_XP;
   }
 }
