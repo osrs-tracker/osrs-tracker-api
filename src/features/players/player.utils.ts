@@ -69,10 +69,16 @@ export class PlayerUtils {
     return Math.floor(base + Math.max(melee, range, mage));
   }
 
-  /** Whether a hiscore has every `COMBAT_SKILLS` key, each null (no xp) or with a numeric level. */
+  /**
+   * Whether a hiscore has every `COMBAT_SKILLS` key, each null (no xp) or with a numeric level, and an Overall value
+   * (`getTotalXp` reads it; `fromJagex` always maps it).
+   */
   static hasCombatSkills(skills: HiscoreEntry['skills']): boolean {
-    return COMBAT_SKILLS.every(
-      (name) => name in skills && (skills[name] === null || typeof skills[name]?.level === 'number'),
+    return (
+      skills[SkillEnum.Overall] !== null &&
+      COMBAT_SKILLS.every(
+        (name) => name in skills && (skills[name] === null || typeof skills[name]?.level === 'number'),
+      )
     );
   }
 

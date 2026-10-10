@@ -63,6 +63,10 @@ describe('PlayerUtils.hasCombatSkills', () => {
     noLevel[SkillEnum.Magic] = { rank: 1, xp: 0 } as unknown as Skills[string];
     expect(PlayerUtils.hasCombatSkills(noLevel)).toBe(false);
   });
+
+  it('rejects a null Overall, which getTotalXp reads', () => {
+    expect(PlayerUtils.hasCombatSkills({ ...skills(0, 1, 1, 1, 10, 1, 1, 1), [SkillEnum.Overall]: null })).toBe(false);
+  });
 });
 
 describe('PlayerUtils.determineType', () => {
