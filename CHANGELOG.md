@@ -11,6 +11,11 @@
   `hiscoreLayouts` collection, cached in memory) and a value that didn't change since the next newer entry as its bare
   rank. Uses `@osrs-tracker/models` 2.0.0 and `@osrs-tracker/hiscores` 4.0.0.
 
+### Behind the scenes
+
+- The combat level and total xp read skills with `@osrs-tracker/models` 2.1.0's `skillLevel` and `overallOf` (with
+  `@osrs-tracker/hiscores` 4.1.0) instead of the API's own copies of those rules. Nothing visible changes.
+
 ## 2026/10/09
 
 ### Responses
