@@ -245,8 +245,8 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     the connect error (also when closing the failed client fails).
   - `app.e2e.spec.ts` (`logger` mocked to collect the lines): per GET route its `Cache-Control` and that it never writes
     (a route's header or a new GET route means changing `CASES`), that no route overlaps another, that the POST lookup
-    writes nothing for a bot, that shutdown closes the Mongo client, and the request ID (`X-Request-Id` matching the
-    `incoming` line's `requestId`, a client's own ignored).
+    writes nothing for a bot and writes `players` for a visitor, that shutdown closes the Mongo client, and the request
+    ID (`X-Request-Id` matching the `incoming` line's `requestId`, a client's own ignored).
 - Not covered: anything against a real database, and the `Cache-Control` of POST responses.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.
