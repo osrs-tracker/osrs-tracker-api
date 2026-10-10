@@ -7,7 +7,8 @@ const WHOLE_WORD_BOOST = 2;
 /**
  * The `$search` pipeline for `GET /items/search/:query`, on the `ITEM_SEARCH_INDEX` Atlas Search index: every word of
  * the query has to start a word of the name, in any order (`drag scim` finds Dragon scimitar), and whole words score
- * higher. Words shorter than the index's `minGrams` can't match a prefix, so they only count towards the score.
+ * higher. Words shorter than the index's `minGrams` can't match a prefix, so they only count towards the score; a query
+ * of only such words (`a`) matches whole words alone.
  */
 export function buildItemSearchPipeline(query: string): Document[] {
   const words = query.split(/\s+/).filter((word) => word.length >= ITEM_SEARCH_MIN_GRAMS);
@@ -17,7 +18,9 @@ export function buildItemSearchPipeline(query: string): Document[] {
       $search: {
         index: ITEM_SEARCH_INDEX,
         compound: {
-          must: words.map((word) => ({ autocomplete: { query: word, path: 'name', tokenOrder: 'any' } })),
+          ...(words.length && {
+            must: words.map((word) => ({ autocomplete: { query: word, path: 'name', tokenOrder: 'any' } })),
+          }),
           should: [{ text: { query, path: 'name', score: { boost: { value: WHOLE_WORD_BOOST } } } }],
         },
       },

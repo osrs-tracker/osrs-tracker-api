@@ -17,10 +17,15 @@ describe('buildItemSearchPipeline', () => {
     ]);
   });
 
-  it('only scores words shorter than the shortest prefix the index matches', () => {
+  it('leaves words shorter than the shortest prefix the index matches out of the prefix matches', () => {
     expect(compoundOf('bee on a stick').must).toEqual(
       ['bee', 'on', 'stick'].map((word) => ({ autocomplete: { query: word, path: 'name', tokenOrder: 'any' } })),
     );
+  });
+
+  it('matches whole words alone when no word is long enough for a prefix match', () => {
+    expect(compoundOf('a').must).toBeUndefined();
+    expect(compoundOf('a').should).toHaveLength(1);
   });
 
   it('boosts whole-word matches of the whole query', () => {
