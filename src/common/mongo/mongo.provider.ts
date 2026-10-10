@@ -1,7 +1,7 @@
 import { FactoryProvider, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RetryPolicy } from '@nestjs/resilience';
-import { MongoClient, ServerApiVersion } from 'mongodb';
+import { Db, MongoClient, ServerApiVersion } from 'mongodb';
 import { Env } from '../../config/env';
 import { MONGO_LOG_CONTEXT } from '../logger/nest-logger';
 
@@ -48,6 +48,49 @@ export function connectWithRetry(createClient: () => MongoClient): Promise<Mongo
   });
 }
 
+/** The Atlas Search index item search runs on (`buildItemSearchPipeline`). */
+export const ITEM_SEARCH_INDEX = 'name_autocomplete';
+/** The shortest word prefix the index matches. */
+export const ITEM_SEARCH_MIN_GRAMS = 2;
+
+/**
+ * Creates the item search index when it's missing. Unlike `createIndex`, `createSearchIndex` fails when the name exists,
+ * and it doesn't change an existing index: a changed definition has to be applied by hand (`updateSearchIndex` or the
+ * Atlas UI). Atlas builds it in the background; until it's ready, item search returns nothing. A failure is logged
+ * rather than thrown, so search alone breaks instead of the whole API.
+ */
+async function ensureItemSearchIndex(db: Db): Promise<void> {
+  const items = db.collection('items');
+  try {
+    if ((await items.listSearchIndexes(ITEM_SEARCH_INDEX).toArray()).length) return;
+
+    await items.createSearchIndex({
+      name: ITEM_SEARCH_INDEX,
+      definition: {
+        mappings: {
+          dynamic: false,
+          fields: {
+            name: [
+              // maxGrams 15 covers the longest word in an item name (Superantipoison)
+              {
+                type: 'autocomplete',
+                tokenization: 'edgeGram',
+                minGrams: ITEM_SEARCH_MIN_GRAMS,
+                maxGrams: 15,
+                foldDiacritics: true,
+              },
+              { type: 'string' },
+            ],
+          },
+        },
+      },
+    });
+    logger.log(`Created the ${ITEM_SEARCH_INDEX} search index on items`);
+  } catch (error) {
+    logger.error(`Couldn't ensure the ${ITEM_SEARCH_INDEX} search index on items: ${error}`);
+  }
+}
+
 export const mongoClientProvider: FactoryProvider = {
   provide: MONGO_CLIENT,
   useFactory: (config: ConfigService<Env, true>) =>
@@ -77,11 +120,11 @@ export const mongoDBProvider: FactoryProvider = {
       .createIndex({ lastHiscoreFetch: -1 }, { partialFilterExpression: { lastHiscoreFetch: { $exists: true } } });
 
     // Ensure item indexes are created
-    await db.collection('items').createIndex({ name: 'text' });
     await db.collection('items').createIndex({ id: 1 }, { unique: true });
     await db
       .collection('items')
       .createIndex({ lastFetch: -1 }, { partialFilterExpression: { lastFetch: { $exists: true } } });
+    await ensureItemSearchIndex(db);
 
     return db;
   },

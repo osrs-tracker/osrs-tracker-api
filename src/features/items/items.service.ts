@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Item } from '@osrs-tracker/models';
 import { Collection, Db } from 'mongodb';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
+import { buildItemSearchPipeline } from './item-search';
 
 @Injectable()
 export class ItemsService {
@@ -39,13 +40,6 @@ export class ItemsService {
   }
 
   searchItems(query: string): Promise<Item[]> {
-    return this.collection
-      .find<Item>(
-        { $text: { $search: query } },
-        { projection: { _id: 0, id: 1, icon: 1, name: 1, score: { $meta: 'textScore' } } },
-      )
-      .sort({ score: { $meta: 'textScore' } })
-      .limit(20)
-      .toArray();
+    return this.collection.aggregate<Item>(buildItemSearchPipeline(query)).toArray();
   }
 }
