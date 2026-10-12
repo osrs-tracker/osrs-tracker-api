@@ -7,6 +7,8 @@
   effort, starts its report with a `VERDICT:` line and raises at most 3 **check** items. The API's own review rules
   moved to the skill's new `## Review rules` section. The release steps read its verdict and check each finding against
   the code before fixing it (#135). Nothing in the API changes.
+- The README and Claude Code's skill now list item browse and the player sitemap, with their `Cache-Control` and the
+  browse letter's pipe (#137). Nothing in the API changes.
 
 ## 2026/10/10
 

@@ -125,11 +125,11 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
 ## Validating params
 
 Validate query and route params in pipes, not with checks in the handler: `ParseUsernamePipe`,
-`ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (item browse's letter), and
-`new ParseIntRangePipe({ min, max?, default?, optional?, message? })` from `common/pipes/` for any other integer (its
-message is named after the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` + `ParseIntPipe` + a
-range check, or an `isNaN` check after a parse pipe. Keep existing status codes and messages: the web may show them. A
-new pipe gets a spec.
+`ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (item browse's letter), each next to its feature, and from
+`common/pipes/` `new ParseIntRangePipe({ min, max?, default?, optional?, message? })` for any other integer (its message
+is named after the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` + `ParseIntPipe` + a range
+check, or an `isNaN` check after a parse pipe. Keep existing status codes and messages: the web may show them. A new
+pipe gets a spec.
 
 Stored usernames are Jagex's matching form: lowercase, `_` and `-` as spaces, trimmed (`PlayerUtils.normalizeUsername`,
 which `ParseUsernamePipe` applies), so one player is one document. Anything that stores, looks up or compares a name
