@@ -57,11 +57,12 @@ Kubernetes probes and `/metrics` for Prometheus; it isn't exposed publicly.
 
 ## Checks
 
-Before committing, run the type check, lint, formatting check, build and tests (Vitest, `src/**/*.spec.ts`). The tests
-use fakes for MongoDB and the OSRS servers, so they never touch production data:
+Before committing, run the formatting check, lint, type check, build and tests (Vitest, `src/**/*.spec.ts`). The tests
+use fakes for MongoDB and the OSRS servers, so they never touch production data. This runs them all at once and reports
+every failure:
 
 ```bash
-npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build && npm test
+.claude/skills/verify/verify.sh
 ```
 
 ## Built with
