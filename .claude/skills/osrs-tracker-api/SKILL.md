@@ -232,8 +232,10 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     and the initial entry written only for a new offset (`buildRefreshUpdate`); combat level, type and status
     (`PlayerUtils`; a hiscore without a combat skill's key counts as failed, a `null` one doesn't, `hasCombatSkills`);
     the layout cache, upsert and collision check (`hiscore-layouts.service.spec.ts`).
-  - The validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for
-    `limit`, `size`, `skip` and IDs).
+  - The validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (in
+    `items/item-browse.spec.ts`) and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip` and IDs).
+  - `items/item-browse.spec.ts`: item browse's name range per letter (`buildItemBrowseFilter`; `0` is everything before
+    `a`, `z` has no upper bound).
   - `items/item-search.spec.ts`: the item search's `$search` pipeline (`buildItemSearchPipeline`; `$search` doesn't run
     on a plain `mongod`, so the pipeline is checked, not its results). The `name_autocomplete` Atlas Search index it
     runs on is created in `mongo.provider.ts` only when missing: a changed definition is applied by hand.
