@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# PreToolUse hook for Bash commands with a `git` call: before Claude runs `git push`, lint and prettier-check the checkout being
-# pushed. That's the session's own worktree when it has one (or the `git -C` path), not $CLAUDE_PROJECT_DIR, which is
-# always the main checkout. It fails open (exit 0) when it can't tell what's pushed; CI still lints.
+# PreToolUse hook for Bash commands with a `git` call: before Claude runs `git push`, lint and prettier-check the
+# checkout being pushed. That's the session's own worktree when it has one (or the `git -C` path), not
+# $CLAUDE_PROJECT_DIR, which is always the main checkout. It fails open (exit 0) when it can't tell what's pushed; CI
+# still lints.
 input=$(cat)
 
 # The settings' `if` is only `Bash(git *)`, which skips non-git commands: `Bash(git push*)` misses `git -C <path> push`,
