@@ -199,7 +199,8 @@ changes `CASES` in the same diff. The spec fails on a new GET route without a ca
 case expects (values only POSTs send go in its `POST_ONLY`); a new branch reusing an existing value it can't see, so
 that one is on the author and the `conventions-reviewer`.
 
-- Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/news/image` 604800).
+- Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/sitemap/players` 3600,
+  `/items/browse/:letter` 86400, `/news/image` 604800).
 - Routes that fetch Jagex live (`/news`, `/news/image`) set it with `res.setHeader` after the fetch succeeds, not with
   `@Header` (which also applies to errors), so caches don't keep a 503.
 - GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR.
@@ -232,6 +233,7 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     the layout cache, upsert and collision check (`hiscore-layouts.service.spec.ts`).
   - The validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe` and `ParseIntRangePipe` (`common/pipes/`, for
     `limit`, `size`, `skip` and IDs).
+  - `items/item-browse.spec.ts`: the browse filter (`buildItemBrowseFilter`) and `ParseBrowseLetterPipe`.
   - `items/item-search.spec.ts`: the item search's `$search` pipeline (`buildItemSearchPipeline`; `$search` doesn't run
     on a plain `mongod`, so the pipeline is checked, not its results). The `name_autocomplete` Atlas Search index it
     runs on is created in `mongo.provider.ts` only when missing: a changed definition is applied by hand.
