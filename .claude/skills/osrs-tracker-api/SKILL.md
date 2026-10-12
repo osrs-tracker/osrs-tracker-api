@@ -330,10 +330,10 @@ Run end to end without asking; stop only on failure. Verify locally once before 
    `model`, which would override its Sonnet pin). Its first line is a `VERDICT:`; check each finding against the code
    before fixing it and drop the ones that don't hold. Fix both and push.
 3. Get current with `main` before waiting on checks, and again before merging:
-   `git fetch origin && git rebase origin/main`, fold `CHANGELOG.md` under one day's heading, verify,
-   `git push --force-with-lease`. Then poll `gh pr view <n> --json mergeable,mergeStateStatus` until it isn't `UNKNOWN`;
-   on `CONFLICTING` (recheck once, it lags a push), rebase again: GitHub runs no PR CI on a conflicting PR, so `--watch`
-   would hang.
+   `git fetch origin && git rebase origin/main`, fold `CHANGELOG.md` under one day's heading, verify only if the rebase
+   had conflicts (a clean rebase leaves the checks to CI), `git push --force-with-lease`. Then poll
+   `gh pr view <n> --json mergeable,mergeStateStatus` until it isn't `UNKNOWN`; on `CONFLICTING` (recheck once, it lags
+   a push), rebase again: GitHub runs no PR CI on a conflicting PR, so `--watch` would hang.
 4. `gh pr checks <n> --watch`. When checks pass: `gh pr merge <n> --merge` (it deploys; if Claude Code's permission
    check blocks it, give the user the command and wait). GitHub deletes the PR branch on merge. Then pull `main` and
    `git fetch --prune`; in the main checkout also switch to `main` first and `git branch -d <branch>`. In a worktree
