@@ -9,6 +9,9 @@
   the code before fixing it (#135). Nothing in the API changes.
 - The README and Claude Code's skill now list item browse and the player sitemap, with their `Cache-Control` and the
   browse letter's pipe and its tests (#137). Nothing in the API changes.
+- Claude Code gets a `verify` skill that runs the verify command, which Claude Code runs before each commit of a code
+  change, and the pre-push lint check now only starts for Bash commands with a `git` call (#138). Nothing in the API
+  changes.
 
 ## 2026/10/10
 
