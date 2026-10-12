@@ -255,6 +255,20 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.
 
+## Review rules
+
+What `conventions-reviewer` checks beyond the rules above. It reads this section; keep repo rules here, not in the
+agent.
+
+- No decisions document to read: the rules above and `CLAUDE.md` are the whole source. A missing check may also live in
+  an interceptor or a shared provider (`src/common/`), not only in a caller.
+- Rules that span files, checked against the whole diff: a new index and `mongo.provider.ts`; a GET route and its
+  `Cache-Control`; a GET's `Cache-Control` outcomes and `CASES` in `src/app.e2e.spec.ts`; a route's statuses and its
+  handler's JSDoc; a protected rule and its spec; a new env var and `Env`/`validateEnv`/`.env.example`; a user-visible
+  change and `CHANGELOG.md`.
+- **breaks** here also covers: corrupts stored data, makes the web app refetch on hydration. A typical **check**:
+  behaviour against production data, or the Lambdas in `../osrs-tracker-aws` (name the query or the Lambda to verify).
+
 ## Production testing
 
 Verify with the command in `CLAUDE.md`. There is no development database, by choice (a local MongoDB was declined, #53):

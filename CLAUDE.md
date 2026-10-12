@@ -49,6 +49,7 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 - Build and runtime: `rspack.config.js` (bundling), `Dockerfile` (image, `sharp` beside the bundle), `vitest.config.mjs`
   (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies, with the Traefik rate-limit and compress
   Middlewares); `.github/workflows/` `CI` (`nodejs.yml`) and `CD` (`deploy.yml`), `.github/dependabot.yml`.
-- `.claude/agents/conventions-reviewer.md` reviews diffs against the skill and this file;
-  `.claude/hooks/pre-push-check.sh` lints and prettier-checks the pushed checkout before every `git push`, and
-  `.claude/settings.json` runs Prettier on every file Claude edits.
+- `.claude/agents/conventions-reviewer.md` reviews diffs against the skill (its `## Review rules`) and this file, its
+  Bash limited to one git, gh or grep read command per call by `.claude/hooks/read-only-bash.sh` (byte-identical across
+  the osrs-tracker repos: change it in all three); `.claude/hooks/pre-push-check.sh` lints and prettier-checks the
+  pushed checkout before every `git push`, and `.claude/settings.json` runs Prettier on every file Claude edits.

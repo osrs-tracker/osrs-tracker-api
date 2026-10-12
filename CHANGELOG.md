@@ -1,3 +1,12 @@
+## 2026/10/12
+
+### Behind the scenes
+
+- Claude Code's `conventions-reviewer` agent is now the one shared with osrs-tracker-web (#134): its Bash is limited to
+  one git, gh or grep read command per call (`.claude/hooks/read-only-bash.sh`), it preloads the skill, runs at `medium`
+  effort, starts its report with a `VERDICT:` line and raises at most 3 **check** items. The API's own review rules
+  moved to the skill's new `## Review rules` section. Nothing in the API changes.
+
 ## 2026/10/10
 
 ### Players
