@@ -12,6 +12,8 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 ## Commands
 
 - Verify: `npx tsc --noEmit -p tsconfig.json && npm run lint:ci && npm run prettier:ci && npm run build && npm test`.
+  The `verify` skill (`.claude/skills/verify/`) runs it, and Claude Code runs that skill before each commit of a code
+  change.
 - Dev server: `npm run start:dev` on port 3000. `.env` points at production data.
 - A `git push` blocked by Claude's pre-push hook (a Claude Code hook, not a git hook): run `npm run lint` and
   `npm run prettier` (both fix what they can), fix the rest by hand, commit and push again.
