@@ -13,8 +13,9 @@ news, and stores player progress so the website can show how players gain XP ove
 
 ## What it provides
 
-- **Players**: player details and their saved hiscore history, used for XP tracking.
-- **Items**: item details and search by name.
+- **Players**: player details and their saved hiscore history, used for XP tracking, plus a sitemap list of tracked
+  players for the website.
+- **Items**: item details, search by name and browsing by first letter.
 - **News**: the latest OSRS news posts, with their images converted to WebP.
 
 Each route's statuses, `Cache-Control` and parameters are described in a short comment on its handler in
