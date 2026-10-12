@@ -12,6 +12,9 @@
 - Claude Code gets a `verify` skill that runs the verify command, which Claude Code runs before each commit of a code
   change, and the pre-push lint check now only starts for Bash commands with a `git` call (#138). Nothing in the API
   changes.
+- The verify checks (`.claude/skills/verify/verify.sh`) now run all at once and report every failure in one go, instead
+  of stopping at the first: about 5s instead of 13s, and one fix round instead of one per failing check (#141). Nothing
+  in the API changes.
 
 ## 2026/10/10
 
