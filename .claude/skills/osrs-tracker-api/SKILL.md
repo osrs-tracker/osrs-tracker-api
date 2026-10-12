@@ -125,10 +125,11 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
 ## Validating params
 
 Validate query and route params in pipes, not with checks in the handler: `ParseUsernamePipe`,
-`ParseScrapingOffsetPipe`, and `new ParseIntRangePipe({ min, max?, default?, optional?, message? })` from
-`common/pipes/` for any other integer (its message is named after the param: `Limit must be between 1 and 50.`). Don't
-add `DefaultValuePipe` + `ParseIntPipe` + a range check, or an `isNaN` check after a parse pipe. Keep existing status
-codes and messages: the web may show them. A new pipe gets a spec.
+`ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (item browse's letter), and
+`new ParseIntRangePipe({ min, max?, default?, optional?, message? })` from `common/pipes/` for any other integer (its
+message is named after the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` + `ParseIntPipe` + a
+range check, or an `isNaN` check after a parse pipe. Keep existing status codes and messages: the web may show them. A
+new pipe gets a spec.
 
 Stored usernames are Jagex's matching form: lowercase, `_` and `-` as spaces, trimmed (`PlayerUtils.normalizeUsername`,
 which `ParseUsernamePipe` applies), so one player is one document. Anything that stores, looks up or compares a name
@@ -199,7 +200,8 @@ changes `CASES` in the same diff. The spec fails on a new GET route without a ca
 case expects (values only POSTs send go in its `POST_ONLY`); a new branch reusing an existing value it can't see, so
 that one is on the author and the `conventions-reviewer`.
 
-- Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/news/image` 604800).
+- Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/sitemap/players` 3600,
+  `/items/browse/:letter` 86400, `/news/image` 604800).
 - Routes that fetch Jagex live (`/news`, `/news/image`) set it with `res.setHeader` after the fetch succeeds, not with
   `@Header` (which also applies to errors), so caches don't keep a 503.
 - GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR.
