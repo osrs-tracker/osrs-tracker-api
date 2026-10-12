@@ -13,7 +13,7 @@ description: >-
 
 NestJS + MongoDB Atlas (native driver), deployed as a Docker image to Kubernetes. Main consumer: the Angular SSR app in
 `../osrs-tracker-web`. The `conventions-reviewer` agent reviews diffs against this file and `CLAUDE.md` at runtime, so
-keep code rules here, not in the agent.
+keep code rules here, not in the agent; repo-specific review rules go in `## Review rules`.
 
 ## Setup gotchas
 
@@ -322,7 +322,9 @@ changes within 10 minutes.
 Run end to end without asking; stop only on failure. Verify locally once before committing; after that CI is the gate.
 
 1. Commit on a `<type>/<short-name>` branch, push, `gh pr create --base main`.
-2. Review `gh pr diff` for bugs and leftovers while the `conventions-reviewer` agent checks the PR; fix both and push.
+2. Review `gh pr diff` for bugs and leftovers while the `conventions-reviewer` agent checks the PR (spawn it without a
+   `model`, which would override its Sonnet pin). Its first line is a `VERDICT:`; check each finding against the code
+   before fixing it and drop the ones that don't hold. Fix both and push.
 3. Get current with `main` before waiting on checks, and again before merging:
    `git fetch origin && git rebase origin/main`, fold `CHANGELOG.md` under one day's heading, verify,
    `git push --force-with-lease`. Then poll `gh pr view <n> --json mergeable,mergeStateStatus` until it isn't `UNKNOWN`;
