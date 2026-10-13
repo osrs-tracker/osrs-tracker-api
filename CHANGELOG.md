@@ -1,3 +1,9 @@
+## 2026/10/13
+
+- Requests to Jagex (the hiscores, the news feed and news images) send
+  `User-Agent: github:osrs-tracker/osrs-tracker-api` instead of undici's `node`, so Jagex can tell where they come from
+  and where to report a problem (#143).
+
 ## 2026/10/12
 
 ### Behind the scenes

@@ -4,6 +4,9 @@ import { Agent } from 'undici';
 export const AGENT = 'AGENT';
 export const IMAGE_AGENT = 'IMAGE_AGENT';
 
+/** The `user-agent` of every outgoing request: names this repo, so the receiver knows where to report a problem. */
+export const USER_AGENT = 'github:osrs-tracker/osrs-tracker-api';
+
 /** The image body size limit: undici aborts a response once more than this has been read, whatever `content-length` says. */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 

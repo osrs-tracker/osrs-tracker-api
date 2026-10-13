@@ -14,7 +14,7 @@ import {
 import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
 import { Agent, fetch } from 'undici';
-import { AGENT } from '../../common/agent/agent.provider';
+import { AGENT, USER_AGENT } from '../../common/agent/agent.provider';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { Env } from '../../config/env';
 import { HiscoreLayoutsService } from './hiscore-layouts.service';
@@ -384,7 +384,12 @@ export class PlayersService {
           username,
           table: PlayerUtils.getHiscoreTable(type),
           fetch: (url, init) =>
-            fetch(url, { ...init, dispatcher: this.agent, signal: AbortSignal.any([init.signal, signal]) }),
+            fetch(url, {
+              ...init,
+              headers: { ...init.headers, 'user-agent': USER_AGENT },
+              dispatcher: this.agent,
+              signal: AbortSignal.any([init.signal, signal]),
+            }),
         });
 
         // The package only checks that `skills` is an array: a truncated hiscore would store a wrong combat level, so it

@@ -13,7 +13,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { LRUCache } from 'lru-cache';
 import sharp from 'sharp';
 import { Agent, errors, fetch } from 'undici';
-import { AGENT, IMAGE_AGENT, MAX_IMAGE_BYTES } from '../../common/agent/agent.provider';
+import { AGENT, IMAGE_AGENT, MAX_IMAGE_BYTES, USER_AGENT } from '../../common/agent/agent.provider';
 import { ThrottledWarning } from '../../common/logger/throttled-warning';
 import { XML_PARSER } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
@@ -98,6 +98,7 @@ export class NewsService {
         this.config.get('OSRS_API_BASE_URL', { infer: true }) + '/m=news/latest_news.rss?oldschool=true',
         {
           dispatcher: this.agent,
+          headers: { 'user-agent': USER_AGENT },
           signal: AbortSignal.timeout(this.NEWS_FETCH_TIMEOUT_MS),
         },
       );
@@ -139,7 +140,7 @@ export class NewsService {
     try {
       const response = await fetch(url, {
         dispatcher: this.imageAgent,
-        headers: { 'accept-encoding': 'identity' },
+        headers: { 'accept-encoding': 'identity', 'user-agent': USER_AGENT },
         redirect: 'error',
         signal: AbortSignal.any([signal, AbortSignal.timeout(this.IMAGE_FETCH_TIMEOUT_MS)]),
       });
