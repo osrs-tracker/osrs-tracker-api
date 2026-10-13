@@ -268,8 +268,8 @@ agent.
   an interceptor or a shared provider (`src/common/`), not only in a caller.
 - Rules that span files, checked against the whole diff: a new index and `mongo.provider.ts`; a GET route and its
   `Cache-Control`; a GET's `Cache-Control` outcomes and `CASES` in `src/app.e2e.spec.ts`; a route's statuses and its
-  handler's JSDoc; a protected rule and its spec; a new env var and `Env`/`validateEnv`/`.env.example`; a user-visible
-  change and `CHANGELOG.md`.
+  handler's JSDoc; a protected rule and its spec; a new env var and `Env`/`validateEnv`/`.env.example`; a change that
+  needs an entry under `CLAUDE.md`'s changelog rule and `CHANGELOG.md`.
 - **breaks** here also covers: corrupts stored data, makes the web app refetch on hydration. A typical **check**:
   behaviour against production data, or the Lambdas in `../osrs-tracker-aws` (name the query or the Lambda to verify).
 
@@ -360,15 +360,18 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 - Conventional commits. `chore(deploy)` is reserved for the CD workflow's digest commits (it skips them).
 - `CHANGELOG.md`: newest day first. Busy days get `###` subtitles (by area, "Behind the scenes" last); extend an
   existing entry rather than add a near-duplicate, and don't repeat the subtitle in its entries. When adding an entry,
-  reread the whole day: add subtitles once it's busy, and merge entries about the same feature.
-- Dependabot PRs (`.github/dependabot.yml`) carry no `CHANGELOG.md` entry, and merging one deploys. After merging,
-  commit the entry straight to `main` (docs only, no redeploy): one entry under that day's "Behind the scenes"
-  ("Dependency updates: …", naming notable bumps), extended for further ones that day. Base image PRs bump the digest in
-  both `FROM` lines. Actions are pinned to commit SHAs with a `# vX.Y.Z` comment, which the actions PRs bump together:
-  pin a new action the same way (`gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`), never by tag. npm majors are
-  ignored in the config: upgrade them by hand from an issue, together with whatever must move with them (e.g. NestJS 12
-  needed TypeScript 6). TypeScript `>=6.1` is ignored too, until `typescript-eslint` allows it (its peer range is
-  `<6.1.0`): drop that ignore when it does.
+  reread the whole day: add subtitles once it's busy, and merge entries about the same feature. Say why, not only what.
+  An entry that breaks a consumer (a response shape, a route, a status code, a header the web app relies on) starts with
+  `**Breaking:**`, under the area it belongs to.
+- Dependabot PRs (`.github/dependabot.yml`) carry no `CHANGELOG.md` entry, and merging one deploys. After merging, add
+  one only when a bump changes behaviour (a new feature used, a fix that matters, a breaking change handled): a
+  "Dependency updates: …" entry under that day's "Behind the scenes" naming the bump and its effect, committed straight
+  to `main` (no source change, so no redeploy) and extended for further ones that day. A routine bump gets none. Base
+  image PRs bump the digest in both `FROM` lines. Actions are pinned to commit SHAs with a `# vX.Y.Z` comment, which the
+  actions PRs bump together: pin a new action the same way (`gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`),
+  never by tag. npm majors are ignored in the config: upgrade them by hand from an issue, together with whatever must
+  move with them (e.g. NestJS 12 needed TypeScript 6). TypeScript `>=6.1` is ignored too, until `typescript-eslint`
+  allows it (its peer range is `<6.1.0`): drop that ignore when it does.
 - GPG "Inappropriate ioctl for device": ask the user to run `echo test | gpg --clearsign > /dev/null` in their terminal.
 - If `gh pr edit` fails on a Projects (classic) error:
   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>`.

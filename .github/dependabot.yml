@@ -1,5 +1,5 @@
 # Weekly update PRs. CI runs on them like on any PR; merging one deploys (it changes package*.json, Dockerfile or
-# .github/). Add their CHANGELOG.md entry when merging (see the osrs-tracker-api skill).
+# .github/). A CHANGELOG.md entry follows only when a bump changes behaviour (see the osrs-tracker-api skill).
 version: 2
 updates:
   - package-ecosystem: npm

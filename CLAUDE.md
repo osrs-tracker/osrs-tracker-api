@@ -25,8 +25,11 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 
 ## Hard rules
 
-- Every change gets a `CHANGELOG.md` entry under today's `## YYYY/MM/DD`. Parallel PRs all add that heading: when
-  merging one after another, rebase and fold the entries under one heading.
+- Every change, tooling included, gets a `CHANGELOG.md` entry under today's `## YYYY/MM/DD`; doc-only changes
+  (`README.md`, `CLAUDE.md`, `.claude/skills/`, `.claude/agents/`) don't, and a Dependabot bump only when it changes
+  behaviour. `.claude/hooks/` and `.claude/settings.json` are tooling, not docs. Parallel PRs all add that heading: when
+  merging one after another, rebase and fold the entries under one heading. The format and the Dependabot steps are in
+  the skill's Commit and push.
 - Doc-only changes go straight to `main`; for anything else, ask: `main` or a PR (unless releasing: "release it" or
   "ship it", see the skill's Release steps).
 - Deploying is merging to `main` (GitHub Actions → Flux). Never build, push or `kubectl apply` by hand.
