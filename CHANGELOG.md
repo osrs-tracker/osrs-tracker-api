@@ -25,7 +25,11 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   online that osrs-tracker-aws's record-player-count Lambda samples every 10 minutes into `playerCounts`: the newest
   sample (404 before the first), and its history, oldest first: every sample for 24h and 7d, hourly averages for 30d,
   daily (UTC) averages plus the peak total for 1y and all. Both send `public, max-age=300`; `@osrs-tracker/models` is
-  bumped to 2.4.0 for `PlayerCount` (#146).
+  bumped to 2.4.0 for `PlayerCount` (#146). Every history point also has `byLocation`, the players per raw location code
+  (an hour's or day's average per code in the bucketed ranges), so the web's chart can show the players per country at
+  that moment (osrs-tracker/osrs-tracker-web#255). The codes stay raw: the web maps them to countries, so a new location
+  needs no API release (#158). The buckets average per code by unwinding each sample's map, about 0.7 s per year of
+  samples on Atlas; a `$push` of the maps hit `$group`'s 100 MB limit at a year.
 - Requests to Jagex (the hiscores, the news feed and news images) send
   `User-Agent: github:osrs-tracker/osrs-tracker-api` instead of undici's `node`, so Jagex can tell where they come from
   and where to report a problem (#143).
