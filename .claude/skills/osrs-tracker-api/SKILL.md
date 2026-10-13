@@ -280,14 +280,22 @@ a local run uses production data, so stick to GETs, which never write. When a ch
 `POST /players/:username/lookup`, use **ToxSick** as the test player: before the lookup, save `GET /players/ToxSick` and
 `GET /players/ToxSick/hiscores?scrapingOffset=<n>` for each of its `scrapingOffsets` to the scratchpad (GETs never
 write; the first page is enough, since entries are prepended). A lookup overwrites the stored player fields, merges
-`scrapingOffsets` and may prepend a hiscore entry (`buildRefreshUpdate`). Restoring that is a write to Atlas the user
-does, never Claude: give them the `updateOne` that puts back the changed fields and removes a prepended entry. Every
-mongosh snippet handed over starts with `use('osrs-tracker')` (mongosh starts in `test`, where a write silently matches
-nothing) and says the counts to expect (`deletedCount`, `modifiedCount`), so a no-op shows. To check live data, use the
-MongoDB MCP server (Atlas project `osrs-tracker`, cluster `shared-cluster`, database `osrs-tracker`) for reads only,
-before and after the user's write; its writes are blocked in auto mode. `POST /items/:id/lookup` only sets the item's
-`lastFetch` (it moves to the top of `GET /items`), so it needs nothing restored. Automated tests never need a database:
-they run on fakes (Tests).
+`scrapingOffsets` and may prepend a hiscore entry (`buildRefreshUpdate`). Claude restores that itself, with an
+`update-many` that puts back the changed fields and removes a prepended entry. `POST /items/:id/lookup` only sets the
+item's `lastFetch` (it moves to the top of `GET /items`), so it needs nothing restored. Automated tests never need a
+database: they run on fakes (Tests).
+
+Live data is read and written through the `mongodb` MCP server (`.mcp.json`, database `osrs-tracker`), which connects
+with `OSRS_TRACKER_MONGO_URI` from the user's environment: a database user with `readWrite` on `osrs-tracker` only, and
+no Atlas API tools. Reads (`find`, `count`, `aggregate`) need no prompt; every write tool asks first, even in auto mode
+(`permissions.ask` in `.claude/settings.json`; a write tool a server bump adds goes there too), and the drops,
+`delete-many` and `$out`/`$merge` pipelines also ask through the server's own confirmation. The cluster has no backups,
+so before a write that can touch more than one document: save the affected documents (the server's `export` with the
+same filter, or a `mongodump` of the collection), or at least show a `find` with that filter and its `count`; state the
+counts to expect (`matchedCount`, `modifiedCount`, `deletedCount`), so a no-op or a too-wide filter shows; and read the
+documents again afterwards. Cloud sessions and routines don't have the variable, so there the server fails to connect:
+hand the user a mongosh snippet instead, starting with `use('osrs-tracker')` (mongosh starts in `test`, where a write
+silently matches nothing) and with the expected counts.
 
 ## Deploy
 

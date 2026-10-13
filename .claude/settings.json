@@ -1,4 +1,17 @@
 {
+  "permissions": {
+    "ask": [
+      "mcp__mongodb__insert-many",
+      "mcp__mongodb__update-many",
+      "mcp__mongodb__delete-many",
+      "mcp__mongodb__create-index",
+      "mcp__mongodb__drop-index",
+      "mcp__mongodb__rename-collection",
+      "mcp__mongodb__create-collection",
+      "mcp__mongodb__drop-collection",
+      "mcp__mongodb__drop-database"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {

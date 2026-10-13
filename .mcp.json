@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mongodb": {
+      "command": "npx",
+      "args": ["-y", "mongodb-mcp-server@3.0.5", "--disabledTools", "atlas"],
+      "env": { "MDB_MCP_CONNECTION_STRING": "${OSRS_TRACKER_MONGO_URI}" }
+    }
+  }
+}
