@@ -10,8 +10,13 @@ export const MAX_IMAGE_PIXELS = 25_000_000;
  */
 export const MAX_CONCURRENT_IMAGE_CONVERSIONS = 2;
 
-/** Conversions waiting for a slot (they hold no image yet); beyond that a request gets 503 at once. */
-export const MAX_QUEUED_IMAGE_CONVERSIONS = 10;
+/**
+ * Conversions waiting for a slot (they hold no image yet, so waiting is cheap); beyond that a request gets 503 at once.
+ * A first visit to the web's news archive asks for 30 images at once, spread over the pods: with 10, a burst of 30
+ * uncached images got two 503s (2026-10-13), while a news thumbnail converts in about 0.1s, so 50 drain well within
+ * `IMAGE_QUEUE_TIMEOUT_MS`.
+ */
+export const MAX_QUEUED_IMAGE_CONVERSIONS = 50;
 
 /** Longest a conversion waits for a slot before its request gets 503. */
 export const IMAGE_QUEUE_TIMEOUT_MS = 10_000;

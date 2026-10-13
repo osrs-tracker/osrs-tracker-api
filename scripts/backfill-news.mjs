@@ -1,6 +1,7 @@
 // One-off backfill of the `news` collection with the posts from before the API stored the feed (2026-10), from the
 // OSRS Wiki's `update` bucket: title, date and category, plus the Jagex link from each Update page's `{{Update|url=}}`.
-// Only those facts are stored, never Wiki text (CC BY-NC-SA), so backfilled posts have no `description` or `enclosure`.
+// Only those facts are stored, never Wiki text (CC BY-NC-SA), so backfilled posts have no `description` or `enclosure`:
+// `backfill-news-images.mjs`, run after it, adds Jagex's own teaser and image from Jagex's news archive.
 // Inserts only (`$setOnInsert`): a post the feed already stored keeps its feed version.
 //
 // Run from the repo root after the API has deployed (it creates the unique `link` index):
