@@ -11,13 +11,27 @@ import { BulkheadFullError, ResiliencePolicy, ResilienceService } from '@nestjs/
 import { OsrsNewsItem } from '@osrs-tracker/models';
 import { XMLParser } from 'fast-xml-parser';
 import { LRUCache } from 'lru-cache';
+import { AnyBulkWriteOperation, Collection, Db } from 'mongodb';
 import sharp from 'sharp';
 import { Agent, errors, fetch } from 'undici';
 import { AGENT, IMAGE_AGENT, MAX_IMAGE_BYTES, USER_AGENT } from '../../common/agent/agent.provider';
 import { ThrottledWarning } from '../../common/logger/throttled-warning';
+import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { XML_PARSER } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
 import { MAX_IMAGE_PIXELS, NEWS_IMAGES } from './news.config';
+
+export const NEWS_COLLECTION = 'news';
+
+/** The most posts `getNewsSince` returns. */
+export const MAX_NEWS_SINCE = 200;
+
+/**
+ * A stored post, keyed on `link`: a feed item, or one backfilled from the Wiki's `update` bucket (2026-10), which has no
+ * `description` or `enclosure`.
+ */
+export type StoredNewsItem = Omit<OsrsNewsItem, 'description' | 'enclosure'> &
+  Partial<Pick<OsrsNewsItem, 'description' | 'enclosure'>>;
 
 @Injectable()
 export class NewsService {
@@ -33,6 +47,7 @@ export class NewsService {
   private readonly evictionWarning = new ThrottledWarning();
 
   private readonly imagesPolicy: ResiliencePolicy;
+  private readonly news: Collection<StoredNewsItem>;
 
   /**
    * The parsed feed, so `/news` doesn't fetch Jagex on every request (SSR calls the API directly, not via a cache).
@@ -64,16 +79,30 @@ export class NewsService {
     @Inject(AGENT) private readonly agent: Agent,
     @Inject(IMAGE_AGENT) private readonly imageAgent: Agent,
     @Inject(XML_PARSER) private readonly xmlParser: XMLParser,
+    @Inject(MONGODB_DATABASE) db: Db,
     private readonly config: ConfigService<Env, true>,
     resilience: ResilienceService,
   ) {
     this.imagesPolicy = resilience.preset(NEWS_IMAGES);
+    this.news = db.collection(NEWS_COLLECTION);
   }
 
   async getRecentNews(limit: number): Promise<OsrsNewsItem[]> {
     const osrsNewsItems = await this.newsCache.forceFetch('news');
 
     return osrsNewsItems.slice(0, limit);
+  }
+
+  /**
+   * The stored posts published after `since`, newest first, at most `MAX_NEWS_SINCE`. Refreshes the feed first (stored
+   * by `fetchNews`), so they're as fresh as `/news`; when Jagex fails, the stored posts are served as they are.
+   */
+  async getNewsSince(since: Date): Promise<StoredNewsItem[]> {
+    await this.newsCache.forceFetch('news').catch(() => undefined); // `fetchNews` logged the failure
+
+    return this.news
+      .find({ pubDate: { $gt: since } }, { sort: { pubDate: -1 }, limit: MAX_NEWS_SINCE, projection: { _id: 0 } })
+      .toArray();
   }
 
   /**
@@ -104,7 +133,9 @@ export class NewsService {
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      return this.parseOSRSNewsRSS(await response.text());
+      const items = this.parseOSRSNewsRSS(await response.text());
+      await this.storeNews(items);
+      return items;
     } catch (error) {
       const message = (error as Error).message;
       if (!staleItems) {
@@ -115,6 +146,24 @@ export class NewsService {
       this.logger.warn(`News feed request failed, serving the cached copy: ${message}`);
       options.ttl = this.NEWS_RETRY_MS; // the stale copy is stored again with this ttl, so it's retried sooner
       return staleItems;
+    }
+  }
+
+  /**
+   * Upserts the feed's posts keyed on `link`, so they're kept after they leave the feed (it holds the newest 15). Once
+   * per feed refresh, whoever's request triggered it: the one write a GET can cause. A failure is logged, not thrown,
+   * so `/news` still answers.
+   */
+  private async storeNews(items: OsrsNewsItem[]): Promise<void> {
+    if (!items.length) return;
+
+    const upserts: AnyBulkWriteOperation<StoredNewsItem>[] = items.map((item) => ({
+      updateOne: { filter: { link: item.link }, update: { $set: item }, upsert: true },
+    }));
+    try {
+      await this.news.bulkWrite(upserts, { ordered: false });
+    } catch (error) {
+      this.logger.warn(`Storing the news feed failed: ${(error as Error).message}`);
     }
   }
 

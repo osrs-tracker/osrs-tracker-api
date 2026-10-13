@@ -5,6 +5,14 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 
 ## 2026-10-13
 
+- New `GET /news/since/:date` (an ISO date, or a date and time with a zone; 400 otherwise) serves every OSRS news post
+  published after it, newest first, at most 200, with `public, max-age=300`, for the web's "since you last played"
+  catch-up (osrs-tracker/osrs-tracker-web#254). Jagex's feed only holds the newest 15 posts, so every feed refresh now
+  upserts its posts into a new `news` collection, keyed on a unique `link` (the one write a GET can cause; a failed
+  write is logged and `/news` still answers). The route refreshes the feed first and answers from the stored posts when
+  Jagex fails. `scripts/backfill-news.mjs`, run once after the deploy, backfills about 1,840 posts back to 2013 from the
+  OSRS Wiki's `update` bucket: title, date, category and Jagex link only, no Wiki text (CC BY-NC-SA), so those posts
+  have no `description` or `enclosure`. `GET /news` is unchanged (#145).
 - New `GET /player-counts/latest` and `GET /player-counts?range=24h|7d|30d|1y|all` (`24h` when absent) serve the players
   online that osrs-tracker-aws's record-player-count Lambda samples every 10 minutes into `playerCounts`: the newest
   sample (404 before the first), and its history, oldest first: every sample for 24h and 7d, hourly averages for 30d,

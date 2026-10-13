@@ -16,8 +16,8 @@ import { COMBAT_SKILLS } from './features/players/player.utils';
 /**
  * Boots the whole app against a fake database and a fake Jagex, and checks the skill's Cache-Control rules for every
  * GET route: each sends a deliberate `Cache-Control` without `no-store`, `no-cache` or `private` (the web app's SSR
- * transfer cache drops those), and never writes to the database. Also checks that the POST lookup records nothing for a
- * bot, and the request IDs.
+ * transfer cache drops those), and never writes to the database, except the news feed refresh storing Jagex's posts
+ * (`FEED_STORE`). Also checks that the POST lookup records nothing for a bot, and the request IDs.
  */
 
 const { fakeFetch, logLines } = vi.hoisted(() => {
@@ -60,7 +60,12 @@ interface Case extends Fakes {
   url: string;
   status: number;
   cacheControl: string;
+  /** The only writes the request may make. */
+  writes?: string[];
 }
+
+/** A news feed refresh (on the first request after 5 minutes) stores the feed's posts, whoever's request it is. */
+const FEED_STORE = ['news.bulkWrite'];
 
 const storedPlayer = {
   username: 'toxsick',
@@ -149,7 +154,22 @@ const CASES: Record<string, Case[]> = {
     { url: '/player-counts/latest', docs: [playerCount], status: 200, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
     { name: 'none recorded', url: '/player-counts/latest', status: 404, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
   ],
-  '/news': [{ url: '/news', status: 200, cacheControl: CACHE_CONTROL.NEWS }],
+  '/news': [{ url: '/news', status: 200, cacheControl: CACHE_CONTROL.NEWS, writes: FEED_STORE }],
+  '/news/since/:date': [
+    {
+      url: '/news/since/2026-10-01',
+      docs: [{ title: 'Game update', pubDate: new Date(), category: 'Game Updates', link: 'https://example.com' }],
+      status: 200,
+      cacheControl: CACHE_CONTROL.NEWS_SINCE,
+      writes: FEED_STORE,
+    },
+    {
+      name: 'invalid date',
+      url: '/news/since/yesterday',
+      status: 400,
+      cacheControl: CACHE_CONTROL.NEWS_SINCE,
+    },
+  ],
   '/news/image': [
     {
       url: '/news/image?url=https://cdn.runescape.com/news.png',
@@ -276,14 +296,17 @@ describe('GET routes', () => {
     routeCases.map((c) => ({ ...c, title: c.name ? `${route} (${c.name})` : route })),
   );
 
-  it.each(cases)('$title', async ({ url, status, cacheControl, docs, hiscores }) => {
+  it.each(cases)('$title', async ({ url, status, cacheControl, docs, hiscores, writes = [] }) => {
     fakes = { docs, hiscores };
 
     const response = await fetch(baseUrl + url);
 
     expect(response.status).toBe(status);
     expect(response.headers.get('cache-control')).toBe(cacheControl);
-    expect(collectionCalls.filter((call) => !READ_METHODS.has(call.split('.')[1]))).toEqual([]);
+    const otherWrites = collectionCalls.filter(
+      (call) => !READ_METHODS.has(call.split('.')[1]) && !writes.includes(call),
+    );
+    expect(otherWrites).toEqual([]);
   });
 
   describe('POST /players/:username/lookup', () => {
