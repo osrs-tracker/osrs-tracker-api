@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { ParsePlayerCountRangePipe } from './parse-player-count-range.pipe';
 import { buildPlayerCountHistoryPipeline } from './player-count-history';
 
-/** There's no database in the tests, so this checks the pipeline: each range's start and what it averages over. */
+/**
+ * There's no database in the tests, so this checks the pipeline: each range's start and what it averages over. Its
+ * results were checked against Atlas with `$documents` samples (#158).
+ */
 describe('buildPlayerCountHistoryPipeline', () => {
   const now = new Date('2026-10-13T12:00:00Z');
   const since = (range: Parameters<typeof buildPlayerCountHistoryPipeline>[0]) =>
@@ -24,18 +27,39 @@ describe('buildPlayerCountHistoryPipeline', () => {
       const pipeline = buildPlayerCountHistoryPipeline(range, now);
       expect(groupOf(range)).toBeUndefined();
       expect(pipeline).toContainEqual({ $sort: { date: 1 } });
+      expect(pipeline.at(-1)?.$project.byLocation).toBe(1);
     }
   });
 
+  const truncOf = (range: Parameters<typeof buildPlayerCountHistoryPipeline>[0]) =>
+    buildPlayerCountHistoryPipeline(range, now).find((stage) => stage.$project?.location)?.$project.date;
+
   it('averages 30d per hour, without a peak', () => {
-    expect(groupOf('30d')?._id).toEqual({ $dateTrunc: { date: '$date', unit: 'hour' } });
+    expect(truncOf('30d')).toEqual({ $dateTrunc: { date: '$date', unit: 'hour' } });
     expect(groupOf('30d')).not.toHaveProperty('peak');
   });
 
   it('averages 1y and all per day, with the peak total', () => {
     for (const range of ['1y', 'all'] as const) {
-      expect(groupOf(range)?._id).toEqual({ $dateTrunc: { date: '$date', unit: 'day' } });
-      expect(groupOf(range)?.peak).toEqual({ $max: '$total' });
+      expect(truncOf(range)).toEqual({ $dateTrunc: { date: '$date', unit: 'day' } });
+      expect(groupOf(range)?.peak).toEqual({ $max: { $cond: [{ $eq: ['$i', 0] }, '$total', null] } });
+    }
+  });
+
+  it('averages byLocation per bucket and code, and counts each sample once for its totals', () => {
+    for (const range of ['30d', '1y', 'all'] as const) {
+      const pipeline = buildPlayerCountHistoryPipeline(range, now);
+      expect(pipeline).toContainEqual({ $unwind: { path: '$location', includeArrayIndex: 'i' } });
+      expect(groupOf(range)).toMatchObject({
+        _id: { date: '$date', code: '$location.k' },
+        players: { $avg: '$location.v' },
+        samples: { $sum: { $cond: [{ $eq: ['$i', 0] }, 1, 0] } },
+        total: { $sum: { $cond: [{ $eq: ['$i', 0] }, '$total', 0] } },
+      });
+      expect(pipeline.at(-1)?.$project).toMatchObject({
+        total: { $round: [{ $divide: ['$total', '$samples'] }, 0] },
+        byLocation: { $arrayToObject: '$byLocation' },
+      });
     }
   });
 });

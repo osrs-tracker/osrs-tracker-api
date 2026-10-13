@@ -9,6 +9,8 @@ export interface PlayerCountPoint {
   total: number;
   members: number;
   f2p: number;
+  /** Players per raw location code (`PlayerCount['byLocation']`); in a bucket, the average per code. */
+  byLocation: Record<string, number>;
   /** Daily points only: the highest `total` sampled that day. */
   peak?: number;
 }
@@ -35,19 +37,49 @@ export function buildPlayerCountHistoryPipeline(range: PlayerCountRange, now = n
   const match = span === undefined ? [] : [{ $match: { date: { $gte: new Date(now.getTime() - span) } } }];
 
   if (!bucket)
-    return [...match, { $sort: { date: 1 } }, { $project: { _id: 0, date: 1, total: 1, members: 1, f2p: 1 } }];
+    return [
+      ...match,
+      { $sort: { date: 1 } },
+      { $project: { _id: 0, date: 1, total: 1, members: 1, f2p: 1, byLocation: 1 } },
+    ];
 
   const peak = bucket === 'day';
+  // Each sample is one document per location code after the `$unwind`: its own fields count once, on its first code.
+  const first = { $eq: ['$i', 0] };
+  const once = (value: string | number) => ({ $sum: { $cond: [first, value, 0] } });
 
   return [
     ...match,
     {
+      $project: {
+        date: { $dateTrunc: { date: '$date', unit: bucket } },
+        total: 1,
+        members: 1,
+        f2p: 1,
+        location: { $objectToArray: '$byLocation' },
+      },
+    },
+    { $unwind: { path: '$location', includeArrayIndex: 'i' } },
+    {
       $group: {
-        _id: { $dateTrunc: { date: '$date', unit: bucket } },
-        total: { $avg: '$total' },
-        members: { $avg: '$members' },
-        f2p: { $avg: '$f2p' },
-        ...(peak && { peak: { $max: '$total' } }),
+        _id: { date: '$date', code: '$location.k' },
+        players: { $avg: '$location.v' },
+        samples: once(1),
+        total: once('$total'),
+        members: once('$members'),
+        f2p: once('$f2p'),
+        ...(peak && { peak: { $max: { $cond: [first, '$total', null] } } }),
+      },
+    },
+    {
+      $group: {
+        _id: '$_id.date',
+        samples: { $sum: '$samples' },
+        total: { $sum: '$total' },
+        members: { $sum: '$members' },
+        f2p: { $sum: '$f2p' },
+        ...(peak && { peak: { $max: '$peak' } }),
+        byLocation: { $push: { k: '$_id.code', v: { $round: ['$players', 0] } } },
       },
     },
     { $sort: { _id: 1 } },
@@ -55,9 +87,10 @@ export function buildPlayerCountHistoryPipeline(range: PlayerCountRange, now = n
       $project: {
         _id: 0,
         date: '$_id',
-        total: { $round: ['$total', 0] },
-        members: { $round: ['$members', 0] },
-        f2p: { $round: ['$f2p', 0] },
+        total: { $round: [{ $divide: ['$total', '$samples'] }, 0] },
+        members: { $round: [{ $divide: ['$members', '$samples'] }, 0] },
+        f2p: { $round: [{ $divide: ['$f2p', '$samples'] }, 0] },
+        byLocation: { $arrayToObject: '$byLocation' },
         ...(peak && { peak: 1 }),
       },
     },
