@@ -292,15 +292,17 @@ database: they run on fakes (Tests).
 
 Live data is read and written through the `mongodb` MCP server (`.mcp.json`, database `osrs-tracker`), which connects
 with `OSRS_TRACKER_MONGO_URI` from the user's environment: a database user with `readWrite` on `osrs-tracker` only, and
-no Atlas API tools. Reads (`find`, `count`, `aggregate`) need no prompt; every write tool asks first, even in auto mode
-(`permissions.ask` in `.claude/settings.json`; a write tool a server bump adds goes there too), and the drops,
-`delete-many` and `$out`/`$merge` pipelines also ask through the server's own confirmation. The cluster has no backups,
-so before a write that can touch more than one document: save the affected documents (the server's `export` with the
-same filter, or a `mongodump` of the collection), or at least show a `find` with that filter and its `count`; state the
-counts to expect (`matchedCount`, `modifiedCount`, `deletedCount`), so a no-op or a too-wide filter shows; and read the
-documents again afterwards. Cloud sessions and routines don't have the variable, so there the server fails to connect:
-hand the user a mongosh snippet instead, starting with `use('osrs-tracker')` (mongosh starts in `test`, where a write
-silently matches nothing) and with the expected counts.
+no Atlas API tools. In the desktop app on WSL it must be a Windows user variable passed through `WSLENV`
+(`OSRS_TRACKER_MONGO_URI/u`): the app doesn't load `~/.profile`, which reaches terminal sessions only. Reads (`find`,
+`count`, `aggregate`) need no prompt; every write tool asks first, even in auto mode (`permissions.ask` in
+`.claude/settings.json`; a write tool a server bump adds goes there too), and the drops, `delete-many` and
+`$out`/`$merge` pipelines also ask through the server's own confirmation. The cluster has no backups, so before a write
+that can touch more than one document: save the affected documents (the server's `export` with the same filter, or a
+`mongodump` of the collection), or at least show a `find` with that filter and its `count`; state the counts to expect
+(`matchedCount`, `modifiedCount`, `deletedCount`), so a no-op or a too-wide filter shows; and read the documents again
+afterwards. Cloud sessions and routines don't have the variable, so there the server fails to connect: hand the user a
+mongosh snippet instead, starting with `use('osrs-tracker')` (mongosh starts in `test`, where a write silently matches
+nothing) and with the expected counts.
 
 ## Deploy
 

@@ -27,7 +27,8 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 - Claude Code reads and writes live data through a project MongoDB MCP server (`.mcp.json`, `mongodb-mcp-server` pinned,
   Atlas tools off) that connects as a database user limited to `readWrite` on `osrs-tracker`, instead of the claude.ai
   Atlas connector, which had the whole Atlas account. Every write tool asks first, even in auto mode, and the skill has
-  Claude save or count the affected documents before a multi-document write (#148). Nothing in the API changes.
+  Claude save or count the affected documents before a multi-document write (#148). The desktop app on WSL doesn't load
+  `~/.profile`, so the skill says to pass the connection variable through `WSLENV` there. Nothing in the API changes.
 - Changelog headings and dates are ISO (`2026-10-13`, was `2026/10/13`), as Keep a Changelog recommends and in step with
   the other osrs-tracker repos. Markdown is now checked in CI: Prettier formats it (`npm run prettier` and
   `prettier:ci`; `.prettierignore` skips other sessions' worktrees), and lint checks its local links and `#anchors` with
