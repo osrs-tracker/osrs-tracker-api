@@ -133,6 +133,10 @@ export const mongoDBProvider: FactoryProvider = {
     await db.collection('items').createIndex({ name: 1 }, { collation: ITEM_NAME_COLLATION });
     await ensureItemSearchIndex(db);
 
+    // Ensure news indexes are created: the feed upserts on `link`, `/news/since/:date` reads by `pubDate`
+    await db.collection('news').createIndex({ link: 1 }, { unique: true });
+    await db.collection('news').createIndex({ pubDate: -1 });
+
     return db;
   },
   inject: [MONGO_CLIENT, ConfigService],

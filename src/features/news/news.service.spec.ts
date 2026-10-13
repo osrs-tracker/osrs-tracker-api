@@ -9,6 +9,7 @@ import sharp from 'sharp';
 import { Agent, fetch, Response } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
 import { AGENT, IMAGE_AGENT, imageAgentProvider, MAX_IMAGE_BYTES, USER_AGENT } from '../../common/agent/agent.provider';
+import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { XML_PARSER, XMLParserProvider } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
 import {
@@ -18,7 +19,7 @@ import {
   NEWS_IMAGES,
   NEWS_IMAGES_PRESET,
 } from './news.config';
-import { NewsService } from './news.service';
+import { MAX_NEWS_SINCE, NEWS_COLLECTION, NewsService } from './news.service';
 
 vi.mock('undici', async (importOriginal) => ({ ...(await importOriginal<typeof import('undici')>()), fetch: vi.fn() }));
 
@@ -29,6 +30,14 @@ const RSS =
   '<pubDate>Thu, 08 Oct 2026 12:00:00 GMT</pubDate><category>Game Updates</category><description>Notes</description>' +
   '<enclosure url="https://cdn.runescape.com/news/patch.png" type="image/png"/></item></channel></rss>';
 const IMAGE_URL = 'https://cdn.runescape.com/news/patch.png';
+
+/** The `news` collection: `bulkWrite` stores the feed, `find` answers `storedNews`. */
+let storedNews: object[] = [];
+const fakeNews = {
+  bulkWrite: vi.fn(),
+  find: vi.fn(() => ({ toArray: async () => storedNews })),
+};
+const fakeDb = { collection: (name: string) => (name === NEWS_COLLECTION ? fakeNews : undefined) };
 
 /** Answers every request with a new response from `respond` after a few milliseconds (a body can be read once). */
 function answerWith(respond: () => Response) {
@@ -51,6 +60,7 @@ async function createNewsService(
       { provide: AGENT, useValue: {} },
       { provide: IMAGE_AGENT, useValue: imageAgent ?? {} },
       { provide: XML_PARSER, useValue: xmlParser },
+      { provide: MONGODB_DATABASE, useValue: fakeDb },
       { provide: ConfigService, useValue: config },
     ],
   }).compile();
@@ -78,6 +88,9 @@ describe('NewsService caches', () => {
 
   beforeEach(async () => {
     mockFetch.mockReset();
+    fakeNews.bulkWrite.mockReset();
+    fakeNews.find.mockClear();
+    storedNews = [];
     now = 1_000_000;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
     warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -138,6 +151,52 @@ describe('NewsService caches', () => {
       answerWith(() => new Response(RSS));
       expect((await service.getRecentNews(4))[0].title).toBe('Patch notes');
       expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('storing the feed', () => {
+    it("upserts the feed's posts keyed on link once per refresh", async () => {
+      answerWith(() => new Response(RSS));
+      const [items] = await Promise.all([1, 2, 3].map(() => service.getRecentNews(4)));
+
+      expect(fakeNews.bulkWrite).toHaveBeenCalledOnce();
+      expect(fakeNews.bulkWrite).toHaveBeenCalledWith(
+        [{ updateOne: { filter: { link: items[0].link }, update: { $set: items[0] }, upsert: true } }],
+        { ordered: false },
+      );
+    });
+
+    it('still serves the feed when storing it fails', async () => {
+      answerWith(() => new Response(RSS));
+      fakeNews.bulkWrite.mockRejectedValue(new Error('connection closed'));
+
+      expect((await service.getRecentNews(4))[0].title).toBe('Patch notes');
+      expect(warn).toHaveBeenCalledWith('Storing the news feed failed: connection closed');
+    });
+  });
+
+  describe('getNewsSince', () => {
+    const since = new Date('2026-10-01T00:00:00Z');
+
+    it('refreshes the feed, then reads the stored posts after the date, newest first', async () => {
+      answerWith(() => new Response(RSS));
+      storedNews = [{ title: 'Stored' }];
+
+      expect(await service.getNewsSince(since)).toEqual(storedNews);
+      expect(fakeNews.bulkWrite).toHaveBeenCalledBefore(fakeNews.find);
+      expect(fakeNews.find).toHaveBeenCalledWith(
+        { pubDate: { $gt: since } },
+        { sort: { pubDate: -1 }, limit: MAX_NEWS_SINCE, projection: { _id: 0 } },
+      );
+    });
+
+    it('answers from the stored posts when the feed fails', async () => {
+      answerWith(() => new Response('Bad gateway', { status: 502 }));
+      storedNews = [{ title: 'Stored' }];
+
+      expect(await service.getNewsSince(since)).toEqual(storedNews);
+      expect(fakeNews.bulkWrite).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith('News feed request failed: HTTP 502');
     });
   });
 

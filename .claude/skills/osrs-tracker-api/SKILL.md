@@ -35,9 +35,9 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
   New indexes go in `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy` only
   answers once bootstrap, including the Mongo connect, is done (the metrics server starts listening then, which is what
   the `startupProbe` waits for); after that it stays liveness only and never checks Mongo.
-- The `players` and `items` collections, their fields, writers and index owners are described in osrs-tracker-aws's
-  [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new or changed index or
-  stored field also needs an update there: open an issue in osrs-tracker-aws.
+- The `players`, `items` and `news` collections, their fields, writers and index owners are described in
+  osrs-tracker-aws's [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new
+  or changed index or stored field also needs an update there: open an issue in osrs-tracker-aws.
 - Env: `.env.example` lists the vars, `.env` holds local values (points at prod). In the cluster they come from the
   `aws-mongodb-credentials` secret (the `MONGODB_*` vars and `OSRS_API_BASE_URL`; its template is
   `cluster/osrs-tracker/secrets.example.yaml` in `../home-cluster`, and the user applies it, never this repo), with the
@@ -125,11 +125,12 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
 ## Validating params
 
 Validate query and route params in pipes, not with checks in the handler: `ParseUsernamePipe`,
-`ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (item browse's letter), each next to its feature, and from
-`common/pipes/` `new ParseIntRangePipe({ min, max?, default?, optional?, message? })` for any other integer (its message
-is named after the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` + `ParseIntPipe` + a range
-check, or an `isNaN` check after a parse pipe. Keep existing status codes and messages: the web may show them. A new
-pipe gets a spec.
+`ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (item browse's letter), `ParseSinceDatePipe` (an ISO date for
+`/news/since/:date`), each next to its feature, and from `common/pipes/`
+`new ParseIntRangePipe({ min, max?, default?, optional?, message? })` for any other integer (its message is named after
+the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` + `ParseIntPipe` + a range check, or an
+`isNaN` check after a parse pipe. Keep existing status codes and messages: the web may show them. A new pipe gets a
+spec.
 
 Stored usernames are Jagex's matching form: lowercase, `_` and `-` as spaces, trimmed (`PlayerUtils.normalizeUsername`,
 which `ParseUsernamePipe` applies), so one player is one document. Anything that stores, looks up or compares a name
@@ -200,11 +201,13 @@ changes `CASES` in the same diff. The spec fails on a new GET route without a ca
 case expects (values only POSTs send go in its `POST_ONLY`); a new branch reusing an existing value it can't see, so
 that one is on the author and the `conventions-reviewer`.
 
-- Read-only, slow-changing: `public, max-age=N` (`/news` 300, `/items/search/:query` 3600, `/sitemap/players` 3600,
-  `/items/browse/:letter` 86400, `/news/image` 604800).
-- Routes that fetch Jagex live (`/news`, `/news/image`) set it with `res.setHeader` after the fetch succeeds, not with
-  `@Header` (which also applies to errors), so caches don't keep a 503.
-- GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR.
+- Read-only, slow-changing: `public, max-age=N` (`/news` and `/news/since/:date` 300, `/items/search/:query` 3600,
+  `/sitemap/players` 3600, `/items/browse/:letter` 86400, `/news/image` 604800).
+- Routes that fetch Jagex live (`/news`, `/news/since/:date`, `/news/image`) set it with `res.setHeader` after the fetch
+  succeeds, not with `@Header` (which also applies to errors), so caches don't keep a 503.
+- GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR. The one
+  exception: a news feed refresh (`/news`, `/news/since/:date`) upserts the feed's posts into `news` (keyed on `link`),
+  the same whoever asks; the e2e spec allows only that write (`FEED_STORE`).
 - `/items/:id`, `/players/:username/hiscores` and the recent-items/players lists: `max-age=0, must-revalidate` so
   they're always fresh.
 - `/players/:username`: stored players get a dynamic `max-age` (`playerMaxAgeSeconds`), clamped to `[0, 900]` and capped
@@ -232,8 +235,8 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     and the initial entry written only for a new offset (`buildRefreshUpdate`); combat level, type and status
     (`PlayerUtils`; a hiscore without a combat skill's key counts as failed, a `null` one doesn't, `hasCombatSkills`);
     the layout cache, upsert and collision check (`hiscore-layouts.service.spec.ts`).
-  - The validation pipes `ParseUsernamePipe`, `ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (in
-    `items/item-browse.spec.ts`) and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip` and IDs).
+  - The validation pipes `ParseSinceDatePipe`, `ParseUsernamePipe`, `ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe`
+    (in `items/item-browse.spec.ts`) and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip` and IDs).
   - `items/item-browse.spec.ts`: item browse's name range per letter (`buildItemBrowseFilter`; `0` is everything before
     `a`, `z` has no upper bound).
   - `items/item-search.spec.ts`: the item search's `$search` pipeline (`buildItemSearchPipeline`; `$search` doesn't run
@@ -244,7 +247,9 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     bound and queue timeout (no warning per refusal), the breaker opening on failures but not on not-found players; a
     hiscores page read from the newest entry so its bare values resolve, the recent players' entry whole or Overall only
     (`entry=overall`), and the layout stored before the entry.
-  - `news.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock): shared in-flight
+  - `news.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock, a fake `news`
+    collection): each feed refresh upserting its posts by `link` once, `/news` still answering when that fails, and
+    `/news/since/:date` refreshing first and answering from the stored posts when the feed fails; shared in-flight
     fetches, the stale feed's 60s retry, the 503 and a 404 not cached; the image size limit against a local server with
     the real `fetch` and `IMAGE_AGENT` (503, its log line, `identity`), and an oversized `content-length` refused
     without reading the body; the `news-images` bulkhead (queue bound and timeout, 503 without fetching, one slot per
