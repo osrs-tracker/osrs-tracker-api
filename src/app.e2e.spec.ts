@@ -10,6 +10,7 @@ import { AGENT, IMAGE_AGENT } from './common/agent/agent.provider';
 import { CACHE_CONTROL } from './common/http/cache-control';
 import { MONGO_CLIENT, MONGODB_DATABASE } from './common/mongo/mongo.provider';
 import { ROUTE_CONFLICT_POLICY } from './config/app-options';
+import { encodeNewsCursor } from './features/news/news-archive';
 import { HISCORE_LAYOUTS_COLLECTION } from './features/players/hiscore-layouts.service';
 import { COMBAT_SKILLS } from './features/players/player.utils';
 
@@ -59,7 +60,8 @@ interface Case extends Fakes {
   name?: string;
   url: string;
   status: number;
-  cacheControl: string;
+  /** `null` for an error of a route that sets its `Cache-Control` only on success. */
+  cacheControl: string | null;
   /** The only writes the request may make. */
   writes?: string[];
 }
@@ -74,6 +76,7 @@ const storedPlayer = {
   scrapingOffsets: [0],
 };
 const item = { id: 4151, name: 'Abyssal whip', icon: 'whip.png' };
+const post = { title: 'Game update', pubDate: new Date(), category: 'Game Updates', link: 'https://example.com' };
 const playerCount = { date: new Date(), total: 84441, members: 60000, f2p: 24441, worlds: 321, byLocation: {} };
 const LAYOUT = createHiscoreLayout({ skills: [...COMBAT_SKILLS], activities: [] }, new Date(0));
 /** A stored hiscore entry, so reading it also loads its layout. */
@@ -158,10 +161,38 @@ const CASES: Record<string, Case[]> = {
   '/news/since/:date': [
     {
       url: '/news/since/2026-10-01',
-      docs: [{ title: 'Game update', pubDate: new Date(), category: 'Game Updates', link: 'https://example.com' }],
+      docs: [post],
       status: 200,
       cacheControl: CACHE_CONTROL.NEWS_SINCE,
       writes: FEED_STORE,
+    },
+  ],
+  '/news/archive': [
+    {
+      name: 'first page',
+      url: '/news/archive?limit=1',
+      docs: [post, post],
+      status: 200,
+      cacheControl: CACHE_CONTROL.NEWS_ARCHIVE,
+      writes: FEED_STORE,
+    },
+    {
+      name: 'next page, in a category',
+      url: `/news/archive?before=${encodeNewsCursor(post)}&category=Game%20Updates`,
+      docs: [post],
+      status: 200,
+      cacheControl: CACHE_CONTROL.NEWS_ARCHIVE,
+    },
+    { name: 'invalid before', url: '/news/archive?before=nope', status: 400, cacheControl: null },
+    { name: 'invalid limit', url: '/news/archive?limit=51', status: 400, cacheControl: null },
+    { name: 'repeated category', url: '/news/archive?category=a&category=b', status: 400, cacheControl: null },
+  ],
+  '/news/categories': [
+    {
+      url: '/news/categories',
+      docs: [{ category: 'Game Updates', count: 1 }],
+      status: 200,
+      cacheControl: CACHE_CONTROL.NEWS_CATEGORIES,
     },
   ],
   '/news/image': [

@@ -19,6 +19,7 @@ import { ThrottledWarning } from '../../common/logger/throttled-warning';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { XML_PARSER } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
+import { buildNewsArchiveFilter, encodeNewsCursor, NEWS_ARCHIVE_SORT, NewsArchiveCursor } from './news-archive';
 import { MAX_IMAGE_PIXELS, NEWS_IMAGES } from './news.config';
 
 export const NEWS_COLLECTION = 'news';
@@ -32,6 +33,18 @@ export const MAX_NEWS_SINCE = 200;
  */
 export type StoredNewsItem = Omit<OsrsNewsItem, 'description' | 'enclosure'> &
   Partial<Pick<OsrsNewsItem, 'description' | 'enclosure'>>;
+
+/** A page of `GET /news/archive`: `next` is the `before` of the following page, `null` on the last one. */
+export interface NewsArchivePage {
+  posts: StoredNewsItem[];
+  next: string | null;
+}
+
+/** A category of the stored posts and how many posts it has, for the archive's filter. */
+export interface NewsCategory {
+  category: string;
+  count: number;
+}
 
 @Injectable()
 export class NewsService {
@@ -102,6 +115,41 @@ export class NewsService {
 
     return this.news
       .find({ pubDate: { $gt: since } }, { sort: { pubDate: -1 }, limit: MAX_NEWS_SINCE, projection: { _id: 0 } })
+      .toArray();
+  }
+
+  /**
+   * A page of the stored posts in `NEWS_ARCHIVE_SORT` order, after `cursor` and in `category` when given. The first page
+   * refreshes the feed first, like `getNewsSince` (and answers from the stored posts when Jagex fails); later pages only
+   * hold older posts, so they don't.
+   */
+  async getNewsArchive(limit: number, cursor?: NewsArchiveCursor, category?: string): Promise<NewsArchivePage> {
+    if (!cursor) await this.newsCache.forceFetch('news').catch(() => undefined); // `fetchNews` logged the failure
+
+    // One more than the page, to know whether another page follows without counting
+    const posts = await this.news
+      .find(buildNewsArchiveFilter(cursor, category), {
+        sort: NEWS_ARCHIVE_SORT,
+        limit: limit + 1,
+        projection: { _id: 0 },
+      })
+      .toArray();
+
+    if (posts.length <= limit) return { posts, next: null };
+
+    const page = posts.slice(0, limit);
+    return { posts: page, next: encodeNewsCursor(page[limit - 1]) };
+  }
+
+  /** The stored posts' categories by name, with their post counts. */
+  getNewsCategories(): Promise<NewsCategory[]> {
+    return this.news
+      .aggregate<NewsCategory>([
+        { $match: { category: { $type: 'string' } } },
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+        { $project: { _id: 0, category: '$_id', count: 1 } },
+      ])
       .toArray();
   }
 

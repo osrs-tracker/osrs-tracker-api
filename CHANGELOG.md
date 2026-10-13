@@ -13,6 +13,14 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   Jagex fails. `scripts/backfill-news.mjs`, run once after the deploy, backfills about 1,840 posts back to 2013 from the
   OSRS Wiki's `update` bucket: title, date, category and Jagex link only, no Wiki text (CC BY-NC-SA), so those posts
   have no `description` or `enclosure`. `GET /news` is unchanged (#145).
+- New `GET /news/archive?limit&before&category` pages through every stored post, newest first, for the web's news
+  archive (osrs-tracker/osrs-tracker-web#270): `{ posts, next }`, `limit` 1 to 50 (default 20), `before` the previous
+  page's `next` cursor (`null` on the last page), `category` optional. It pages by a cursor on `pubDate` and `link`
+  rather than an offset, since backfilled posts are dated by day and often share one, so a page boundary can't skip or
+  repeat a post. The first page refreshes the feed like `/news/since/:date`. New `GET /news/categories` lists the
+  categories with their post counts for the archive's filter (the feed and the backfill use the same names). The archive
+  sends `public, max-age=300` and the categories `public, max-age=3600`, both only on success; a bad `before`, `limit`
+  or `category` is a 400 (#156).
 - New `GET /player-counts/latest` and `GET /player-counts?range=24h|7d|30d|1y|all` (`24h` when absent) serve the players
   online that osrs-tracker-aws's record-player-count Lambda samples every 10 minutes into `playerCounts`: the newest
   sample (404 before the first), and its history, oldest first: every sample for 24h and 7d, hourly averages for 30d,

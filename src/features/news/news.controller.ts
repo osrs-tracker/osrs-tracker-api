@@ -2,10 +2,14 @@ import { BadRequestException, Controller, Get, Param, Query, Res } from '@nestjs
 import { Response } from 'express';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ParseIntRangeOptions, ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
+import { NewsArchiveCursor } from './news-archive';
 import { NewsService } from './news.service';
+import { ParseNewsCategoryPipe } from './parse-news-category.pipe';
+import { ParseNewsCursorPipe } from './parse-news-cursor.pipe';
 import { ParseSinceDatePipe } from './parse-since-date.pipe';
 
 const LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 4 };
+const ARCHIVE_LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 20 };
 
 @Controller('news')
 export class NewsController {
@@ -41,6 +45,40 @@ export class NewsController {
     // Set only on success (not with @Header), so caches don't keep a failed read for 5 minutes
     res.setHeader('Cache-Control', CACHE_CONTROL.NEWS_SINCE);
     return news;
+  }
+
+  /**
+   * A page of every stored post (feed and backfilled), newest first with ties on `pubDate` broken by `link`, as
+   * `{ posts, next }`: `limit` posts (1 to 50, default 20) after the `before` cursor (the previous page's `next`; none
+   * for the first page) in `category` when given (a name from `/news/categories`; an unknown one matches nothing).
+   * `next` is `null` on the last page. The first page refreshes the feed first but answers from the stored posts when
+   * Jagex fails. `NEWS_ARCHIVE`; 400 for an invalid `before`, `limit` or `category`. Errors have no `Cache-Control`.
+   */
+  @Get('archive')
+  async getNewsArchive(
+    @Res({ passthrough: true }) res: Response,
+    @Query('limit', new ParseIntRangePipe(ARCHIVE_LIMIT)) limit: number,
+    @Query('before', ParseNewsCursorPipe) cursor: NewsArchiveCursor | undefined,
+    @Query('category', ParseNewsCategoryPipe) category: string | undefined,
+  ) {
+    const page = await this.newsService.getNewsArchive(limit, cursor, category);
+
+    // Set only on success (not with @Header), so caches don't keep a failed read for 5 minutes
+    res.setHeader('Cache-Control', CACHE_CONTROL.NEWS_ARCHIVE);
+    return page;
+  }
+
+  /**
+   * The stored posts' categories by name, as `{ category, count }`, for the archive's filter. `NEWS_CATEGORIES`; errors
+   * have no `Cache-Control`.
+   */
+  @Get('categories')
+  async getNewsCategories(@Res({ passthrough: true }) res: Response) {
+    const categories = await this.newsService.getNewsCategories();
+
+    // Set only on success (not with @Header), so caches don't keep a failed read for an hour
+    res.setHeader('Cache-Control', CACHE_CONTROL.NEWS_CATEGORIES);
+    return categories;
   }
 
   /**
