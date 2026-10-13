@@ -10,5 +10,7 @@ export const XMLParserProvider: FactoryProvider = {
       attributeNamePrefix: '',
       textNodeName: '$text',
       ignoreAttributes: false,
+      // The news feed's items, which would otherwise be an object when the feed holds one
+      isArray: (_tagName, jPath) => jPath === 'rss.channel.item',
     }),
 };

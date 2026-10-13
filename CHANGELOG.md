@@ -62,6 +62,10 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   the other osrs-tracker repos. Markdown is now checked in CI: Prettier formats it (`npm run prettier` and
   `prettier:ci`; `.prettierignore` skips other sessions' worktrees), and lint checks its local links and `#anchors` with
   lychee, offline so external sites can't make CI flaky. Lint runs on docs-only pushes too, where links break (#153).
+- Less hand-rolled code where a dependency already does the job: `ParseSinceDatePipe` rejects a day that doesn't exist
+  with date-fns' `parseISO` instead of comparing calendar days by hand, the player count ranges use date-fns'
+  `millisecondsInDay`, and the XML parser's `isArray` makes the news feed's items an array even for one item. Behaviour
+  is unchanged.
 
 ## 2026-10-12
 

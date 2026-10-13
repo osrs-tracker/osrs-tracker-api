@@ -305,8 +305,8 @@ export class NewsService {
     const channel = this.xmlParser.parse(rss)?.rss?.channel;
     if (!channel || typeof channel !== 'object') throw new Error('Unexpected news feed: no RSS channel');
 
-    // fast-xml-parser gives an object instead of an array for a single item, and nothing for none
-    const items: RssItem[] = channel.item === undefined ? [] : [channel.item].flat();
+    // An array even for a single item (`XML_PARSER`'s `isArray`), and nothing for none
+    const items: RssItem[] = channel.item ?? [];
 
     return items
       .filter((val) => val?.title && val.link && val.enclosure?.url)
