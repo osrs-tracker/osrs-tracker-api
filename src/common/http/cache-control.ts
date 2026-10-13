@@ -20,6 +20,8 @@ export const CACHE_CONTROL = {
   PLAYER_SITEMAP: 'public, max-age=3600',
   /** The player count, latest and history: sampled every 10 minutes. */
   PLAYER_COUNT: 'public, max-age=300',
+  /** The live player count: kept for a minute, Jagex asks for at most one world list poll a minute. */
+  PLAYER_COUNT_LIVE: 'public, max-age=60',
   /** A player lookup that couldn't refresh the stored player: retry the refresh soon. */
   PLAYER_REFRESH_FAILED: 'max-age=60',
   /** A player lookup that just refreshed the player: 15 minutes, `PLAYER_MAX_AGE_SECONDS` in `player.policy.ts`. */
