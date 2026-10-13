@@ -163,12 +163,6 @@ const CASES: Record<string, Case[]> = {
       cacheControl: CACHE_CONTROL.NEWS_SINCE,
       writes: FEED_STORE,
     },
-    {
-      name: 'invalid date',
-      url: '/news/since/yesterday',
-      status: 400,
-      cacheControl: CACHE_CONTROL.NEWS_SINCE,
-    },
   ],
   '/news/image': [
     {

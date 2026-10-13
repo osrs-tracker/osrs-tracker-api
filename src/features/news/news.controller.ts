@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Header, Param, Query, Res } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ParseIntRangeOptions, ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
@@ -31,13 +31,16 @@ export class NewsController {
   /**
    * The stored posts published after `date` (see `ParseSinceDatePipe`), newest first, at most 200: every post since the
    * feed was first stored, plus older ones backfilled from the Wiki without `description` or `enclosure`. Refreshes the
-   * feed first, but answers from the stored posts when Jagex fails. 400 for an invalid date. `NEWS_SINCE` on every
-   * response.
+   * feed first, but answers from the stored posts when Jagex fails. `NEWS_SINCE`; 400 for an invalid date. Errors have
+   * no `Cache-Control`.
    */
   @Get('since/:date')
-  @Header('Cache-Control', CACHE_CONTROL.NEWS_SINCE)
-  getNewsSince(@Param('date', ParseSinceDatePipe) since: Date) {
-    return this.newsService.getNewsSince(since);
+  async getNewsSince(@Res({ passthrough: true }) res: Response, @Param('date', ParseSinceDatePipe) since: Date) {
+    const news = await this.newsService.getNewsSince(since);
+
+    // Set only on success (not with @Header), so caches don't keep a failed read for 5 minutes
+    res.setHeader('Cache-Control', CACHE_CONTROL.NEWS_SINCE);
+    return news;
   }
 
   /**

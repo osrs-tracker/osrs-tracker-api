@@ -203,8 +203,8 @@ that one is on the author and the `conventions-reviewer`.
 
 - Read-only, slow-changing: `public, max-age=N` (`/news` and `/news/since/:date` 300, `/items/search/:query` 3600,
   `/sitemap/players` 3600, `/items/browse/:letter` 86400, `/news/image` 604800).
-- Routes that fetch Jagex live (`/news`, `/news/image`) set it with `res.setHeader` after the fetch succeeds, not with
-  `@Header` (which also applies to errors), so caches don't keep a 503.
+- Routes that fetch Jagex live (`/news`, `/news/since/:date`, `/news/image`) set it with `res.setHeader` after the fetch
+  succeeds, not with `@Header` (which also applies to errors), so caches don't keep a 503.
 - GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR. The one
   exception: a news feed refresh (`/news`, `/news/since/:date`) upserts the feed's posts into `news` (keyed on `link`),
   the same whoever asks; the e2e spec allows only that write (`FEED_STORE`).
