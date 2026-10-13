@@ -21,6 +21,15 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   categories with their post counts for the archive's filter (the feed and the backfill use the same names). The archive
   sends `public, max-age=300` and the categories `public, max-age=3600`, both only on success; a bad `before`, `limit`
   or `category` is a 400 (#156).
+- Backfilled posts get Jagex's own teaser (`description`) and image (`enclosure`) from Jagex's monthly news archive, so
+  the web's news archive can lead every post with its art (osrs-tracker/osrs-tracker-web#270):
+  `scripts/backfill-news-images.mjs` (a dry run unless `--write`) sets either only where a post lacks it, matched on
+  `link`, so the feed's version wins. It stores image URLs only, and only `cdn.runescape.com` ones, the only images
+  `GET /news/image` serves: posts from 2013 to 2016 point at Jagex's old `rswikiimages` host, which is gone, and some
+  later ones at imgur or a generic fallback: those keep only their teaser. Of the 1,825 posts without either, it matches
+  1,809 (16 by a slug that differs only in Jagex's `-1` suffix): 1,809 teasers and 1,322 images, written on 2026-10-13.
+  `GET /news/image` now queues up to 50 conversions per pod (was 10): a burst of 30 uncached images, what a first visit
+  to the archive asks for, got two 503s, while a thumbnail converts in about 0.1s (#161).
 - New `GET /player-counts/latest` and `GET /player-counts?range=24h|7d|30d|1y|all` (`24h` when absent) serve the players
   online that osrs-tracker-aws's record-player-count Lambda samples every 10 minutes into `playerCounts`: the newest
   sample (404 before the first), and its history, oldest first: every sample for 24h and 7d, hourly averages for 30d,
