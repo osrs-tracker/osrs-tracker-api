@@ -1,18 +1,39 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadGatewayException, Inject, Injectable, Logger } from '@nestjs/common';
+import { fetchWorldList, parseWorldList } from '@osrs-tracker/hiscores';
 import { PlayerCount } from '@osrs-tracker/models';
+import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
+import { Agent, fetch } from 'undici';
+import { AGENT, USER_AGENT } from '../../common/agent/agent.provider';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { buildPlayerCountHistoryPipeline, PlayerCountPoint, PlayerCountRange } from './player-count-history';
 
+/** How long a live count (or a failure to get one) is kept: Jagex asks for at most one world list poll a minute. */
+export const LIVE_PLAYER_COUNT_TTL_MS = 60_000;
+
 @Injectable()
 export class PlayerCountsService {
+  private readonly logger = new Logger(PlayerCountsService.name);
   private readonly COLLECTION_NAME = 'playerCounts';
+
+  /**
+   * The live count, or `'failed'` when Jagex failed, so an outage doesn't turn every request into a poll either.
+   * `forceFetch` shares one world list request between concurrent requests.
+   */
+  private readonly liveCache = new LRUCache<'live', PlayerCount | 'failed'>({
+    max: 1,
+    ttl: LIVE_PLAYER_COUNT_TTL_MS,
+    fetchMethod: () => this.fetchLive(),
+  });
 
   get collection(): Collection<PlayerCount> {
     return this.db.collection(this.COLLECTION_NAME);
   }
 
-  constructor(@Inject(MONGODB_DATABASE) private readonly db: Db) {}
+  constructor(
+    @Inject(MONGODB_DATABASE) private readonly db: Db,
+    @Inject(AGENT) private readonly agent: Agent,
+  ) {}
 
   /** The newest sample, or `null` before the first one. */
   getLatest(): Promise<PlayerCount | null> {
@@ -26,5 +47,36 @@ export class PlayerCountsService {
     return this.collection
       .aggregate<PlayerCountPoint>(buildPlayerCountHistoryPipeline(range), { hint: { date: 1 } })
       .toArray();
+  }
+
+  /**
+   * The players online now, from Jagex's world list, at most `LIVE_PLAYER_COUNT_TTL_MS` old; never stored (the
+   * record-player-count Lambda owns `playerCounts`). A 502 when Jagex fails, answered for `LIVE_PLAYER_COUNT_TTL_MS`
+   * without asking again.
+   */
+  async getLive(): Promise<PlayerCount> {
+    const live = await this.liveCache.forceFetch('live');
+    if (live === 'failed') throw new BadGatewayException(`The world list can't be reached, try again later.`);
+
+    return live;
+  }
+
+  /** The live cache's `fetchMethod`: like the Lambda, 0 worlds or 0 players is a failure, not a count. */
+  private async fetchLive(): Promise<PlayerCount | 'failed'> {
+    const date = new Date();
+    try {
+      const counts = parseWorldList(
+        await fetchWorldList({
+          userAgent: USER_AGENT,
+          fetch: (url, init) => fetch(url, { ...init, dispatcher: this.agent }),
+        }),
+      );
+      if (!counts.worlds || !counts.total) throw new Error(`${counts.worlds} worlds with ${counts.total} players`);
+
+      return { date, ...counts };
+    } catch (error) {
+      this.logger.warn(`World list request failed: ${(error as Error).message}`);
+      return 'failed';
+    }
   }
 }

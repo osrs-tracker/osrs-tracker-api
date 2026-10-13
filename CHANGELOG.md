@@ -39,6 +39,14 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   that moment (osrs-tracker/osrs-tracker-web#255). The codes stay raw: the web maps them to countries, so a new location
   needs no API release (#158). The buckets average per code by unwinding each sample's map, about 0.7 s per year of
   samples on Atlas; a `$push` of the maps hit `$group`'s 100 MB limit at a year.
+- New `GET /player-counts/live` serves the players online now, read from Jagex's world list instead of the newest stored
+  sample (up to 10 minutes old), for the web's "Online now" (osrs-tracker/osrs-tracker-web#290): a `PlayerCount` whose
+  `date` is when it was fetched, with `public, max-age=60`. The browser can't fetch the world list itself (no CORS
+  headers). Each pod fetches it at most once a minute, shared by the requests meanwhile, since Jagex asks for at most
+  one poll a minute; a failure (Jagex down, a format the parser rejects, or 0 worlds or players, as in the Lambda) is a
+  502 with `max-age=0, must-revalidate`, logged, and also kept for a minute so an outage doesn't poll per request. It
+  writes nothing: the Lambda keeps recording `playerCounts`. The client and parser come from `@osrs-tracker/hiscores`
+  4.2.0 (osrs-tracker/osrs-tracker-aws#100) (#163).
 - Requests to Jagex (the hiscores, the news feed and news images) send
   `User-Agent: github:osrs-tracker/osrs-tracker-api` instead of undici's `node`, so Jagex can tell where they come from
   and where to report a problem (#143).

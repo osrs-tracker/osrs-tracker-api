@@ -27,9 +27,10 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
   bytes by hand. undici rejects the body read with a `terminated` `TypeError` whose `cause` is a
   `ResponseExceededMaxSizeError`. It only counts bytes as they arrive, so an image whose `content-length` is already
   over the limit is refused before its body is read, rather than downloaded up to 10 MB in a conversion slot.
-- Jagex data cached in memory (the news feed, images) is an `lru-cache` with a `fetchMethod`, read with `forceFetch`: it
-  shares the fetch in flight per key and doesn't cache a rejection, so don't add a pending map beside it; to keep a
-  stale value on failure, return it from `fetchMethod` (setting `options.ttl` for the retry delay).
+- Jagex data cached in memory (the news feed, images, the live player count) is an `lru-cache` with a `fetchMethod`,
+  read with `forceFetch`: it shares the fetch in flight per key and doesn't cache a rejection, so don't add a pending
+  map beside it; to keep a stale value on failure, return it from `fetchMethod` (setting `options.ttl` for the retry
+  delay).
 - `MongoModule` is global, retries the initial connect (12 x 10s, a standalone `RetryPolicy`, sized against the
   `startupProbe` in `osrs-tracker-api.yaml`: change both together) and closes the client on shutdown (bounded to 5s).
   New indexes go in `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy` only
@@ -201,12 +202,12 @@ changes `CASES` in the same diff. The spec fails on a new GET route without a ca
 case expects (values only POSTs send go in its `POST_ONLY`); a new branch reusing an existing value it can't see, so
 that one is on the author and the `conventions-reviewer`.
 
-- Read-only, slow-changing: `public, max-age=N` (`/news`, `/news/since/:date` and `/news/archive` 300,
-  `/news/categories`, `/items/search/:query` and `/sitemap/players` 3600, `/items/browse/:letter` 86400, `/news/image`
-  604800).
-- Routes that fetch Jagex live (`/news`, `/news/since/:date`, `/news/archive`, `/news/image`) and `/news/categories` set
-  it with `res.setHeader` after the read succeeds, not with `@Header` (which also applies to errors), so caches don't
-  keep a 503.
+- Read-only, slow-changing: `public, max-age=N` (`/player-counts/live` 60, `/news`, `/news/since/:date` and
+  `/news/archive` 300, `/news/categories`, `/items/search/:query` and `/sitemap/players` 3600, `/items/browse/:letter`
+  86400, `/news/image` 604800).
+- Routes that fetch Jagex live (`/news`, `/news/since/:date`, `/news/archive`, `/news/image`, `/player-counts/live`) and
+  `/news/categories` set it with `res.setHeader` after the read succeeds, not with `@Header` (which also applies to
+  errors), so caches don't keep a 503 (`/player-counts/live` sets `REVALIDATE` first, for its 502).
 - GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR. The one
   exception: a news feed refresh (`/news`, `/news/since/:date`, the first page of `/news/archive`) upserts the feed's
   posts into `news` (keyed on `link`), the same whoever asks; the e2e spec allows only that write (`FEED_STORE`).
@@ -259,6 +260,9 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     the image size limit against a local server with the real `fetch` and `IMAGE_AGENT` (503, its log line, `identity`),
     and an oversized `content-length` refused without reading the body; the `news-images` bulkhead (queue bound and
     timeout, 503 without fetching, one slot per shared conversion, none for a cache hit).
+  - `player-counts/player-counts.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock,
+    world lists from `world-list.fixture.ts`): the live count shared between concurrent requests and kept a minute, and
+    a failure (Jagex, the format check, 0 worlds or players) answered 502 for a minute without asking again.
   - `mongo.provider.spec.ts` (fake timers): the connect retry's constant 10s delay, warn lines, giving up after 12 with
     the connect error (also when closing the failed client fails).
   - `app.e2e.spec.ts` (`logger` mocked to collect the lines): per GET route its `Cache-Control` and that it never writes

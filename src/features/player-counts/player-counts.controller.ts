@@ -1,4 +1,5 @@
-import { Controller, Get, Header, NotFoundException, Query } from '@nestjs/common';
+import { Controller, Get, Header, NotFoundException, Query, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ParsePlayerCountRangePipe } from './parse-player-count-range.pipe';
 import type { PlayerCountRange } from './player-count-history';
@@ -27,5 +28,19 @@ export class PlayerCountsController {
     if (!latest) throw new NotFoundException('No player count recorded yet');
 
     return latest;
+  }
+
+  /**
+   * The players online now, from Jagex's world list (fetched at most once a minute per pod; `date` is when), not a
+   * stored sample. `PLAYER_COUNT_LIVE`; 502 with `REVALIDATE` when the world list can't be fetched or parsed.
+   */
+  @Get('live')
+  async getLive(@Res({ passthrough: true }) res: Response) {
+    // Until the count is read, so a 502 isn't cached for a minute
+    res.setHeader('Cache-Control', CACHE_CONTROL.REVALIDATE);
+    const live = await this.playerCountsService.getLive();
+
+    res.setHeader('Cache-Control', CACHE_CONTROL.PLAYER_COUNT_LIVE);
+    return live;
   }
 }

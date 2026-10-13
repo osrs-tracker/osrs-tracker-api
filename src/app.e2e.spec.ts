@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { WORLD_LIST_URL } from '@osrs-tracker/hiscores';
 import { createHiscoreLayout, encodeHiscoreEntry } from '@osrs-tracker/models';
 import { Server } from 'node:http';
 import { AddressInfo } from 'node:net';
@@ -11,6 +12,8 @@ import { CACHE_CONTROL } from './common/http/cache-control';
 import { MONGO_CLIENT, MONGODB_DATABASE } from './common/mongo/mongo.provider';
 import { ROUTE_CONFLICT_POLICY } from './config/app-options';
 import { encodeNewsCursor } from './features/news/news-archive';
+import { PlayerCountsService } from './features/player-counts/player-counts.service';
+import { encodeWorldList } from './features/player-counts/world-list.fixture';
 import { HISCORE_LAYOUTS_COLLECTION } from './features/players/hiscore-layouts.service';
 import { COMBAT_SKILLS } from './features/players/player.utils';
 
@@ -54,6 +57,8 @@ interface Fakes {
   docs?: object[];
   /** The four hiscore tables: all found, or all failing. */
   hiscores?: 'found' | 'failed';
+  /** Jagex's world list: answered, or failing. */
+  worldList?: 'found' | 'failed';
 }
 
 interface Case extends Fakes {
@@ -157,6 +162,16 @@ const CASES: Record<string, Case[]> = {
     { url: '/player-counts/latest', docs: [playerCount], status: 200, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
     { name: 'none recorded', url: '/player-counts/latest', status: 404, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
   ],
+  '/player-counts/live': [
+    { url: '/player-counts/live', worldList: 'found', status: 200, cacheControl: CACHE_CONTROL.PLAYER_COUNT_LIVE },
+    {
+      name: 'Jagex down',
+      url: '/player-counts/live',
+      worldList: 'failed',
+      status: 502,
+      cacheControl: CACHE_CONTROL.REVALIDATE,
+    },
+  ],
   '/news': [{ url: '/news', status: 200, cacheControl: CACHE_CONTROL.NEWS, writes: FEED_STORE }],
   '/news/since/:date': [
     {
@@ -251,6 +266,8 @@ const HISCORE = {
   activities: [],
 };
 
+const WORLD_LIST = encodeWorldList([{ players: 1000, members: true }, { players: 500 }]);
+
 let png: Buffer;
 
 /** Fake Jagex: the news feed, the CDN and the hiscores. Anything else fails, so the test never reaches the network. */
@@ -260,6 +277,8 @@ async function fakeJagex(url: string): Promise<Response> {
     return new Response(new Uint8Array(png), { headers: { 'content-type': 'image/png' } });
   if (url.startsWith('https://secure.runescape.com/m=hiscore_oldschool') && url.includes('/index_lite.json'))
     return fakes.hiscores === 'found' ? Response.json(HISCORE) : new Response('', { status: 503 });
+  if (url === WORLD_LIST_URL)
+    return fakes.worldList === 'found' ? new Response(WORLD_LIST) : new Response('', { status: 503 });
   throw new Error(`Unexpected fetch: ${url}`);
 }
 
@@ -297,6 +316,8 @@ describe('GET routes', () => {
   beforeEach(() => {
     fakes = {};
     collectionCalls = [];
+    // The live count and its failures are kept for a minute: each case asks Jagex afresh
+    app.get(PlayerCountsService)['liveCache'].clear();
   });
 
   it('covers every GET route', () => {
@@ -321,8 +342,8 @@ describe('GET routes', () => {
     routeCases.map((c) => ({ ...c, title: c.name ? `${route} (${c.name})` : route })),
   );
 
-  it.each(cases)('$title', async ({ url, status, cacheControl, docs, hiscores, writes = [] }) => {
-    fakes = { docs, hiscores };
+  it.each(cases)('$title', async ({ url, status, cacheControl, docs, hiscores, worldList, writes = [] }) => {
+    fakes = { docs, hiscores, worldList };
 
     const response = await fetch(baseUrl + url);
 
