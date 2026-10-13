@@ -5,6 +5,11 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 
 ## 2026/10/13
 
+- New `GET /player-counts/latest` and `GET /player-counts?range=24h|7d|30d|1y|all` (`24h` when absent) serve the players
+  online that osrs-tracker-aws's record-player-count Lambda samples every 10 minutes into `playerCounts`: the newest
+  sample (404 before the first), and its history, oldest first: every sample for 24h and 7d, hourly averages for 30d,
+  daily (UTC) averages plus the peak total for 1y and all. Both send `public, max-age=300`; `@osrs-tracker/models` is
+  bumped to 2.4.0 for `PlayerCount` (#146).
 - Requests to Jagex (the hiscores, the news feed and news images) send
   `User-Agent: github:osrs-tracker/osrs-tracker-api` instead of undici's `node`, so Jagex can tell where they come from
   and where to report a problem (#143).

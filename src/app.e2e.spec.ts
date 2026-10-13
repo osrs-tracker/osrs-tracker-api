@@ -69,6 +69,7 @@ const storedPlayer = {
   scrapingOffsets: [0],
 };
 const item = { id: 4151, name: 'Abyssal whip', icon: 'whip.png' };
+const playerCount = { date: new Date(), total: 84441, members: 60000, f2p: 24441, worlds: 321, byLocation: {} };
 const LAYOUT = createHiscoreLayout({ skills: [...COMBAT_SKILLS], activities: [] }, new Date(0));
 /** A stored hiscore entry, so reading it also loads its layout. */
 const storedEntry = encodeHiscoreEntry(
@@ -139,6 +140,14 @@ const CASES: Record<string, Case[]> = {
   ],
   '/items/browse/:letter': [
     { url: '/items/browse/a', docs: [item], status: 200, cacheControl: CACHE_CONTROL.ITEM_BROWSE },
+  ],
+  '/player-counts': [
+    { url: '/player-counts?range=1y', docs: [playerCount], status: 200, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
+    { name: 'invalid range', url: '/player-counts?range=1w', status: 400, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
+  ],
+  '/player-counts/latest': [
+    { url: '/player-counts/latest', docs: [playerCount], status: 200, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
+    { name: 'none recorded', url: '/player-counts/latest', status: 404, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
   ],
   '/news': [{ url: '/news', status: 200, cacheControl: CACHE_CONTROL.NEWS }],
   '/news/image': [
