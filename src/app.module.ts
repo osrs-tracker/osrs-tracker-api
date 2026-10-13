@@ -13,6 +13,7 @@ import { XMLModule } from './common/xml/xml.module';
 import { ItemsModule } from './features/items/items.module';
 import { NEWS_IMAGES, NEWS_IMAGES_PRESET } from './features/news/news.config';
 import { NewsModule } from './features/news/news.module';
+import { PlayerCountsModule } from './features/player-counts/player-counts.module';
 import { JAGEX_HISCORES, JAGEX_HISCORES_PRESET } from './features/players/player.config';
 import { PlayersModule } from './features/players/players.module';
 import { validateEnv } from './config/env';
@@ -34,6 +35,7 @@ import { NoIndexMiddleware } from './middleware/robots.middleware';
     PlayersModule,
     NewsModule,
     ItemsModule,
+    PlayerCountsModule,
   ],
   providers: [ResilienceEventsListener],
 })
