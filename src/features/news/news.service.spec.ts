@@ -12,6 +12,7 @@ import { AGENT, IMAGE_AGENT, imageAgentProvider, MAX_IMAGE_BYTES, USER_AGENT } f
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { XML_PARSER, XMLParserProvider } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
+import { decodeNewsCursor } from './news-archive';
 import {
   IMAGE_QUEUE_TIMEOUT_MS,
   MAX_CONCURRENT_IMAGE_CONVERSIONS,
@@ -19,7 +20,7 @@ import {
   NEWS_IMAGES,
   NEWS_IMAGES_PRESET,
 } from './news.config';
-import { MAX_NEWS_SINCE, NEWS_COLLECTION, NewsService } from './news.service';
+import { MAX_NEWS_SINCE, NEWS_COLLECTION, NewsService, StoredNewsItem } from './news.service';
 
 vi.mock('undici', async (importOriginal) => ({ ...(await importOriginal<typeof import('undici')>()), fetch: vi.fn() }));
 
@@ -35,7 +36,9 @@ const IMAGE_URL = 'https://cdn.runescape.com/news/patch.png';
 let storedNews: object[] = [];
 const fakeNews = {
   bulkWrite: vi.fn(),
-  find: vi.fn(() => ({ toArray: async () => storedNews })),
+  find: vi.fn<(filter: object, options: object) => { toArray: () => Promise<object[]> }>(() => ({
+    toArray: async () => storedNews,
+  })),
 };
 const fakeDb = { collection: (name: string) => (name === NEWS_COLLECTION ? fakeNews : undefined) };
 
@@ -196,6 +199,88 @@ describe('NewsService caches', () => {
 
       expect(await service.getNewsSince(since)).toEqual(storedNews);
       expect(fakeNews.bulkWrite).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith('News feed request failed: HTTP 502');
+    });
+  });
+
+  describe('getNewsArchive', () => {
+    const day = (date: string) => new Date(`${date}T00:00:00Z`);
+    /** Newest first by `pubDate`, then `link`: several share a day, as backfilled posts do. */
+    const posts: StoredNewsItem[] = [
+      { title: 'E', pubDate: day('2026-10-13'), category: 'Game Updates', link: 'e' },
+      { title: 'D2', pubDate: day('2026-10-12'), category: 'Community', link: 'd2' },
+      { title: 'D1', pubDate: day('2026-10-12'), category: 'Game Updates', link: 'd1' },
+      { title: 'C3', pubDate: day('2026-10-11'), category: 'Game Updates', link: 'c3' },
+      { title: 'C2', pubDate: day('2026-10-11'), category: 'Community', link: 'c2' },
+      { title: 'C1', pubDate: day('2026-10-11'), category: 'Game Updates', link: 'c1' },
+      { title: 'A', pubDate: day('2026-10-01'), category: 'Game Updates', link: 'a' },
+    ];
+
+    /** The filters `buildNewsArchiveFilter` builds: equality (dates by time), `$lt` and `$or`. */
+    function matches(doc: Record<string, unknown>, filter: Record<string, unknown>): boolean {
+      return Object.entries(filter).every(([key, condition]) => {
+        if (key === '$or') return (condition as Record<string, unknown>[]).some((f) => matches(doc, f));
+        const value = doc[key] as Date | string;
+        if (condition && typeof condition === 'object' && '$lt' in condition) return value < (condition.$lt as Date);
+        return value instanceof Date ? value.getTime() === (condition as Date).getTime() : value === condition;
+      });
+    }
+
+    beforeEach(() => {
+      // Applies the filter and limit to `posts` (already in `NEWS_ARCHIVE_SORT` order), as Mongo would
+      fakeNews.find.mockImplementation((filter, options) => ({
+        toArray: async () =>
+          posts
+            .filter((post) => matches(post, filter as Record<string, unknown>))
+            .slice(0, (options as { limit: number }).limit),
+      }));
+    });
+
+    /** Every page's titles, following `next` from the first page to the last. */
+    async function pageThrough(limit: number, category?: string): Promise<string[][]> {
+      const pages: string[][] = [];
+      let page = await service.getNewsArchive(limit, undefined, category);
+      pages.push(page.posts.map((post) => post.title));
+      while (page.next) {
+        page = await service.getNewsArchive(limit, decodeNewsCursor(page.next), category);
+        pages.push(page.posts.map((post) => post.title));
+      }
+      return pages;
+    }
+
+    it('pages through every post once, also when a page ends between posts of one day', async () => {
+      answerWith(() => new Response(RSS));
+
+      expect(await pageThrough(2)).toEqual([['E', 'D2'], ['D1', 'C3'], ['C2', 'C1'], ['A']]);
+      expect(await pageThrough(7)).toEqual([['E', 'D2', 'D1', 'C3', 'C2', 'C1', 'A']]);
+    });
+
+    it('pages through one category', async () => {
+      answerWith(() => new Response(RSS));
+
+      expect(await pageThrough(2, 'Game Updates')).toEqual([['E', 'D1'], ['C3', 'C1'], ['A']]);
+      expect(await pageThrough(2, 'Unknown')).toEqual([[]]);
+    });
+
+    it('refreshes the feed for the first page only', async () => {
+      answerWith(() => new Response(RSS));
+
+      const first = await service.getNewsArchive(2);
+      expect(fakeNews.bulkWrite).toHaveBeenCalledBefore(fakeNews.find);
+      expect(fakeNews.find).toHaveBeenCalledWith(
+        {},
+        { sort: { pubDate: -1, link: -1 }, limit: 3, projection: { _id: 0 } },
+      );
+
+      await advance(300_001);
+      await service.getNewsArchive(2, decodeNewsCursor(first.next!));
+      expect(mockFetch).toHaveBeenCalledOnce();
+    });
+
+    it('answers the first page from the stored posts when the feed fails', async () => {
+      answerWith(() => new Response('Bad gateway', { status: 502 }));
+
+      expect((await service.getNewsArchive(1)).posts.map((post) => post.title)).toEqual(['E']);
       expect(warn).toHaveBeenCalledWith('News feed request failed: HTTP 502');
     });
   });
