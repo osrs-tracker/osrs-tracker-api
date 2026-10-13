@@ -1,3 +1,4 @@
+import { millisecondsInDay as DAY } from 'date-fns/constants';
 import { Document } from 'mongodb';
 
 export const PLAYER_COUNT_RANGES = ['24h', '7d', '30d', '1y', 'all'] as const;
@@ -14,9 +15,6 @@ export interface PlayerCountPoint {
   /** Daily points only: the highest `total` sampled that day. */
   peak?: number;
 }
-
-const HOUR = 60 * 60_000;
-const DAY = 24 * HOUR;
 
 /** How far back each range reaches (`all`: every sample) and what it averages over (none: every sample). */
 const RANGES: Record<PlayerCountRange, { span?: number; bucket?: 'hour' | 'day' }> = {

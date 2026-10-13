@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
+import { isValid, parseISO } from 'date-fns';
 
 /** A date (`2026-10-13`, midnight UTC) or a date and time with a zone (`Z` or `±hh:mm`). */
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2}))?$/;
@@ -11,15 +12,10 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z
 export class ParseSinceDatePipe implements PipeTransform<string, Date> {
   transform(value: string): Date {
     const date = new Date(value);
-    // `Date` rolls a day that doesn't exist over into the next month: compare the calendar day it read
-    const day = ISO_DATE.test(value ?? '') && new Date(`${value.slice(0, 10)}T00:00:00Z`);
 
-    if (
-      !day ||
-      isNaN(date.getTime()) ||
-      isNaN(day.getTime()) ||
-      day.toISOString().slice(0, 10) !== value.slice(0, 10)
-    ) {
+    // `Date` rolls a day that doesn't exist over into the next month; `parseISO` rejects it. `parseISO` only validates:
+    // it reads a bare date in the server's time zone, where `Date` reads midnight UTC.
+    if (!ISO_DATE.test(value ?? '') || !isValid(date) || !isValid(parseISO(value))) {
       throw new BadRequestException('Date must be an ISO 8601 date, like 2026-10-13 or 2026-10-13T12:00:00Z.');
     }
 
