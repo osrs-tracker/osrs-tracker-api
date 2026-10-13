@@ -4,6 +4,13 @@
   `User-Agent: github:osrs-tracker/osrs-tracker-api` instead of undici's `node`, so Jagex can tell where they come from
   and where to report a problem (#143).
 
+### Behind the scenes
+
+- Claude Code reads and writes live data through a project MongoDB MCP server (`.mcp.json`, `mongodb-mcp-server` pinned,
+  Atlas tools off) that connects as a database user limited to `readWrite` on `osrs-tracker`, instead of the claude.ai
+  Atlas connector, which had the whole Atlas account. Every write tool asks first, even in auto mode, and the skill has
+  Claude save or count the affected documents before a multi-document write (#148). Nothing in the API changes.
+
 ## 2026/10/12
 
 ### Behind the scenes
