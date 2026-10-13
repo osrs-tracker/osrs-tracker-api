@@ -25,7 +25,7 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 
 ## Hard rules
 
-- Every change, tooling included, gets a `CHANGELOG.md` entry under today's `## YYYY/MM/DD`; doc-only changes
+- Every change, tooling included, gets a `CHANGELOG.md` entry under today's `## YYYY-MM-DD`; doc-only changes
   (`README.md`, `CLAUDE.md`, `.claude/skills/`, `.claude/agents/`) don't, and a Dependabot bump only when it changes
   behaviour. `.claude/hooks/` and `.claude/settings.json` are tooling, not docs. Parallel PRs all add that heading: when
   merging one after another, rebase and fold the entries under one heading. The format and the Dependabot steps are in
