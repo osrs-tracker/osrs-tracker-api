@@ -14,7 +14,7 @@ import {
 import { Document } from 'mongodb';
 import { fetch } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
-import { AGENT } from '../../common/agent/agent.provider';
+import { AGENT, USER_AGENT } from '../../common/agent/agent.provider';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import {
   HISCORE_QUEUE_TIMEOUT_MS,
@@ -113,6 +113,11 @@ describe('PlayersService hiscore lookups', () => {
     answerWith('notFound');
     expect(await service.previewPlayer('nobody', 0, false)).toEqual({ status: 'notFound' });
     expect(mockFetch).toHaveBeenCalledTimes(1);
+    // Our user agent is added to the package's headers, not in their place
+    expect(mockFetch.mock.calls[0][1]?.headers).toEqual({
+      'cache-control': expect.any(String),
+      'user-agent': USER_AGENT,
+    });
 
     mockFetch.mockClear();
     answerWith('failed');

@@ -8,7 +8,7 @@ import { AddressInfo } from 'node:net';
 import sharp from 'sharp';
 import { Agent, fetch, Response } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
-import { AGENT, IMAGE_AGENT, imageAgentProvider, MAX_IMAGE_BYTES } from '../../common/agent/agent.provider';
+import { AGENT, IMAGE_AGENT, imageAgentProvider, MAX_IMAGE_BYTES, USER_AGENT } from '../../common/agent/agent.provider';
 import { XML_PARSER, XMLParserProvider } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
 import {
@@ -333,6 +333,7 @@ describe('NewsService caches', () => {
       expect(warn).toHaveBeenCalledExactlyOnceWith(`Image request failed for ${url}: Body larger than 10485760 bytes`);
       // The limit counts bytes off the wire, so a compressed body mustn't be asked for
       expect(requests[0]['accept-encoding']).toBe('identity');
+      expect(requests[0]['user-agent']).toBe(USER_AGENT);
 
       await expect(service.getImageAsWebp(url)).rejects.toBeInstanceOf(ServiceUnavailableException);
       expect(requests).toHaveLength(2);
