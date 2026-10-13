@@ -18,8 +18,8 @@
   },
   "scripts": {
     "build": "NODE_ENV=production nest build -b rspack",
-    "prettier": "prettier --write \"src/**/*.ts\"",
-    "prettier:ci": "prettier --check \"src/**/*.ts\"",
+    "prettier": "prettier --write \"src/**/*.ts\" \"**/*.md\"",
+    "prettier:ci": "prettier --check \"src/**/*.ts\" \"**/*.md\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",

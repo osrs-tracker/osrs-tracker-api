@@ -3,7 +3,7 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
-## 2026/10/13
+## 2026-10-13
 
 - New `GET /player-counts/latest` and `GET /player-counts?range=24h|7d|30d|1y|all` (`24h` when absent) serve the players
   online that osrs-tracker-aws's record-player-count Lambda samples every 10 minutes into `playerCounts`: the newest
@@ -20,8 +20,12 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   Atlas tools off) that connects as a database user limited to `readWrite` on `osrs-tracker`, instead of the claude.ai
   Atlas connector, which had the whole Atlas account. Every write tool asks first, even in auto mode, and the skill has
   Claude save or count the affected documents before a multi-document write (#148). Nothing in the API changes.
+- Changelog headings and dates are ISO (`2026-10-13`, was `2026/10/13`), as Keep a Changelog recommends and in step with
+  the other osrs-tracker repos. Markdown is now checked in CI: Prettier formats it (`npm run prettier` and
+  `prettier:ci`; `.prettierignore` skips other sessions' worktrees), and lint checks its local links and `#anchors` with
+  lychee, offline so external sites can't make CI flaky. Lint runs on docs-only pushes too, where links break (#153).
 
-## 2026/10/12
+## 2026-10-12
 
 ### Behind the scenes
 
@@ -39,7 +43,7 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   of stopping at the first: about 5s instead of 13s, and one fix round instead of one per failing check (#141). Nothing
   in the API changes.
 
-## 2026/10/10
+## 2026-10-10
 
 ### Players
 
@@ -89,7 +93,7 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   `npm run start:dev` without linking it by hand (#122). `CLAUDE.md` says where the sibling repos (`../<repo>`) are from
   a worktree.
 
-## 2026/10/09
+## 2026-10-09
 
 ### Responses
 
@@ -194,7 +198,7 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   holds, how to check a build-tool change in a clean checkout and the rebase before waiting on PR checks; `CLAUDE.md`
   says what to do when the pre-push hook blocks a push, and the conventions reviewer diffs against `origin/main`.
 
-## 2026/10/08
+## 2026-10-08
 
 ### Rollouts
 
@@ -322,12 +326,12 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   it). The README and the project skill link osrs-tracker-aws's `DATA-MODEL.md` for who owns which field and index, and
   the skill keeps only the API's side of the pause/resume contract.
 - Project skill: when adding a changelog entry, reread the whole day, add subtitles once it's busy and merge entries
-  about the same feature. Regrouped this day and 2026/10/07 that way. Releasing from a worktree no longer tries to
+  about the same feature. Regrouped this day and 2026-10-07 that way. Releasing from a worktree no longer tries to
   switch to `main` (the main checkout has it) or delete the PR branch GitHub already deleted; `CLAUDE.md` and the README
   point at the new Cache-Control checks.
 - README: fixed the license badge link, setup now starts from `.env.example` and warns that `.env` points at production
   data, and it describes the metrics/health server on port 9090 and the checks to run before committing. Added a short
-  summary of the history before 2026/10/02 at the end of this changelog. The `Dockerfile` health check comment now names
+  summary of the history before 2026-10-02 at the end of this changelog. The `Dockerfile` health check comment now names
   the right file for `/healthy` (`src/app-metrics.controller.ts`, not `server.ts`). After the technical debt roadmap
   (#37), `CLAUDE.md`, the README, the project skill and the conventions reviewer were checked against the code:
   `CLAUDE.md` maps the new places (`src/config/`, `player.config.ts`, the `Semaphore`, the build and test config); the
@@ -336,7 +340,7 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 - Shared providers (database, HTTP agent, XML parser) are injected by exported constants instead of repeated strings, so
   a typo fails the build instead of startup.
 
-## 2026/10/07
+## 2026-10-07
 
 ### Read-only GETs and browser lookups
 
@@ -373,7 +377,7 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   dependencies change, not for deploys or documentation (unless the previous build didn't pass), and reuses the
   installed dependencies until they change.
 
-## 2026/10/04
+## 2026-10-04
 
 - Project skill: documented the changelog conventions (`###` subtitles on busy days, no near-duplicate entries) and
   tightened the wording throughout.
@@ -385,7 +389,7 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   the URL, so every player name or scanner URL no longer creates its own time series. Request logs have the same value
   in a new `route` field, next to the full `url`.
 
-## 2026/10/03
+## 2026-10-03
 
 - The ingress runs on Traefik (ingress-nginx is retired); the rate limits moved to Traefik Middlewares with the same
   values.
@@ -406,7 +410,7 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 - Database: removed 7 duplicate players stored under an invalid username (uppercase or with `'`/`,`) whose history was
   already in the valid record, and lowercased the 5 remaining uppercase usernames so they can be found again.
 
-## 2026/10/02
+## 2026-10-02
 
 - Fixed the project skill's frontmatter so its description parses as YAML again.
 - Trimmed the project skill to repo-specific rules, added `.env.example` and ignored `tsconfig.tsbuildinfo`.
@@ -421,15 +425,15 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 - Documented the external services (RuneScape API proxy, MongoDB Atlas, AWS Lambdas) in the project skill.
 - Expanded the README with an overview, how the API fits into OSRS Tracker and how to run it locally.
 
-## Before 2026/10/02
+## Before 2026-10-02
 
-Summarised from the commit history (2025/04/19 to 2026/09/23); this changelog started on 2026/10/02.
+Summarised from the commit history (2025-04-19 to 2026-09-23); this changelog started on 2026-10-02.
 
-- 2025/04: first version of the API: players with their hiscore history, items and item search, CI with lint and
+- 2025-04: first version of the API: players with their hiscore history, items and item search, CI with lint and
   Prettier checks, JSON logging and Prometheus metrics. Added `skipRefresh` to `GET /players/:username`, `Cache-Control`
   headers on items and players, and the news endpoints with the `/news/image` proxy that converts images to WebP.
-- 2025/06: usernames are normalised so the same player isn't stored twice, and `X-Robots-Tag` headers keep the API out
+- 2025-06: usernames are normalised so the same player isn't stored twice, and `X-Robots-Tag` headers keep the API out
   of search engines.
-- 2025/11 to 2026/07: fixed status codes on player errors (including a 200 for a missing player with `skipRefresh`),
+- 2025-11 to 2026-07: fixed status codes on player errors (including a 200 for a missing player with `skipRefresh`),
   updated dependencies and fixed the bundling of the build and of `sharp`.
-- 2026/09/23: switched to Jagex's JSON hiscores and the new `@osrs-tracker/models`; `sourceString` became legacy.
+- 2026-09-23: switched to Jagex's JSON hiscores and the new `@osrs-tracker/models`; `sourceString` became legacy.
