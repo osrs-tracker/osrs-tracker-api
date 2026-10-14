@@ -6,8 +6,8 @@ const MAX_URL_LENGTH = 512;
 
 /**
  * Parses the `url` of `/news/image`: a plain `https://cdn.runescape.com/` URL of at most 512 characters, without
- * credentials, query or hash, returned as `URL.href`. Comparing the parsed origin, not a prefix, is what keeps the route
- * from fetching and converting another host's images (`https://cdn.runescape.com.evil.example/`).
+ * credentials, query or hash, returned as `URL.href`. Comparing the parsed origin, not a prefix, is what keeps the
+ * route from fetching and converting another host's images (`https://cdn.runescape.com.evil.example/`).
  */
 @Injectable()
 export class ParseNewsImageUrlPipe implements PipeTransform<string | undefined, string> {
