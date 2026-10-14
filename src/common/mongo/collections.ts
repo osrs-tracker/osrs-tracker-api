@@ -10,3 +10,5 @@ export const ITEMS_COLLECTION = 'items';
 export const NEWS_COLLECTION = 'news';
 /** The player count samples, written every 10 minutes by osrs-tracker-aws. */
 export const PLAYER_COUNTS_COLLECTION = 'playerCounts';
+/** One document per UTC day of player count averages and peak, recomputed by osrs-tracker-aws after every sample. */
+export const PLAYER_COUNTS_DAILY_COLLECTION = 'playerCountsDaily';

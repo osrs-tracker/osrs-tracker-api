@@ -16,32 +16,51 @@ export interface PlayerCountPoint {
   peak?: number;
 }
 
-/** How far back each range reaches (`all`: every sample) and what it averages over (none: every sample). */
-const RANGES: Record<PlayerCountRange, { span?: number; bucket?: 'hour' | 'day' }> = {
-  '24h': { span: DAY },
-  '7d': { span: 7 * DAY },
-  '30d': { span: 30 * DAY, bucket: 'hour' },
-  '1y': { span: 365 * DAY, bucket: 'day' },
-  'all': { bucket: 'day' },
+/**
+ * How far back each range reaches (`all`: every point) and its points: every sample, hourly averages of the samples, or
+ * the stored daily averages (`playerCountsDaily`).
+ */
+const RANGES: Record<PlayerCountRange, { span?: number; points: 'samples' | 'hours' | 'days' }> = {
+  '24h': { span: DAY, points: 'samples' },
+  '7d': { span: 7 * DAY, points: 'samples' },
+  '30d': { span: 30 * DAY, points: 'hours' },
+  '1y': { span: 365 * DAY, points: 'days' },
+  'all': { points: 'days' },
 };
 
 /**
- * The `playerCounts` pipeline for `GET /player-counts?range=`, oldest point first: every sample for 24h and 7d (one
- * every 10 minutes), hourly averages for 30d, daily averages and peaks for 1y and all. Averages are rounded, so
- * `members + f2p` can be one off `total`. A missed sample is a gap, never a 0.
+ * Whether `range` reads `playerCountsDaily` (one document per UTC day, recomputed by the record-player-count Lambda after
+ * every sample, so today's is partial) instead of `playerCounts`: averaging every sample per day on each request grew
+ * with the stored samples (6.5 s for 10 years, #159).
+ */
+export const readsDailyAverages = (range: PlayerCountRange): boolean => RANGES[range].points === 'days';
+
+/**
+ * The pipeline for `GET /player-counts?range=`, oldest point first, on the collection `readsDailyAverages` picks: every
+ * sample for 24h and 7d (one every 10 minutes), hourly averages for 30d, the stored daily averages and peaks for 1y and
+ * all. Averages are rounded, so `members + f2p` can be one off `total`. A missed sample is a gap, never a 0.
  */
 export function buildPlayerCountHistoryPipeline(range: PlayerCountRange, now = new Date()): Document[] {
-  const { span, bucket } = RANGES[range];
+  const { span, points } = RANGES[range];
   const match = span === undefined ? [] : [{ $match: { date: { $gte: new Date(now.getTime() - span) } } }];
 
-  if (!bucket)
+  if (points !== 'hours')
     return [
       ...match,
       { $sort: { date: 1 } },
-      { $project: { _id: 0, date: 1, total: 1, members: 1, f2p: 1, byLocation: 1 } },
+      {
+        $project: {
+          _id: 0,
+          date: 1,
+          total: 1,
+          members: 1,
+          f2p: 1,
+          byLocation: 1,
+          ...(points === 'days' && { peak: 1 }),
+        },
+      },
     ];
 
-  const peak = bucket === 'day';
   // Each sample is one document per location code after the `$unwind`: its own fields count once, on its first code.
   const first = { $eq: ['$i', 0] };
   const once = (value: string | number) => ({ $sum: { $cond: [first, value, 0] } });
@@ -50,7 +69,7 @@ export function buildPlayerCountHistoryPipeline(range: PlayerCountRange, now = n
     ...match,
     {
       $project: {
-        date: { $dateTrunc: { date: '$date', unit: bucket } },
+        date: { $dateTrunc: { date: '$date', unit: 'hour' } },
         total: 1,
         members: 1,
         f2p: 1,
@@ -66,7 +85,6 @@ export function buildPlayerCountHistoryPipeline(range: PlayerCountRange, now = n
         total: once('$total'),
         members: once('$members'),
         f2p: once('$f2p'),
-        ...(peak && { peak: { $max: { $cond: [first, '$total', null] } } }),
       },
     },
     {
@@ -76,7 +94,6 @@ export function buildPlayerCountHistoryPipeline(range: PlayerCountRange, now = n
         total: { $sum: '$total' },
         members: { $sum: '$members' },
         f2p: { $sum: '$f2p' },
-        ...(peak && { peak: { $max: '$peak' } }),
         byLocation: { $push: { k: '$_id.code', v: { $round: ['$players', 0] } } },
       },
     },
@@ -89,7 +106,6 @@ export function buildPlayerCountHistoryPipeline(range: PlayerCountRange, now = n
         members: { $round: [{ $divide: ['$members', '$samples'] }, 0] },
         f2p: { $round: [{ $divide: ['$f2p', '$samples'] }, 0] },
         byLocation: { $arrayToObject: '$byLocation' },
-        ...(peak && { peak: 1 }),
       },
     },
   ];
