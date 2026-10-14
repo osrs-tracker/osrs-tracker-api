@@ -8,7 +8,7 @@ export interface SitemapPlayer {
 }
 
 /** Players without a hiscore entry for this many days are left out of the sitemap. */
-export const SITEMAP_PLAYER_DAYS = 30;
+const SITEMAP_PLAYER_DAYS = 30;
 
 const NEWEST_ENTRY = { $first: '$hiscoreEntries' } as const;
 

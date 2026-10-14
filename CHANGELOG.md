@@ -13,6 +13,10 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   `ParseItemSearchQueryPipe`), like every other route, instead of in the handler; statuses and messages are unchanged.
   The image URL check is what keeps the route from fetching and converting any host's images, and its rejections
   (another origin, a lookalike host, `http`, credentials, a query or hash) are now tested (#169).
+- The player queries share their projection and their filter of a player's entries by offset
+  (`players/player-queries.ts`) instead of three copies, which had already drifted; each query answers as before. The
+  15-minute `max-age` is one constant (`PLAYER_MAX_AGE_SECONDS`, in `cache-control.ts`), the refreshed player is checked
+  against `Player` (`satisfies`) instead of cast, and three unused exports are gone (#168).
 
 ## 2026-10-13
 

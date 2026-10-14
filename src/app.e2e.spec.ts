@@ -8,7 +8,7 @@ import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from './app.module';
 import { AGENT, IMAGE_AGENT } from './common/agent/agent.provider';
-import { CACHE_CONTROL } from './common/http/cache-control';
+import { CACHE_CONTROL, PLAYER_MAX_AGE_SECONDS } from './common/http/cache-control';
 import { MONGO_CLIENT, MONGODB_DATABASE } from './common/mongo/mongo.provider';
 import { ROUTE_CONFLICT_POLICY } from './config/app-options';
 import { encodeNewsCursor } from './features/news/news-archive';
@@ -118,7 +118,13 @@ const CASES: Record<string, Case[]> = {
     { name: 'invalid entry', url: '/players?entry=all', status: 400, cacheControl: CACHE_CONTROL.REVALIDATE },
   ],
   '/players/:username': [
-    { name: 'stored', url: '/players/toxsick', docs: [storedPlayer], status: 200, cacheControl: 'max-age=900' },
+    {
+      name: 'stored',
+      url: '/players/toxsick',
+      docs: [storedPlayer],
+      status: 200,
+      cacheControl: `max-age=${PLAYER_MAX_AGE_SECONDS}`,
+    },
     {
       name: 'unknown',
       url: '/players/toxsick?includeLatestHiscoreEntry=true',
