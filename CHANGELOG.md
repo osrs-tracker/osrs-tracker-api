@@ -40,6 +40,9 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 - Removed the one-off news backfill scripts (`scripts/backfill-news.mjs`, `scripts/backfill-news-images.mjs`): both ran
   on 2026-10-13 (production holds 1,819 posts from before 2026-09-01, 1,316 with an image), they sat outside lint and
   Prettier, and git keeps them should a backfill ever be needed again (#173).
+- `conventions-reviewer`'s read-only hook (`.claude/hooks/read-only-bash.sh`) now allows `gh issue view`, so the
+  reviewer can read the issue a change is for; other `gh issue` subcommands stay blocked. The file is byte-identical to
+  osrs-tracker-web's again (osrs-tracker/osrs-tracker-web@a1688c3), its ShellCheck comment included (#182).
 
 ## 2026-10-13
 
