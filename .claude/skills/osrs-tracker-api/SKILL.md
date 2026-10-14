@@ -326,11 +326,11 @@ changes within 10 minutes.
    `/items` and `/items/4151` answer 200, an unknown route 404 (not `/news`, which fetches Jagex live).
 3. **Merging is the end of the job: don't wait for or watch the `CD` run.** It smoke tests on its own, and a failure
    shows as a failed `CD` run (named after the commit it deploys) and a failed `Flux / sync` status, and reaches
-   Discord. Only when the user asks, follow it with `gh run watch` and smoke test the changed routes:
-   `curl -s -D - -o /dev/null` (status, `cache-control`), the pod logs (the read-only `kubernetes` or `flux` MCP
-   server's log tool; `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m` as a fallback; reading the
-   cluster is fine), and for web rendering changes the pages in the browser (see the web skill; cached pages may lag up
-   to 5 minutes).
+   Discord. Only when the user asks, follow it with `gh run watch <run-id>` (the `CD` run's, as a background Bash
+   command, as in Release step 4) and smoke test the changed routes: `curl -s -D - -o /dev/null` (status,
+   `cache-control`), the pod logs (the read-only `kubernetes` or `flux` MCP server's log tool;
+   `kubectl -n osrs-tracker logs deploy/osrs-tracker-api --since=5m` as a fallback; reading the cluster is fine), and
+   for web rendering changes the pages in the browser (see the web skill; cached pages may lag up to 5 minutes).
 
 - **Retry** a failed deploy (Docker Hub or Flux hiccup) by re-running the failed `CD` run; a later docs-only push won't
   redeploy.
@@ -351,11 +351,14 @@ Run end to end without asking; stop only on failure. Verify locally once before 
    had conflicts (a clean rebase leaves the checks to CI), `git push --force-with-lease`. Then poll
    `gh pr view <n> --json mergeable,mergeStateStatus` until it isn't `UNKNOWN`; on `CONFLICTING` (recheck once, it lags
    a push), rebase again: GitHub runs no PR CI on a conflicting PR, so `--watch` would hang.
-4. `gh pr checks <n> --watch`. When checks pass: `gh pr merge <n> --merge` (it deploys; if Claude Code's permission
-   check blocks it, give the user the command and wait). GitHub deletes the PR branch on merge. Then pull `main` and
-   `git fetch --prune`; in the main checkout also switch to `main` first and `git branch -d <branch>`. In a worktree
-   `main` is checked out by the main checkout, so pull there (`git -C <main checkout> pull --ff-only`) instead of
-   switching.
+4. Run `gh pr checks <n> --watch` as a background Bash command (`run_in_background`) and carry on meanwhile: the session
+   is woken once, when it exits. Never wait in the foreground (it blocks the session) or with Monitor, `/loop`, `sleep`
+   or a polling loop (each wake-up rereads the whole conversation). If it exits at once with "no checks reported", the
+   checks aren't registered yet: run it again. When checks pass, after reading the result (never chain it as
+   `--watch && gh pr merge`): `gh pr merge <n> --merge` (it deploys; if Claude Code's permission check blocks it, give
+   the user the command and wait). GitHub deletes the PR branch on merge. Then pull `main` and `git fetch --prune`; in
+   the main checkout also switch to `main` first and `git branch -d <branch>`. In a worktree `main` is checked out by
+   the main checkout, so pull there (`git -C <main checkout> pull --ff-only`) instead of switching.
 5. Done: the deploy runs on its own (Deploy step 3). Pull `main` again later for the digest commit.
 
 ## Commit and push
@@ -364,8 +367,10 @@ Run end to end without asking; stop only on failure. Verify locally once before 
   finds no source changes, which still passes. `build` also builds the image and checks that `sharp` converts in it, so
   a `Dockerfile` change is tested on the PR (CD only builds after merging, and there is no Docker locally).
 - `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push, watch its **CI**
-  run (`gh run watch --exit-status`), not CD. A direct push to `main` with source changes deploys it. From a worktree,
-  push with `git push origin HEAD:main`.
+  run, not CD: `gh run watch <run-id> --exit-status` as a background Bash command, as in Release step 4 (the ID from
+  `gh run list --commit "$(git rev-parse HEAD)" --workflow CI --json databaseId`, the full SHA; empty right after the
+  push, so ask again). A direct push to `main` with source changes deploys it. From a worktree, push with
+  `git push origin HEAD:main`.
 - Conventional commits. `chore(deploy)` is reserved for the CD workflow's digest commits (it skips them).
 - `CHANGELOG.md`: newest day first. Busy days get `###` subtitles (by area, "Behind the scenes" last); extend an
   existing entry rather than add a near-duplicate, and don't repeat the subtitle in its entries. When adding an entry,
