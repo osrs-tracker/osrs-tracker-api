@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Controller,
   Get,
   Header,
@@ -17,6 +16,7 @@ import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ParseIntRangeOptions, ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
 import { ItemsService } from './items.service';
 import { ParseBrowseLetterPipe } from './parse-browse-letter.pipe';
+import { ParseItemSearchQueryPipe } from './parse-item-search-query.pipe';
 
 const ITEM_ID_PIPE = new ParseIntRangePipe({ min: 1, message: (id) => `Invalid item ID "${id}"` });
 const LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 5 };
@@ -61,10 +61,7 @@ export class ItemsController {
    */
   @Get('search/:query')
   @Header('Cache-Control', CACHE_CONTROL.ITEM_SEARCH)
-  async searchItems(@Param('query') query: string) {
-    if (!query) throw new BadRequestException('No search query provided');
-    if (query.length > 64) throw new BadRequestException('Search query must be 64 characters or less');
-
+  async searchItems(@Param('query', ParseItemSearchQueryPipe) query: string) {
     return this.itemsService.searchItems(query);
   }
 

@@ -128,11 +128,13 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
 Validate query and route params in pipes, not with checks in the handler: `ParseUsernamePipe`,
 `ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (item browse's letter), `ParseSinceDatePipe` (an ISO date for
 `/news/since/:date`), `ParseNewsCursorPipe` and `ParseNewsCategoryPipe` (`/news/archive`'s `before` and `category`),
-`ParsePlayerCountRangePipe` (`/player-counts`' `range`: `24h`, `7d`, `30d`, `1y` or `all`; `24h` when absent), each next
-to its feature, and from `common/pipes/` `new ParseIntRangePipe({ min, max?, default?, optional?, message? })` for any
-other integer (its message is named after the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` +
-`ParseIntPipe` + a range check, or an `isNaN` check after a parse pipe. Keep existing status codes and messages: the web
-may show them. A new pipe gets a spec.
+`ParsePlayerCountRangePipe` (`/player-counts`' `range`: `24h`, `7d`, `30d`, `1y` or `all`; `24h` when absent),
+`ParseNewsImageUrlPipe` (`/news/image`'s `url`: only plain `https://cdn.runescape.com/` URLs, by parsed origin, never a
+prefix check), `ParseItemSearchQueryPipe` (`/items/search/:query`, at most 64 characters), each next to its feature, and
+from `common/pipes/` `new ParseIntRangePipe({ min, max?, default?, optional?, message? })` for any other integer (its
+message is named after the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` + `ParseIntPipe` + a
+range check, or an `isNaN` check after a parse pipe. Keep existing status codes and messages: the web may show them. A
+new pipe gets a spec.
 
 Stored usernames are Jagex's matching form: lowercase, `_` and `-` as spaces, trimmed (`PlayerUtils.normalizeUsername`,
 which `ParseUsernamePipe` applies), so one player is one document. Anything that stores, looks up or compares a name
@@ -242,7 +244,9 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     (`PlayerUtils`; a hiscore without a combat skill's key counts as failed, a `null` one doesn't, `hasCombatSkills`);
     the layout cache, upsert and collision check (`hiscore-layouts.service.spec.ts`).
   - The validation pipes `ParseSinceDatePipe`, `ParseUsernamePipe`, `ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe`
-    (in `items/item-browse.spec.ts`) and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`, `skip` and IDs).
+    (in `items/item-browse.spec.ts`), `ParseItemSearchQueryPipe`, `ParseNewsImageUrlPipe` (another origin, a lookalike
+    host, `http`, credentials, a query or hash rejected) and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`,
+    `skip` and IDs).
   - `news/news-archive.spec.ts`: the archive's cursor (`encodeNewsCursor`/`decodeNewsCursor`), its filter
     (`buildNewsArchiveFilter`) and `ParseNewsCursorPipe` and `ParseNewsCategoryPipe`.
   - `items/item-browse.spec.ts`: item browse's name range per letter (`buildItemBrowseFilter`; `0` is everything before
