@@ -15,13 +15,15 @@ import { encodeNewsCursor } from './features/news/news-archive';
 import { PlayerCountsService } from './features/player-counts/player-counts.service';
 import { encodeWorldList } from './features/player-counts/world-list.fixture';
 import { HISCORE_LAYOUTS_COLLECTION } from './features/players/hiscore-layouts.service';
+import { MIN_PLAYER_REFRESH_HOURS } from './features/players/player.config';
 import { COMBAT_SKILLS } from './features/players/player.utils';
 
 /**
  * Boots the whole app against a fake database and a fake Jagex, and checks the skill's Cache-Control rules for every
  * GET route: each sends a deliberate `Cache-Control` without `no-store`, `no-cache` or `private` (the web app's SSR
  * transfer cache drops those), and never writes to the database, except the news feed refresh storing Jagex's posts
- * (`FEED_STORE`). Also checks that the POST lookup records nothing for a bot, and the request IDs.
+ * (`FEED_STORE`). Also checks the POST lookup's outcomes (nothing recorded for a bot, the refresh's statuses and
+ * writes), and the request IDs.
  */
 
 const { fakeFetch, logLines } = vi.hoisted(() => {
@@ -53,10 +55,13 @@ const READ_METHODS = new Set(['find', 'findOne', 'aggregate', 'countDocuments', 
 
 /** What the fake database and fake Jagex answer for one request. */
 interface Fakes {
-  /** Documents every `find`, `findOne` and `aggregate` returns, whatever the query (`hiscoreLayouts` answers `LAYOUT`). */
+  /**
+   * Documents every `find`, `findOne`, `aggregate` and `findOneAndUpdate` returns, whatever the query (`hiscoreLayouts`
+   * answers `LAYOUT`).
+   */
   docs?: object[];
-  /** The four hiscore tables: all found, or all failing. */
-  hiscores?: 'found' | 'failed';
+  /** The four hiscore tables: all found, all not found (404), or all failing. */
+  hiscores?: 'found' | 'notFound' | 'failed';
   /** Jagex's world list: answered, or failing. */
   worldList?: 'found' | 'failed';
 }
@@ -219,7 +224,7 @@ const CASES: Record<string, Case[]> = {
   ],
 };
 
-/** `CACHE_CONTROL` values only the POST lookup sends, which this spec doesn't request. */
+/** `CACHE_CONTROL` values only the POST lookup sends, checked by its own tests below rather than by `CASES`. */
 const POST_ONLY: string[] = [CACHE_CONTROL.PLAYER_REFRESH_FAILED, CACHE_CONTROL.PLAYER_REFRESHED];
 
 let fakes: Fakes = {};
@@ -238,7 +243,10 @@ const cursor = (docs: object[]) => {
 /** Only closed, by `MongoModule` on shutdown. */
 const fakeMongoClient = { close: vi.fn(async () => undefined) };
 
-/** Records every method called on any collection, and answers reads with `fakes.docs` (or `LAYOUT`). */
+/**
+ * Records every method called on any collection, answers reads and `findOneAndUpdate` with `fakes.docs` (or `LAYOUT`),
+ * and other writes as matching one document, so a refresh's upsert succeeds.
+ */
 const fakeDb = {
   collection: (name: string) =>
     new Proxy(
@@ -247,9 +255,9 @@ const fakeDb = {
         get: (_target, method: string) => (): unknown => {
           collectionCalls.push(`${name}.${method}`);
           const docs = name === HISCORE_LAYOUTS_COLLECTION ? [LAYOUT] : (fakes.docs ?? []);
-          if (method === 'findOne') return Promise.resolve(docs[0] ?? null);
+          if (method === 'findOne' || method === 'findOneAndUpdate') return Promise.resolve(docs[0] ?? null);
           if (method === 'find' || method === 'aggregate') return cursor(docs);
-          return Promise.resolve({ acknowledged: true, matchedCount: 0, modifiedCount: 0, upsertedCount: 0 });
+          return Promise.resolve({ acknowledged: true, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 });
         },
       },
     ),
@@ -275,8 +283,10 @@ async function fakeJagex(url: string): Promise<Response> {
   if (url.startsWith('https://secure.runescape.com/m=news/latest_news.rss')) return new Response(RSS);
   if (url.startsWith('https://cdn.runescape.com/'))
     return new Response(new Uint8Array(png), { headers: { 'content-type': 'image/png' } });
-  if (url.startsWith('https://secure.runescape.com/m=hiscore_oldschool') && url.includes('/index_lite.json'))
-    return fakes.hiscores === 'found' ? Response.json(HISCORE) : new Response('', { status: 503 });
+  if (url.startsWith('https://secure.runescape.com/m=hiscore_oldschool') && url.includes('/index_lite.json')) {
+    if (fakes.hiscores === 'found') return Response.json(HISCORE);
+    return new Response('', { status: fakes.hiscores === 'notFound' ? 404 : 503 });
+  }
   if (url === WORLD_LIST_URL)
     return fakes.worldList === 'found' ? new Response(WORLD_LIST) : new Response('', { status: 503 });
   throw new Error(`Unexpected fetch: ${url}`);
@@ -356,11 +366,22 @@ describe('GET routes', () => {
   });
 
   describe('POST /players/:username/lookup', () => {
+    const VISITOR = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/140.0';
+    /** Past the refresh window, so a lookup refreshes it. */
+    const stalePlayer = {
+      ...storedPlayer,
+      lastModified: new Date(Date.now() - (MIN_PLAYER_REFRESH_HOURS + 1) * 3_600_000),
+      scrapingOffsets: [-12],
+    };
+
     const lookup = (userAgent?: string) =>
       fetch(`${baseUrl}/players/toxsick/lookup?scrapingOffset=-12`, {
         method: 'POST',
         headers: userAgent ? { 'User-Agent': userAgent } : {},
       });
+    const writes = () => collectionCalls.filter((call) => !READ_METHODS.has(call.split('.')[1]));
+    /** The `players` writes, in order; `hiscoreLayouts` is left out, as the layout may already be cached. */
+    const playerWrites = () => writes().filter((call) => call.startsWith('players.'));
 
     it('records nothing for a bot', async () => {
       fakes = { docs: [storedPlayer] };
@@ -374,10 +395,51 @@ describe('GET routes', () => {
     it("records a visitor's lookup of a stored player", async () => {
       fakes = { docs: [{ ...storedPlayer, scrapingOffsets: [-12] }] };
 
-      const response = await lookup('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/140.0');
+      const response = await lookup(VISITOR);
 
       expect(response.status).toBe(200);
       expect(collectionCalls).toContain('players.updateOne');
+    });
+
+    it('stores an unknown player found on the hiscores, and records the lookup', async () => {
+      fakes = { docs: [], hiscores: 'found' };
+
+      const response = await lookup(VISITOR);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toBe(CACHE_CONTROL.PLAYER_REFRESHED);
+      expect(playerWrites()).toEqual(['players.updateOne', 'players.updateOne']); // The refresh's upsert, the lookup
+    });
+
+    it('answers 503 for an unknown player when the hiscores fail, and writes nothing', async () => {
+      fakes = { docs: [], hiscores: 'failed' };
+
+      const response = await lookup(VISITOR);
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('cache-control')).toBe(CACHE_CONTROL.REVALIDATE);
+      expect(writes()).toEqual([]);
+    });
+
+    it('returns a stale stored player with refreshFailed when the hiscores fail, and records the lookup', async () => {
+      fakes = { docs: [stalePlayer], hiscores: 'failed' };
+
+      const response = await lookup(VISITOR);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toBe(CACHE_CONTROL.PLAYER_REFRESH_FAILED);
+      expect(await response.json()).toMatchObject({ username: 'toxsick', refreshFailed: true });
+      expect(playerWrites()).toEqual(['players.updateOne']); // Only the lookup: a failed refresh writes nothing
+    });
+
+    it('answers 404 for a stored player no longer on the hiscores, and writes nothing', async () => {
+      fakes = { docs: [stalePlayer], hiscores: 'notFound' };
+
+      const response = await lookup(VISITOR);
+
+      expect(response.status).toBe(404);
+      // Not counted here: process-players owns the 404 bookkeeping (pause/resume contract)
+      expect(writes()).toEqual([]);
     });
   });
 

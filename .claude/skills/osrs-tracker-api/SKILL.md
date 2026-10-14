@@ -273,10 +273,12 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   - `mongo.provider.spec.ts` (fake timers): the connect retry's constant 10s delay, warn lines, giving up after 12 with
     the connect error (also when closing the failed client fails).
   - `app.e2e.spec.ts` (`logger` mocked to collect the lines): per GET route its `Cache-Control` and that it never writes
-    (a route's header or a new GET route means changing `CASES`), that no route overlaps another, that the POST lookup
-    writes nothing for a bot and writes `players` for a visitor, that shutdown closes the Mongo client, and the request
-    ID (`X-Request-Id` matching the `incoming` line's `requestId`, a client's own ignored).
-- Not covered: anything against a real database, and the `Cache-Control` of POST responses.
+    (a route's header or a new GET route means changing `CASES`), that no route overlaps another, the POST lookup's
+    outcomes with their `Cache-Control` and `players` writes (a bot: 204, nothing; an unknown player found: stored, 200;
+    unknown with the hiscores failing: 503, nothing; a stale stored player with them failing: 200, `refreshFailed`, the
+    lookup recorded; not on the hiscores: 404, nothing), that shutdown closes the Mongo client, and the request ID
+    (`X-Request-Id` matching the `incoming` line's `requestId`, a client's own ignored).
+- Not covered: anything against a real database.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.
 
