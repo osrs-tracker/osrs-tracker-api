@@ -1,3 +1,6 @@
+/** Longest `max-age` for a stored player (`playerMaxAgeSeconds`), and what a lookup that just refreshed it sends. */
+export const PLAYER_MAX_AGE_SECONDS = 900;
+
 /**
  * `Cache-Control` values for GET routes. The web app's SSR transfer cache drops `no-store`, `no-cache` and `private`
  * responses (the UI flashes back to skeletons on hydration), so none of these may use them.
@@ -24,6 +27,6 @@ export const CACHE_CONTROL = {
   PLAYER_COUNT_LIVE: 'public, max-age=60',
   /** A player lookup that couldn't refresh the stored player: retry the refresh soon. */
   PLAYER_REFRESH_FAILED: 'max-age=60',
-  /** A player lookup that just refreshed the player: 15 minutes, `PLAYER_MAX_AGE_SECONDS` in `player.policy.ts`. */
-  PLAYER_REFRESHED: 'max-age=900',
+  /** A player lookup that just refreshed the player: 15 minutes, as long as a stored player's longest. */
+  PLAYER_REFRESHED: `max-age=${PLAYER_MAX_AGE_SECONDS}`,
 } as const;

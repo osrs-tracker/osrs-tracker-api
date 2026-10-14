@@ -19,6 +19,7 @@ import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { Env } from '../../config/env';
 import { HiscoreLayoutsService } from './hiscore-layouts.service';
 import { JAGEX_HISCORES, NOT_FOUND_CACHE_MAX, NOT_FOUND_CACHE_TTL_MS } from './player.config';
+import { entriesForOffset, HISCORE_ENTRIES, PLAYER_PROJECTION } from './player-queries';
 import { buildSitemapPlayersPipeline, SitemapPlayer } from './player-sitemap';
 import { buildLookupUpdate, buildRefreshUpdate } from './player.policy';
 import { PlayerUtils } from './player.utils';
@@ -35,7 +36,7 @@ export const RECENT_PLAYERS_ENTRY = { Overall: 'overall' } as const;
 export type RecentPlayersEntry = (typeof RECENT_PLAYERS_ENTRY)[keyof typeof RECENT_PLAYERS_ENTRY];
 
 /** The entry with only its Overall skill and no activities, still a valid `HiscoreEntry`. */
-export function toOverallEntry({ date, scrapingOffset, skills }: HiscoreEntry): HiscoreEntry {
+function toOverallEntry({ date, scrapingOffset, skills }: HiscoreEntry): HiscoreEntry {
   const overall = skills[SkillEnum.Overall];
   return {
     date,
@@ -92,34 +93,15 @@ export class PlayersService {
       {
         hint: { username: 1 },
         projection: {
-          _id: 0,
-          username: 1,
-          combatLevel: 1,
-          diedAsHardcore: 1,
-          lastModified: 1,
-          status: 1,
-          type: 1,
-          scrapingOffsets: 1,
+          ...PLAYER_PROJECTION,
           pausedScrapingOffsets: 1, // Still tracked (they have a history), resumed by the next successful refresh
           ...(includeLatestHiscoreEntry ? { hiscoreEntries: { $elemMatch: { o: scrapingOffset } } } : {}),
-          // Date of the oldest stored entry for this offset (entries are stored newest first). The clean-hiscores Lambda
-          // removes entries older than MAX_AGE_IN_DAYS, so this is where the history starts, not when tracking started.
+          // Date of the oldest stored entry for this offset (entries are stored newest first). The clean-hiscores
+          // Lambda removes entries older than MAX_AGE_IN_DAYS, so this is where the history starts, not when tracking
+          // started.
           trackedSince: {
             $ifNull: [
-              {
-                $getField: {
-                  field: 'd',
-                  input: {
-                    $last: {
-                      $filter: {
-                        input: { $ifNull: ['$hiscoreEntries', []] },
-                        as: 'entry',
-                        cond: { $eq: ['$$entry.o', scrapingOffset] },
-                      },
-                    },
-                  },
-                },
-              },
+              { $getField: { field: 'd', input: { $last: entriesForOffset(HISCORE_ENTRIES, scrapingOffset) } } },
               null,
             ],
           },
@@ -152,13 +134,8 @@ export class PlayersService {
               username: 1,
               hiscoreEntries: {
                 $slice: [
-                  {
-                    $filter: {
-                      input: '$hiscoreEntries',
-                      as: 'entry',
-                      cond: { $eq: ['$$entry.o', scrapingOffset] },
-                    },
-                  },
+                  // Not `HISCORE_ENTRIES`: a stored player without entries answers `null` (an empty body), not `[]`
+                  entriesForOffset('$hiscoreEntries', scrapingOffset),
                   // From the newest: an unchanged value is stored as a bare rank, resolved from a newer entry
                   0,
                   skip + size,
@@ -204,25 +181,10 @@ export class PlayersService {
           { $limit: limit },
           {
             $project: {
-              _id: 0,
-              username: 1,
-              combatLevel: 1,
-              diedAsHardcore: 1,
-              lastModified: 1,
-              status: 1,
-              type: 1,
-              scrapingOffsets: 1,
+              ...PLAYER_PROJECTION,
               hiscoreEntries: {
                 $slice: [
-                  scrapingOffset === undefined
-                    ? { $ifNull: ['$hiscoreEntries', []] }
-                    : {
-                        $filter: {
-                          input: { $ifNull: ['$hiscoreEntries', []] },
-                          as: 'entry',
-                          cond: { $eq: ['$$entry.o', scrapingOffset] },
-                        },
-                      },
+                  scrapingOffset === undefined ? HISCORE_ENTRIES : entriesForOffset(HISCORE_ENTRIES, scrapingOffset),
                   1,
                 ],
               },
@@ -289,7 +251,8 @@ export class PlayersService {
    * merging the paused offsets back and removing the pause fields. A refresh that isn't `refreshed` writes nothing and
    * leaves them untouched: the Lambda does the 404 counting.
    *
-   * @param scrapingOffset Added to the player's `scrapingOffsets` if not already present, with an initial `hiscoreEntry`.
+   * @param scrapingOffset Added to the player's `scrapingOffsets` if not already present, with an initial
+   *   `hiscoreEntry`.
    * @returns `notFound` when the player isn't on the normal hiscores, `failed` when the hiscores couldn't be reached.
    */
   async refreshPlayerInfo(username: string, scrapingOffset: number): Promise<RefreshResult> {
@@ -364,7 +327,7 @@ export class PlayersService {
         status: PlayerUtils.determineStatus(normal, ironman, ultimate),
         diedAsHardcore: PlayerUtils.getTotalXp(hardcore) < PlayerUtils.getTotalXp(ironman),
         lastModified: new Date(),
-      } as Player,
+      } satisfies Player,
       partialHiscoreEntry: { skills: normal.skills, activities: normal.activities },
       layout: normalResult.layout,
     };
@@ -392,8 +355,8 @@ export class PlayersService {
             }),
         });
 
-        // The package only checks that `skills` is an array: a truncated hiscore would store a wrong combat level, so it
-        // counts as failed like any other bad response
+        // The package only checks that `skills` is an array: a truncated hiscore would store a wrong combat level, so
+        // it counts as failed like any other bad response
         if (result.status === 'found' && !PlayerUtils.hasCombatSkills(result.hiscore.skills)) {
           throw new HiscoreFailedError('missing combat skills');
         }

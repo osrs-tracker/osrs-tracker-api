@@ -218,8 +218,9 @@ that one is on the author and the `conventions-reviewer`.
   posts into `news` (keyed on `link`), the same whoever asks; the e2e spec allows only that write (`FEED_STORE`).
 - `/items/:id`, `/players/:username/hiscores` and the recent-items/players lists: `max-age=0, must-revalidate` so
   they're always fresh.
-- `/players/:username`: stored players get a dynamic `max-age` (`playerMaxAgeSeconds`), clamped to `[0, 900]` and capped
-  at the time until the refresh window; the preview of an unknown player and the 503 get `max-age=0, must-revalidate`.
+- `/players/:username`: stored players get a dynamic `max-age` (`playerMaxAgeSeconds`), clamped to `[0, 900]`
+  (`PLAYER_MAX_AGE_SECONDS` in `cache-control.ts`, which `PLAYER_REFRESHED` uses too) and capped at the time until the
+  refresh window; the preview of an unknown player and the 503 get `max-age=0, must-revalidate`.
 
 ## Tests
 

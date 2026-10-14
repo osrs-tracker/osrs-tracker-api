@@ -59,13 +59,15 @@ export class PlayersController {
   }
 
   /**
-   * Read-only: never refreshes or stores the player (the browser's `POST .../lookup` does). The username is
-   * matched like Jagex does: case-insensitive, `_` and `-` as spaces, leading and trailing ones ignored. A stored player as stored (stale or not), with `trackedSince` (its oldest entry for
-   * `scrapingOffset`, or `null`) and a `max-age` of the time left until it may be refreshed (0 to
-   * `PLAYER_MAX_AGE_SECONDS`, `playerMaxAgeSeconds`). An unknown player is a live preview from the hiscores, not stored
-   * (`scrapingOffsets: []`, `trackedSince: null`); 404 when not on the hiscores (or with `skipRefresh`, which skips the
-   * preview), 503 when they can't be reached; all three `REVALIDATE`. `includeLatestHiscoreEntry` adds `hiscoreEntries`
-   * with the newest entry for `scrapingOffset` (empty when there is none). 400 for an invalid username or param.
+   * Read-only: never refreshes or stores the player (the browser's `POST .../lookup` does). The username is matched
+   * like Jagex does: case-insensitive, `_` and `-` as spaces, leading and trailing ones ignored.
+   *
+   * A stored player as stored (stale or not), with `trackedSince` (its oldest entry for `scrapingOffset`, or `null`)
+   * and a `max-age` of the time left until it may be refreshed (0 to `PLAYER_MAX_AGE_SECONDS`, `playerMaxAgeSeconds`).
+   * An unknown player is a live preview from the hiscores, not stored (`scrapingOffsets: []`, `trackedSince: null`);
+   * 404 when not on the hiscores (or with `skipRefresh`, which skips the preview), 503 when they can't be reached; all
+   * three `REVALIDATE`. `includeLatestHiscoreEntry` adds `hiscoreEntries` with the newest entry for `scrapingOffset`
+   * (empty when there is none). 400 for an invalid username or param.
    */
   @Get(':username')
   async getByUsername(
@@ -156,7 +158,7 @@ export class PlayersController {
       this.logger.log(`Player '${username}' refreshed successfully.`);
 
       response.setHeader('Cache-Control', CACHE_CONTROL.PLAYER_REFRESHED);
-      return this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry); // Retry fetching the player
+      return this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry); // Read it again, refreshed
     }
 
     return player;

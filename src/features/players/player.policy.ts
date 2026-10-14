@@ -1,10 +1,8 @@
 import { hiscoreEntriesWriteExpression, Player, StoredHiscoreEntry, StoredPlayer } from '@osrs-tracker/models';
 import { addHours, differenceInHours, differenceInSeconds } from 'date-fns';
 import { Document, UpdateFilter } from 'mongodb';
+import { PLAYER_MAX_AGE_SECONDS } from '../../common/http/cache-control';
 import { MIN_PLAYER_REFRESH_HOURS } from './player.config';
-
-/** Longest `max-age` for a stored player: 15 minutes. */
-export const PLAYER_MAX_AGE_SECONDS = 900;
 
 /**
  * `max-age` for a stored player: until its refresh window starts (a lookup then refreshes it), capped at
