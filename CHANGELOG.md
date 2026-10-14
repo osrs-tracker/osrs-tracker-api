@@ -9,6 +9,10 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   fail for one, a stale stored player returned with `refreshFailed: true`, and a 404 that writes nothing (the Lambda
   counts 404s, never the API), each with its `Cache-Control`. That branch was untested, and it's the API's side of the
   pause/resume contract. The fake Jagex can answer 404 and the fake database now accepts a refresh (#167).
+- `GET /news/image` and `GET /items/search/:query` validate their param in a pipe (`ParseNewsImageUrlPipe`,
+  `ParseItemSearchQueryPipe`), like every other route, instead of in the handler; statuses and messages are unchanged.
+  The image URL check is what keeps the route from fetching and converting any host's images, and its rejections
+  (another origin, a lookalike host, `http`, credentials, a query or hash) are now tested (#169).
 
 ## 2026-10-13
 
