@@ -23,6 +23,9 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   and `news-archive.ts`. `ResilienceEventsListener` gets a spec: its throttled bulkhead warning and circuit lines are
   the only log record of a Jagex outage. The Dependabot config and the skill note that TypeScript 7 waits for
   `typescript-eslint` too (#171).
+- Removed the one-off news backfill scripts (`scripts/backfill-news.mjs`, `scripts/backfill-news-images.mjs`): both ran
+  on 2026-10-13 (production holds 1,819 posts from before 2026-09-01, 1,316 with an image), they sat outside lint and
+  Prettier, and git keeps them should a backfill ever be needed again (#173).
 
 ## 2026-10-13
 
