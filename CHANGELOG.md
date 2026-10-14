@@ -16,7 +16,7 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 - The player queries share their projection and their filter of a player's entries by offset
   (`players/player-queries.ts`) instead of three copies, which had already drifted; each query answers as before. The
   15-minute `max-age` is one constant (`PLAYER_MAX_AGE_SECONDS`, in `cache-control.ts`), the refreshed player is checked
-  against `Player` (`satisfies`) instead of cast, and three unused exports are gone (#168).
+  against `Player` (`satisfies`) instead of cast, and two unused exports are gone (#168).
 
 ## 2026-10-13
 
