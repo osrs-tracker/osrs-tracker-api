@@ -1,11 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import { ParsePlayerCountRangePipe } from './parse-player-count-range.pipe';
-import { buildPlayerCountHistoryPipeline } from './player-count-history';
+import { buildPlayerCountHistoryPipeline, readsDailyAverages } from './player-count-history';
 
 /**
- * There's no database in the tests, so this checks the pipeline: each range's start and what it averages over. Its
- * results were checked against Atlas with `$documents` samples (#158).
+ * There's no database in the tests, so this checks the pipeline: each range's start and what it averages over. The
+ * hourly averages were checked against Atlas with `$documents` samples (#158); the stored daily averages against what
+ * the API answered before reading them (#159).
  */
 describe('buildPlayerCountHistoryPipeline', () => {
   const now = new Date('2026-10-13T12:00:00Z');
@@ -14,7 +15,7 @@ describe('buildPlayerCountHistoryPipeline', () => {
   const groupOf = (range: Parameters<typeof buildPlayerCountHistoryPipeline>[0]) =>
     buildPlayerCountHistoryPipeline(range, now).find((stage) => stage.$group)?.$group;
 
-  it('starts each range its span before now, and all at the first sample', () => {
+  it('starts each range its span before now, and all at the first point', () => {
     expect(since('24h')).toEqual(new Date('2026-10-12T12:00:00Z'));
     expect(since('7d')).toEqual(new Date('2026-10-06T12:00:00Z'));
     expect(since('30d')).toEqual(new Date('2026-09-13T12:00:00Z'));
@@ -39,28 +40,38 @@ describe('buildPlayerCountHistoryPipeline', () => {
     expect(groupOf('30d')).not.toHaveProperty('peak');
   });
 
-  it('averages 1y and all per day, with the peak total', () => {
+  it('reads 1y and all from the stored daily averages, with their peak and without their sample count', () => {
+    for (const range of ['24h', '7d', '30d'] as const) expect(readsDailyAverages(range)).toBe(false);
     for (const range of ['1y', 'all'] as const) {
-      expect(truncOf(range)).toEqual({ $dateTrunc: { date: '$date', unit: 'day' } });
-      expect(groupOf(range)?.peak).toEqual({ $max: { $cond: [{ $eq: ['$i', 0] }, '$total', null] } });
+      const pipeline = buildPlayerCountHistoryPipeline(range, now);
+      expect(readsDailyAverages(range)).toBe(true);
+      expect(groupOf(range)).toBeUndefined();
+      expect(pipeline).toContainEqual({ $sort: { date: 1 } });
+      expect(pipeline.at(-1)?.$project).toEqual({
+        _id: 0,
+        date: 1,
+        total: 1,
+        members: 1,
+        f2p: 1,
+        byLocation: 1,
+        peak: 1,
+      });
     }
   });
 
-  it('averages byLocation per bucket and code, and counts each sample once for its totals', () => {
-    for (const range of ['30d', '1y', 'all'] as const) {
-      const pipeline = buildPlayerCountHistoryPipeline(range, now);
-      expect(pipeline).toContainEqual({ $unwind: { path: '$location', includeArrayIndex: 'i' } });
-      expect(groupOf(range)).toMatchObject({
-        _id: { date: '$date', code: '$location.k' },
-        players: { $avg: '$location.v' },
-        samples: { $sum: { $cond: [{ $eq: ['$i', 0] }, 1, 0] } },
-        total: { $sum: { $cond: [{ $eq: ['$i', 0] }, '$total', 0] } },
-      });
-      expect(pipeline.at(-1)?.$project).toMatchObject({
-        total: { $round: [{ $divide: ['$total', '$samples'] }, 0] },
-        byLocation: { $arrayToObject: '$byLocation' },
-      });
-    }
+  it('averages 30d byLocation per hour and code, and counts each sample once for its totals', () => {
+    const pipeline = buildPlayerCountHistoryPipeline('30d', now);
+    expect(pipeline).toContainEqual({ $unwind: { path: '$location', includeArrayIndex: 'i' } });
+    expect(groupOf('30d')).toMatchObject({
+      _id: { date: '$date', code: '$location.k' },
+      players: { $avg: '$location.v' },
+      samples: { $sum: { $cond: [{ $eq: ['$i', 0] }, 1, 0] } },
+      total: { $sum: { $cond: [{ $eq: ['$i', 0] }, '$total', 0] } },
+    });
+    expect(pipeline.at(-1)?.$project).toMatchObject({
+      total: { $round: [{ $divide: ['$total', '$samples'] }, 0] },
+      byLocation: { $arrayToObject: '$byLocation' },
+    });
   });
 });
 

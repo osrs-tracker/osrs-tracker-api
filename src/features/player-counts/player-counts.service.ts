@@ -1,13 +1,18 @@
 import { BadGatewayException, Inject, Injectable, Logger } from '@nestjs/common';
 import { fetchWorldList, parseWorldList } from '@osrs-tracker/hiscores';
-import { PlayerCount } from '@osrs-tracker/models';
+import { PlayerCount, PlayerCountDay } from '@osrs-tracker/models';
 import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
 import { Agent, fetch } from 'undici';
 import { AGENT, USER_AGENT } from '../../common/agent/agent.provider';
-import { PLAYER_COUNTS_COLLECTION } from '../../common/mongo/collections';
+import { PLAYER_COUNTS_COLLECTION, PLAYER_COUNTS_DAILY_COLLECTION } from '../../common/mongo/collections';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
-import { buildPlayerCountHistoryPipeline, PlayerCountPoint, PlayerCountRange } from './player-count-history';
+import {
+  buildPlayerCountHistoryPipeline,
+  PlayerCountPoint,
+  PlayerCountRange,
+  readsDailyAverages,
+} from './player-count-history';
 
 /** How long a live count (or a failure to get one) is kept: Jagex asks for at most one world list poll a minute. */
 export const LIVE_PLAYER_COUNT_TTL_MS = 60_000;
@@ -27,12 +32,14 @@ export class PlayerCountsService {
   });
 
   private readonly collection: Collection<PlayerCount>;
+  private readonly daily: Collection<PlayerCountDay>;
 
   constructor(
     @Inject(MONGODB_DATABASE) db: Db,
     @Inject(AGENT) private readonly agent: Agent,
   ) {
     this.collection = db.collection(PLAYER_COUNTS_COLLECTION);
+    this.daily = db.collection(PLAYER_COUNTS_DAILY_COLLECTION);
   }
 
   /** The newest sample, or `null` before the first one. */
@@ -44,9 +51,14 @@ export class PlayerCountsService {
   }
 
   getHistory(range: PlayerCountRange): Promise<PlayerCountPoint[]> {
-    return this.collection
-      .aggregate<PlayerCountPoint>(buildPlayerCountHistoryPipeline(range), { hint: { date: 1 } })
-      .toArray();
+    const pipeline = buildPlayerCountHistoryPipeline(range);
+    const options = { hint: { date: 1 } }; // record-player-count's index, on both collections
+
+    return (
+      readsDailyAverages(range)
+        ? this.daily.aggregate<PlayerCountPoint>(pipeline, options)
+        : this.collection.aggregate<PlayerCountPoint>(pipeline, options)
+    ).toArray();
   }
 
   /**

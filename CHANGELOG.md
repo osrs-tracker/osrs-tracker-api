@@ -5,6 +5,20 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 
 ## 2026-10-14
 
+### Player counts
+
+- `GET /player-counts?range=1y` and `range=all` read the daily averages and peaks that osrs-tracker-aws's
+  record-player-count now stores in `playerCountsDaily` (osrs-tracker/osrs-tracker-aws#125), instead of averaging every
+  sample per day on each request. Since #158 averages `byLocation` per code, that aggregation grew with the stored
+  samples: with 10 years of synthetic samples on Atlas it took 0.93 s for `1y` and 6.5 s for `all`, past the web's 3 s
+  SSR timeout; reading 10 years of daily documents takes about 50 ms and 120 ms. The response fields, values and
+  `Cache-Control` are unchanged (checked against production), except that `1y` no longer starts with a partial day: its
+  first point is the first whole day, so it has 365 points, not 366. `24h`, `7d` and `30d` still read the samples. An
+  in-API cache was tried first and dropped: each deploy starts the pods cold, so the first request per range still
+  waited the full aggregation (#159).
+
+### Behind the scenes
+
 - The e2e spec now runs the `POST /players/:username/lookup` refresh: an unknown player stored, a 503 when the hiscores
   fail for one, a stale stored player returned with `refreshFailed: true`, and a 404 that writes nothing (the Lambda
   counts 404s, never the API), each with its `Cache-Control`. That branch was untested, and it's the API's side of the
