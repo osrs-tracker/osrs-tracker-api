@@ -3,6 +3,13 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-10-14
+
+- The e2e spec now runs the `POST /players/:username/lookup` refresh: an unknown player stored, a 503 when the hiscores
+  fail for one, a stale stored player returned with `refreshFailed: true`, and a 404 that writes nothing (the Lambda
+  counts 404s, never the API), each with its `Cache-Control`. That branch was untested, and it's the API's side of the
+  pause/resume contract. The fake Jagex can answer 404 and the fake database now accepts a refresh (#167).
+
 ## 2026-10-13
 
 - New `GET /news/since/:date` (an ISO date, or a date and time with a zone; 400 otherwise) serves every OSRS news post
