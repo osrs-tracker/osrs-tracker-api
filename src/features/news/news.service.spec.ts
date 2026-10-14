@@ -8,6 +8,7 @@ import { AddressInfo } from 'node:net';
 import sharp from 'sharp';
 import { Agent, fetch, Response } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
+import { NEWS_COLLECTION } from '../../common/mongo/collections';
 import { AGENT, IMAGE_AGENT, imageAgentProvider, MAX_IMAGE_BYTES, USER_AGENT } from '../../common/agent/agent.provider';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { XML_PARSER, XMLParserProvider } from '../../common/xml/xml.provider';
@@ -20,7 +21,8 @@ import {
   NEWS_IMAGES,
   NEWS_IMAGES_PRESET,
 } from './news.config';
-import { MAX_NEWS_SINCE, NEWS_COLLECTION, NewsService, StoredNewsItem } from './news.service';
+import { MAX_NEWS_SINCE, NewsService } from './news.service';
+import { StoredNewsItem } from './news.types';
 
 vi.mock('undici', async (importOriginal) => ({ ...(await importOriginal<typeof import('undici')>()), fetch: vi.fn() }));
 

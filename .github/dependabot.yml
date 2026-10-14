@@ -18,7 +18,9 @@ updates:
       # @types/node, which follows the Node major in the Dockerfile and CI.
       - dependency-name: '*'
         update-types: [version-update:semver-major]
-      # typescript-eslint 8.71.x peers typescript <6.1.0, so a 6.1 bump fails `npm ci`. Remove once it allows 6.1
+      # typescript-eslint 8.71.x peers typescript <6.1.0, so a 6.1 bump fails `npm ci`. Remove once it allows 6.1.
+      # TypeScript 7 also waits for a typescript-eslint release whose peer range includes it; upgrade by hand from an
+      # issue then.
       - dependency-name: typescript
         versions: ['>=6.1.0']
 

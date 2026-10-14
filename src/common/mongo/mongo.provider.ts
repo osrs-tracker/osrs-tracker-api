@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { RetryPolicy } from '@nestjs/resilience';
 import { Db, MongoClient, ServerApiVersion } from 'mongodb';
 import { Env } from '../../config/env';
+import { ITEMS_COLLECTION, NEWS_COLLECTION, PLAYERS_COLLECTION } from './collections';
 import { MONGO_LOG_CONTEXT } from '../logger/nest-logger';
 
 export const MONGO_CLIENT = 'MONGO_CLIENT';
@@ -66,7 +67,7 @@ export const ITEM_SEARCH_MIN_GRAMS = 2;
  * rather than thrown, so search alone breaks instead of the whole API.
  */
 async function ensureItemSearchIndex(db: Db): Promise<void> {
-  const items = db.collection('items');
+  const items = db.collection(ITEMS_COLLECTION);
   try {
     if ((await items.listSearchIndexes(ITEM_SEARCH_INDEX).toArray()).length) return;
 
@@ -120,22 +121,22 @@ export const mongoDBProvider: FactoryProvider = {
     const db = mongoClient.db(config.get('MONGODB_DATABASE', { infer: true }));
 
     // Ensure player indexes are created
-    await db.collection('players').createIndex({ username: 1 }, { unique: true });
+    await db.collection(PLAYERS_COLLECTION).createIndex({ username: 1 }, { unique: true });
     await db
-      .collection('players')
+      .collection(PLAYERS_COLLECTION)
       .createIndex({ lastHiscoreFetch: -1 }, { partialFilterExpression: { lastHiscoreFetch: { $exists: true } } });
 
     // Ensure item indexes are created
-    await db.collection('items').createIndex({ id: 1 }, { unique: true });
+    await db.collection(ITEMS_COLLECTION).createIndex({ id: 1 }, { unique: true });
     await db
-      .collection('items')
+      .collection(ITEMS_COLLECTION)
       .createIndex({ lastFetch: -1 }, { partialFilterExpression: { lastFetch: { $exists: true } } });
-    await db.collection('items').createIndex({ name: 1 }, { collation: ITEM_NAME_COLLATION });
+    await db.collection(ITEMS_COLLECTION).createIndex({ name: 1 }, { collation: ITEM_NAME_COLLATION });
     await ensureItemSearchIndex(db);
 
     // Ensure news indexes are created: the feed upserts on `link`, `/news/since/:date` reads by `pubDate`
-    await db.collection('news').createIndex({ link: 1 }, { unique: true });
-    await db.collection('news').createIndex({ pubDate: -1 });
+    await db.collection(NEWS_COLLECTION).createIndex({ link: 1 }, { unique: true });
+    await db.collection(NEWS_COLLECTION).createIndex({ pubDate: -1 });
 
     return db;
   },

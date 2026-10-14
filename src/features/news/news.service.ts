@@ -16,25 +16,16 @@ import sharp from 'sharp';
 import { Agent, errors, fetch } from 'undici';
 import { AGENT, IMAGE_AGENT, MAX_IMAGE_BYTES, USER_AGENT } from '../../common/agent/agent.provider';
 import { ThrottledWarning } from '../../common/logger/throttled-warning';
+import { NEWS_COLLECTION } from '../../common/mongo/collections';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { XML_PARSER } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
 import { buildNewsArchiveFilter, encodeNewsCursor, NEWS_ARCHIVE_SORT, NewsArchiveCursor } from './news-archive';
 import { MAX_IMAGE_PIXELS, NEWS_IMAGES } from './news.config';
-
-export const NEWS_COLLECTION = 'news';
+import { StoredNewsItem } from './news.types';
 
 /** The most posts `getNewsSince` returns. */
 export const MAX_NEWS_SINCE = 200;
-
-/**
- * A stored post, keyed on `link`: a feed item, or one backfilled from the Wiki's `update` bucket (2026-10). Backfilled
- * posts got Jagex's teaser (`description`) and, where it's on `cdn.runescape.com`, image (`enclosure`) from Jagex's
- * news archive (`scripts/backfill-news-images.mjs`); the oldest have no image, and posts the archive doesn't list have
- * neither.
- */
-export type StoredNewsItem = Omit<OsrsNewsItem, 'description' | 'enclosure'> &
-  Partial<Pick<OsrsNewsItem, 'description' | 'enclosure'>>;
 
 /** A page of `GET /news/archive`: `next` is the `before` of the following page, `null` on the last one. */
 export interface NewsArchivePage {

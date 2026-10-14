@@ -17,6 +17,12 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   (`players/player-queries.ts`) instead of three copies, which had already drifted; each query answers as before. The
   15-minute `max-age` is one constant (`PLAYER_MAX_AGE_SECONDS`, in `cache-control.ts`), the refreshed player is checked
   against `Player` (`satisfies`) instead of cast, and two unused exports are gone (#168).
+- Collection names are one constant each (`common/mongo/collections.ts`), used by `mongo.provider.ts`, the services and
+  the specs, instead of string literals, private names and two exported constants; each service opens its collection
+  once. `StoredNewsItem` moves to `news/news.types.ts`, which ends the type-only import cycle between `news.service.ts`
+  and `news-archive.ts`. `ResilienceEventsListener` gets a spec: its throttled bulkhead warning and circuit lines are
+  the only log record of a Jagex outage. The Dependabot config and the skill note that TypeScript 7 waits for
+  `typescript-eslint` too (#171).
 
 ## 2026-10-13
 

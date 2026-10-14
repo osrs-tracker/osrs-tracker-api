@@ -15,6 +15,7 @@ import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
 import { Agent, fetch } from 'undici';
 import { AGENT, USER_AGENT } from '../../common/agent/agent.provider';
+import { PLAYERS_COLLECTION } from '../../common/mongo/collections';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { Env } from '../../config/env';
 import { HiscoreLayoutsService } from './hiscore-layouts.service';
@@ -53,7 +54,6 @@ type PlayerStatusAndType =
 /** Usernames passed in are expected normalized, as `ParseUsernamePipe` returns them. */
 @Injectable()
 export class PlayersService {
-  private readonly COLLECTION_NAME = 'players';
   private readonly logger = new Logger(PlayersService.name);
 
   /**
@@ -69,17 +69,16 @@ export class PlayersService {
     ttl: NOT_FOUND_CACHE_TTL_MS,
   });
 
-  get collection(): Collection<StoredPlayer> {
-    return this.db.collection(this.COLLECTION_NAME);
-  }
+  private readonly collection: Collection<StoredPlayer>;
 
   constructor(
     @Inject(AGENT) private readonly agent: Agent,
-    @Inject(MONGODB_DATABASE) private readonly db: Db,
+    @Inject(MONGODB_DATABASE) db: Db,
     private readonly config: ConfigService<Env, true>,
     private readonly layouts: HiscoreLayoutsService,
     resilience: ResilienceService,
   ) {
+    this.collection = db.collection(PLAYERS_COLLECTION);
     this.hiscoresPolicy = resilience.preset(JAGEX_HISCORES);
   }
 

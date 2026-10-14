@@ -8,7 +8,8 @@ import {
 } from '@osrs-tracker/models';
 import { Db } from 'mongodb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HISCORE_LAYOUTS_COLLECTION, HiscoreLayoutsService } from './hiscore-layouts.service';
+import { HISCORE_LAYOUTS_COLLECTION } from '../../common/mongo/collections';
+import { HiscoreLayoutsService } from './hiscore-layouts.service';
 
 const OLD_NAMES: HiscoreLayoutNames = { skills: ['Overall', 'Attack'], activities: ['Clue Scrolls (all)'] };
 // 'Sailing' stands in for a skill Jagex adds that neither enum knows yet.

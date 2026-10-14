@@ -14,6 +14,7 @@ import {
 import { Document } from 'mongodb';
 import { fetch } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
+import { HISCORE_LAYOUTS_COLLECTION } from '../../common/mongo/collections';
 import { AGENT, USER_AGENT } from '../../common/agent/agent.provider';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import {
@@ -23,7 +24,7 @@ import {
   MAX_CONCURRENT_HISCORE_REQUESTS,
   MAX_QUEUED_HISCORE_REQUESTS,
 } from './player.config';
-import { HISCORE_LAYOUTS_COLLECTION, HiscoreLayoutsService } from './hiscore-layouts.service';
+import { HiscoreLayoutsService } from './hiscore-layouts.service';
 import { COMBAT_SKILLS } from './player.utils';
 import { PlayersService, RECENT_PLAYERS_ENTRY } from './players.service';
 
@@ -98,7 +99,7 @@ describe('PlayersService hiscore lookups', () => {
       providers: [
         PlayersService,
         { provide: AGENT, useValue: {} },
-        { provide: MONGODB_DATABASE, useValue: {} }, // Previews never touch the database
+        { provide: MONGODB_DATABASE, useValue: { collection: () => ({}) } }, // Previews never touch the database
         { provide: HiscoreLayoutsService, useValue: {} }, // Nor its layouts
         { provide: ConfigService, useValue: { get: () => 'https://secure.runescape.com' } },
       ],
