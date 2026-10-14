@@ -72,10 +72,11 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
   the breaker should count has to throw inside `execute()`; a not-found player is a success.
   `common/resilience/resilience-events.ts` logs breaker changes and (throttled) rejections, and serves the
   `resilience_*` metrics on `/metrics`. The package is young: keep it pinned exactly and read its release notes on every
-  bump. Not used on purpose: no `@Retry`/`@Timeout`/`@CircuitBreaker` on controllers (GETs are cheap Mongo reads,
-  `POST …/lookup` isn't idempotent and its Jagex calls are covered), no `retry` on Jagex (visitor latency;
-  process-players retries), no `OutboundRateLimitPolicy` (the bulkhead caps Jagex load per pod), nothing on the news
-  feed (one URL, cached and served stale on failure by `lru-cache`).
+  bump, and revisit the choice when 0.1 ships or after six months without a release (0.0.2 was 2026-10-08). Not used on
+  purpose: no `@Retry`/`@Timeout`/`@CircuitBreaker` on controllers (GETs are cheap Mongo reads, `POST …/lookup` isn't
+  idempotent and its Jagex calls are covered), no `retry` on Jagex (visitor latency; process-players retries), no
+  `OutboundRateLimitPolicy` (the bulkhead caps Jagex load per pod), nothing on the news feed (one URL, cached and served
+  stale on failure by `lru-cache`).
 - TypeScript 6 only loads the `@types` packages listed in `tsconfig.json`'s `types` (`node`); add one there when its
   globals are needed. It resolves packages through `exports`, so a package that lists `types` after `require` gets its
   CJS typings (`@osrs-tracker/models` before 0.10.1).
@@ -153,6 +154,14 @@ A route that duplicates or shadows another (`/items/recent` next to `/items/:id`
 e2e spec: `ROUTE_CONFLICT_POLICY` (`config/app-options.ts`, `error` for both kinds) is passed by `main.ts` and
 `app.e2e.spec.ts`. Rename or restructure the route; don't relax the policy to `warn`, and leave
 `routeResolutionStrategy` at its default (with conflicts rejected, declaration order doesn't matter).
+
+## Service failures
+
+Two patterns, each where it fits: a service throws a Nest HTTP exception when the status is its own decision
+(`NewsService`'s 404, 502 and 503, `PlayerCountsService`'s 502); it returns a result union when the controller combines
+the result with other state, as `PlayersService.refreshPlayerInfo` returns `RefreshResult` for the lookup to weigh
+against the stored player (failed with a stored player is a 200, without one a 503). Don't convert one into the other
+(#173).
 
 ## Mongo pipeline updates
 
@@ -347,9 +356,9 @@ changes within 10 minutes.
 2. Flux applies that commit within a minute and reports the rollout as the `Flux / sync` commit status (failures also
    reach Discord). Flux applies `main`'s tip, so a push right after the digest commit gets the status instead; the
    workflow then takes it from `main`'s tip when that contains the digest commit (same logic as osrs-tracker-web's
-   `deploy.yml`: keep the two in step). It waits up to 10 minutes for it, then smoke tests
-   `https://osrs-tracker-api.freekmencke.com`: `/items` and `/items/4151` answer 200, an unknown route 404 (not `/news`,
-   which fetches Jagex live).
+   `deploy.yml`, a hand-kept copy on purpose: change both together, and consider a shared composite action only if they
+   drift again, #173). It waits up to 10 minutes for it, then smoke tests `https://osrs-tracker-api.freekmencke.com`:
+   `/items` and `/items/4151` answer 200, an unknown route 404 (not `/news`, which fetches Jagex live).
 3. **Merging is the end of the job: don't wait for or watch the `CD` run.** It smoke tests on its own, and a failure
    shows as a failed `CD` run (named after the commit it deploys) and a failed `Flux / sync` status, and reaches
    Discord. Only when the user asks, follow it with `gh run watch` and smoke test the changed routes:
