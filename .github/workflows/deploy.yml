@@ -155,7 +155,7 @@ jobs:
             status=$(flux_status "$COMMIT")
             echo "Flux / sync on $COMMIT: ${status:-no status yet}"
             # Flux applies main's tip and reports on it, so a push right after this one may get the status instead.
-            # Keep in step with osrs-tracker-web's deploy.yml, which does the same.
+            # Keep in step with osrs-tracker-web's .github/scripts/deploy-wait-flux.sh, which does the same.
             if [ -z "$status" ]; then
               tip=$(gh api "repos/$REPO/commits/main" --jq .sha 2>/dev/null || true)
               if [ -n "$tip" ] && [ "$tip" != "$COMMIT" ] \
