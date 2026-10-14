@@ -55,7 +55,10 @@ const READ_METHODS = new Set(['find', 'findOne', 'aggregate', 'countDocuments', 
 
 /** What the fake database and fake Jagex answer for one request. */
 interface Fakes {
-  /** Documents every `find`, `findOne` and `aggregate` returns, whatever the query (`hiscoreLayouts` answers `LAYOUT`). */
+  /**
+   * Documents every `find`, `findOne`, `aggregate` and `findOneAndUpdate` returns, whatever the query (`hiscoreLayouts`
+   * answers `LAYOUT`).
+   */
   docs?: object[];
   /** The four hiscore tables: all found, all not found (404), or all failing. */
   hiscores?: 'found' | 'notFound' | 'failed';
@@ -376,9 +379,9 @@ describe('GET routes', () => {
         method: 'POST',
         headers: userAgent ? { 'User-Agent': userAgent } : {},
       });
+    const writes = () => collectionCalls.filter((call) => !READ_METHODS.has(call.split('.')[1]));
     /** The `players` writes, in order; `hiscoreLayouts` is left out, as the layout may already be cached. */
-    const playerWrites = () =>
-      collectionCalls.filter((call) => call.startsWith('players.') && !READ_METHODS.has(call.split('.')[1]));
+    const playerWrites = () => writes().filter((call) => call.startsWith('players.'));
 
     it('records nothing for a bot', async () => {
       fakes = { docs: [storedPlayer] };
@@ -415,7 +418,7 @@ describe('GET routes', () => {
 
       expect(response.status).toBe(503);
       expect(response.headers.get('cache-control')).toBe(CACHE_CONTROL.REVALIDATE);
-      expect(playerWrites()).toEqual([]);
+      expect(writes()).toEqual([]);
     });
 
     it('returns a stale stored player with refreshFailed when the hiscores fail, and records the lookup', async () => {
@@ -436,7 +439,7 @@ describe('GET routes', () => {
 
       expect(response.status).toBe(404);
       // Not counted here: process-players owns the 404 bookkeeping (pause/resume contract)
-      expect(collectionCalls.filter((call) => !READ_METHODS.has(call.split('.')[1]))).toEqual([]);
+      expect(writes()).toEqual([]);
     });
   });
 
