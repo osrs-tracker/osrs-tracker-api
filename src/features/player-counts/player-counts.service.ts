@@ -5,6 +5,7 @@ import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
 import { Agent, fetch } from 'undici';
 import { AGENT, USER_AGENT } from '../../common/agent/agent.provider';
+import { PLAYER_COUNTS_COLLECTION } from '../../common/mongo/collections';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { buildPlayerCountHistoryPipeline, PlayerCountPoint, PlayerCountRange } from './player-count-history';
 
@@ -14,7 +15,6 @@ export const LIVE_PLAYER_COUNT_TTL_MS = 60_000;
 @Injectable()
 export class PlayerCountsService {
   private readonly logger = new Logger(PlayerCountsService.name);
-  private readonly COLLECTION_NAME = 'playerCounts';
 
   /**
    * The live count, or `'failed'` when Jagex failed, so an outage doesn't turn every request into a poll either.
@@ -26,14 +26,14 @@ export class PlayerCountsService {
     fetchMethod: () => this.fetchLive(),
   });
 
-  get collection(): Collection<PlayerCount> {
-    return this.db.collection(this.COLLECTION_NAME);
-  }
+  private readonly collection: Collection<PlayerCount>;
 
   constructor(
-    @Inject(MONGODB_DATABASE) private readonly db: Db,
+    @Inject(MONGODB_DATABASE) db: Db,
     @Inject(AGENT) private readonly agent: Agent,
-  ) {}
+  ) {
+    this.collection = db.collection(PLAYER_COUNTS_COLLECTION);
+  }
 
   /** The newest sample, or `null` before the first one. */
   getLatest(): Promise<PlayerCount | null> {

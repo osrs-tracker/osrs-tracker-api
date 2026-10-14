@@ -9,12 +9,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { AppModule } from './app.module';
 import { AGENT, IMAGE_AGENT } from './common/agent/agent.provider';
 import { CACHE_CONTROL, PLAYER_MAX_AGE_SECONDS } from './common/http/cache-control';
+import { HISCORE_LAYOUTS_COLLECTION } from './common/mongo/collections';
 import { MONGO_CLIENT, MONGODB_DATABASE } from './common/mongo/mongo.provider';
 import { ROUTE_CONFLICT_POLICY } from './config/app-options';
 import { encodeNewsCursor } from './features/news/news-archive';
 import { PlayerCountsService } from './features/player-counts/player-counts.service';
 import { encodeWorldList } from './features/player-counts/world-list.fixture';
-import { HISCORE_LAYOUTS_COLLECTION } from './features/players/hiscore-layouts.service';
 import { MIN_PLAYER_REFRESH_HOURS } from './features/players/player.config';
 import { COMBAT_SKILLS } from './features/players/player.utils';
 

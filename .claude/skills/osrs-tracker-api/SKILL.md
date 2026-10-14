@@ -36,7 +36,8 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
   New indexes go in `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy` only
   answers once bootstrap, including the Mongo connect, is done (the metrics server starts listening then, which is what
   the `startupProbe` waits for); after that it stays liveness only and never checks Mongo.
-- The `players`, `items` and `news` collections, their fields, writers and index owners are described in
+- Collection names are constants in `common/mongo/collections.ts` (never a string literal); a service opens its
+  collection once, in its constructor. The collections, their fields, writers and index owners are described in
   osrs-tracker-aws's [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new
   or changed index or stored field also needs an update there: open an issue in osrs-tracker-aws.
 - Env: `.env.example` lists the vars, `.env` holds local values (points at prod). In the cluster they come from the
@@ -275,6 +276,10 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   - `player-counts/player-counts.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock,
     world lists from `world-list.fixture.ts`): the live count shared between concurrent requests and kept a minute, and
     a failure (Jagex, the format check, 0 worlds or players) answered 502 for a minute without asking again.
+  - `common/resilience/resilience-events.spec.ts` (fake timers, a `Subject` as `events$`, the shared metrics registry):
+    one bulkhead warning per policy and minute with the count since, the circuit open and probe-failed warnings,
+    `resilience_rejections_total` by policy and reason (no warning per circuit rejection), the gauges, and the metrics
+    removed on shutdown.
   - `mongo.provider.spec.ts` (fake timers): the connect retry's constant 10s delay, warn lines, giving up after 12 with
     the connect error (also when closing the failed client fails).
   - `app.e2e.spec.ts` (`logger` mocked to collect the lines): per GET route its `Cache-Control` and that it never writes
@@ -401,7 +406,8 @@ Run end to end without asking; stop only on failure. Verify locally once before 
   actions PRs bump together: pin a new action the same way (`gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`),
   never by tag. npm majors are ignored in the config: upgrade them by hand from an issue, together with whatever must
   move with them (e.g. NestJS 12 needed TypeScript 6). TypeScript `>=6.1` is ignored too, until `typescript-eslint`
-  allows it (its peer range is `<6.1.0`): drop that ignore when it does.
+  allows it (its peer range is `<6.1.0`): drop that ignore when it does. TypeScript 7 also waits for a
+  `typescript-eslint` release whose peer range includes it; upgrade by hand from an issue then.
 - GPG "Inappropriate ioctl for device": ask the user to run `echo test | gpg --clearsign > /dev/null` in their terminal.
 - If `gh pr edit` fails on a Projects (classic) error:
   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>`.

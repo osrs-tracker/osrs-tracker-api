@@ -29,7 +29,8 @@ describe('PlayerCountsService.getLive', () => {
     now = 1_000_000;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
     warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    service = new PlayerCountsService({} as Db, {} as Agent);
+    // The live count never touches the database; the service only opens its collection
+    service = new PlayerCountsService({ collection: () => ({}) } as unknown as Db, {} as Agent);
   });
 
   afterEach(() => vi.restoreAllMocks());

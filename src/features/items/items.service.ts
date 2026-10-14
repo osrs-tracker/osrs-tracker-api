@@ -1,19 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Item } from '@osrs-tracker/models';
 import { Collection, Db } from 'mongodb';
+import { ITEMS_COLLECTION } from '../../common/mongo/collections';
 import { ITEM_NAME_COLLATION, MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { buildItemBrowseFilter } from './item-browse';
 import { buildItemSearchPipeline } from './item-search';
 
 @Injectable()
 export class ItemsService {
-  private readonly COLLECTION_NAME = 'items';
+  private readonly collection: Collection<Item>;
 
-  get collection(): Collection<Item> {
-    return this.db.collection(this.COLLECTION_NAME);
+  constructor(@Inject(MONGODB_DATABASE) db: Db) {
+    this.collection = db.collection(ITEMS_COLLECTION);
   }
-
-  constructor(@Inject(MONGODB_DATABASE) private readonly db: Db) {}
 
   getLastFetchedItems(limit: number): Promise<Item[]> {
     return this.collection

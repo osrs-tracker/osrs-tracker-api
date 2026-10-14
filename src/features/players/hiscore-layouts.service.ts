@@ -11,9 +11,8 @@ import {
 } from '@osrs-tracker/models';
 import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
+import { HISCORE_LAYOUTS_COLLECTION } from '../../common/mongo/collections';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
-
-export const HISCORE_LAYOUTS_COLLECTION = 'hiscoreLayouts';
 
 /** Layouts in memory. They never change, so there's no ttl; few exist, so a small `max` holds them all. */
 const MAX_CACHED_LAYOUTS = 100;
