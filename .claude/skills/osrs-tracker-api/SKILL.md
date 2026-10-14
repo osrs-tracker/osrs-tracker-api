@@ -244,59 +244,24 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
   policy is tested in a `Test.createTestingModule` with a real `ResilienceModule` and the production preset, not mocks
   (`players.service.spec.ts`, `news.service.spec.ts`). Vite's transformer emits Nest's decorator metadata from
   `tsconfig.json`, so no SWC plugin is needed.
-- Covered (changing one of these means changing its spec):
-  - `config/env.spec.ts`: the env validation (`validateEnv`).
-  - `common/logger/`: Nest's and the app's line shape, `type`, params and `requestId`, and nothing written around pino
-    (`nest-logger.spec.ts`); outgoing lines' `type` and `requestId` (`logger.spec.ts`, a local server and `undici`'s
-    real `fetch`); `ThrottledWarning`.
-  - `players/`: the stored player's `max-age`, when a lookup refreshes (`needsRefresh`), the lookup's `lastHiscoreFetch`
-    and per-offset `scrapingOffsetLookups` date (`buildLookupUpdate`), the refresh update's pause/resume, `$literal`,
-    and the initial entry written only for a new offset (`buildRefreshUpdate`); combat level, type and status
-    (`PlayerUtils`; a hiscore without a combat skill's key counts as failed, a `null` one doesn't, `hasCombatSkills`);
-    the layout cache, upsert and collision check (`hiscore-layouts.service.spec.ts`).
-  - The validation pipes `ParseSinceDatePipe`, `ParseUsernamePipe`, `ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe`
-    (in `items/item-browse.spec.ts`), `ParseItemSearchQueryPipe`, `ParseNewsImageUrlPipe` (another origin, a lookalike
-    host, `http`, credentials, a query or hash rejected) and `ParseIntRangePipe` (`common/pipes/`, for `limit`, `size`,
-    `skip` and IDs).
-  - `news/news-archive.spec.ts`: the archive's cursor (`encodeNewsCursor`/`decodeNewsCursor`), its filter
-    (`buildNewsArchiveFilter`) and `ParseNewsCursorPipe` and `ParseNewsCategoryPipe`.
-  - `items/item-browse.spec.ts`: item browse's name range per letter (`buildItemBrowseFilter`; `0` is everything before
-    `a`, `z` has no upper bound).
-  - `items/item-search.spec.ts`: the item search's `$search` pipeline (`buildItemSearchPipeline`; `$search` doesn't run
-    on a plain `mongod`, so the pipeline is checked, not its results). The `name_autocomplete` Atlas Search index it
-    runs on is created in `mongo.provider.ts` only when missing: a changed definition is applied by hand.
-  - `players.service.spec.ts` (real `ResilienceModule` with production's preset, `undici`'s `fetch` mocked): normal
-    table first, shared in-flight lookups, the preview's not-found cache, the concurrency cap in FIFO order, the queue
-    bound and queue timeout (no warning per refusal), the breaker opening on failures but not on not-found players; a
-    hiscores page read from the newest entry so its bare values resolve, the recent players' entry whole or Overall only
-    (`entry=overall`), and the layout stored before the entry.
-  - `news.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock, a fake `news`
-    collection): each feed refresh upserting its posts by `link` once, `/news` still answering when that fails, and
-    `/news/since/:date` refreshing first and answering from the stored posts when the feed fails, `/news/archive` paging
-    every post once when a page ends between posts of one day (a fake `find` that applies the filter) and refreshing the
-    feed for the first page only; shared in-flight fetches, the stale feed's 60s retry, the 503 and a 404 not cached;
-    the image size limit against a local server with the real `fetch` and `IMAGE_AGENT` (503, its log line, `identity`),
-    and an oversized `content-length` refused without reading the body; the `news-images` bulkhead (queue bound and
-    timeout, 503 without fetching, one slot per shared conversion, none for a cache hit).
-  - `player-counts/player-count-history.spec.ts`: the history's pipeline (`buildPlayerCountHistoryPipeline`, checked,
-    not run, like the item search): each `range`'s start, every sample for `24h` and `7d`, hourly averages for `30d`,
-    daily ones with the peak total for `1y` and `all`, `byLocation` averaged per bucket and code with each sample
-    counted once for the totals; and `ParsePlayerCountRangePipe`.
-  - `player-counts/player-counts.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock,
-    world lists from `world-list.fixture.ts`): the live count shared between concurrent requests and kept a minute, and
-    a failure (Jagex, the format check, 0 worlds or players) answered 502 for a minute without asking again.
-  - `common/resilience/resilience-events.spec.ts` (fake timers, a `Subject` as `events$`, the shared metrics registry):
-    one bulkhead warning per policy and minute with the count since, the circuit open and probe-failed warnings,
-    `resilience_rejections_total` by policy and reason (no warning per circuit rejection), the gauges, and the metrics
-    removed on shutdown.
-  - `mongo.provider.spec.ts` (fake timers): the connect retry's constant 10s delay, warn lines, giving up after 12 with
-    the connect error (also when closing the failed client fails).
-  - `app.e2e.spec.ts` (`logger` mocked to collect the lines): per GET route its `Cache-Control` and that it never writes
-    (a route's header or a new GET route means changing `CASES`), that no route overlaps another, the POST lookup's
-    outcomes with their `Cache-Control` and `players` writes (a bot: 204, nothing; an unknown player found: stored, 200;
-    unknown with the hiscores failing: 503, nothing; a stale stored player with them failing: 200, `refreshFailed`, the
-    lookup recorded; not on the hiscores: 404, nothing), that shutdown closes the Mongo client, and the request ID
-    (`X-Request-Id` matching the `incoming` line's `requestId`, a client's own ignored).
+- What a spec protects is in its `describe` and `it` names (`rg -l describe src` lists the specs). Changing protected
+  logic means changing the spec next to it, in the same diff.
+- Setups those names don't show, to reuse rather than reinvent:
+  - lru-cache caches (`news.service.spec.ts`, `player-counts.service.spec.ts`): mock `performance.now`, lru-cache's
+    clock, then wait out its 1ms `ttlResolution`, which caches the time.
+  - Bulkhead queue timeouts (`players.service.spec.ts`, `news.service.spec.ts`): fake only `setTimeout` and
+    `clearTimeout`. Whole fake timers suit the Mongo connect retry (`mongo.provider.spec.ts`) and the throttled warnings
+    (`throttled-warning.spec.ts`, `resilience-events.spec.ts`).
+  - A local server with `undici`'s real `fetch`, where `undici` itself is the point: the outgoing log lines
+    (`logger.spec.ts`) and the image size limit through `IMAGE_AGENT` (`news.service.spec.ts`).
+  - Pipelines only Atlas runs are checked as built, not run: the item search's `$search` (`item-search.spec.ts`) and the
+    player count history (`player-count-history.spec.ts`). The `name_autocomplete` Atlas Search index is created in
+    `mongo.provider.ts` only when missing: a changed definition is applied by hand.
+  - `news.service.spec.ts` pages the archive with a fake `find` that applies the filter; world lists come from
+    `player-counts/world-list.fixture.ts`.
+  - `resilience-events.spec.ts` feeds a `Subject` as `events$` and uses the shared metrics registry, which the listener
+    must clear on shutdown; `app.e2e.spec.ts` mocks `logger` to collect the lines (its `CASES`, `POST_ONLY` and fakes:
+    Cache-Control above).
 - Not covered: anything against a real database.
 - In a worktree, `vitest.config.mjs` only picks up that checkout's `src/`, not other worktrees'. It counts as source in
   CI's `changes` job, like `src/`, so changing it runs build and test.
