@@ -128,10 +128,11 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
 Validate query and route params in pipes, not with checks in the handler: `ParseUsernamePipe`,
 `ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (item browse's letter), `ParseSinceDatePipe` (an ISO date for
 `/news/since/:date`), `ParseNewsCursorPipe` and `ParseNewsCategoryPipe` (`/news/archive`'s `before` and `category`),
-each next to its feature, and from `common/pipes/` `new ParseIntRangePipe({ min, max?, default?, optional?, message? })`
-for any other integer (its message is named after the param: `Limit must be between 1 and 50.`). Don't add
-`DefaultValuePipe` + `ParseIntPipe` + a range check, or an `isNaN` check after a parse pipe. Keep existing status codes
-and messages: the web may show them. A new pipe gets a spec.
+`ParsePlayerCountRangePipe` (`/player-counts`' `range`: `24h`, `7d`, `30d`, `1y` or `all`; `24h` when absent), each next
+to its feature, and from `common/pipes/` `new ParseIntRangePipe({ min, max?, default?, optional?, message? })` for any
+other integer (its message is named after the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` +
+`ParseIntPipe` + a range check, or an `isNaN` check after a parse pipe. Keep existing status codes and messages: the web
+may show them. A new pipe gets a spec.
 
 Stored usernames are Jagex's matching form: lowercase, `_` and `-` as spaces, trimmed (`PlayerUtils.normalizeUsername`,
 which `ParseUsernamePipe` applies), so one player is one document. Anything that stores, looks up or compares a name
@@ -202,12 +203,14 @@ changes `CASES` in the same diff. The spec fails on a new GET route without a ca
 case expects (values only POSTs send go in its `POST_ONLY`); a new branch reusing an existing value it can't see, so
 that one is on the author and the `conventions-reviewer`.
 
-- Read-only, slow-changing: `public, max-age=N` (`/player-counts/live` 60, `/news`, `/news/since/:date` and
-  `/news/archive` 300, `/news/categories`, `/items/search/:query` and `/sitemap/players` 3600, `/items/browse/:letter`
-  86400, `/news/image` 604800).
+- Read-only, slow-changing: `public, max-age=N` (`/player-counts/live` 60, `/news`, `/news/since/:date`,
+  `/news/archive`, `/player-counts` and `/player-counts/latest` 300, `/news/categories`, `/items/search/:query` and
+  `/sitemap/players` 3600, `/items/browse/:letter` 86400, `/news/image` 604800).
 - Routes that fetch Jagex live (`/news`, `/news/since/:date`, `/news/archive`, `/news/image`, `/player-counts/live`) and
   `/news/categories` set it with `res.setHeader` after the read succeeds, not with `@Header` (which also applies to
   errors), so caches don't keep a 503 (`/player-counts/live` sets `REVALIDATE` first, for its 502).
+- `/player-counts` and `/player-counts/latest` read only stored samples (no Jagex call), so they set `PLAYER_COUNT` with
+  `@Header`, on every response.
 - GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR. The one
   exception: a news feed refresh (`/news`, `/news/since/:date`, the first page of `/news/archive`) upserts the feed's
   posts into `news` (keyed on `link`), the same whoever asks; the e2e spec allows only that write (`FEED_STORE`).
@@ -260,6 +263,10 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     the image size limit against a local server with the real `fetch` and `IMAGE_AGENT` (503, its log line, `identity`),
     and an oversized `content-length` refused without reading the body; the `news-images` bulkhead (queue bound and
     timeout, 503 without fetching, one slot per shared conversion, none for a cache hit).
+  - `player-counts/player-count-history.spec.ts`: the history's pipeline (`buildPlayerCountHistoryPipeline`, checked,
+    not run, like the item search): each `range`'s start, every sample for `24h` and `7d`, hourly averages for `30d`,
+    daily ones with the peak total for `1y` and `all`, `byLocation` averaged per bucket and code with each sample
+    counted once for the totals; and `ParsePlayerCountRangePipe`.
   - `player-counts/player-counts.service.spec.ts` (`undici`'s `fetch` mocked, `performance.now` as lru-cache's clock,
     world lists from `world-list.fixture.ts`): the live count shared between concurrent requests and kept a minute, and
     a failure (Jagex, the format check, 0 worlds or players) answered 502 for a minute without asking again.

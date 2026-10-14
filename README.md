@@ -18,6 +18,8 @@ news, and stores player progress so the website can show how players gain XP ove
 - **Items**: item details, search by name and browsing by first letter.
 - **News**: the latest OSRS news posts, with their images converted to WebP, and every post since a date (stored from
   the feed, and back to 2013 from the OSRS Wiki).
+- **Player counts**: the players online now (live from Jagex's world list) and over time (sampled every 10 minutes by
+  [osrs-tracker-aws](https://github.com/osrs-tracker/osrs-tracker-aws)).
 
 Each route's statuses, `Cache-Control` and parameters are described in a short comment on its handler in
 `src/features/*/*.controller.ts`.
