@@ -3,6 +3,15 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-10-16
+
+### Behind the scenes
+
+- The verify script keeps its logs when a check fails and prints each failed log's path and, for a log over 80 lines,
+  only its last 60. It used to print the whole log and delete it on exit, but Claude Code's Bash tool keeps only the
+  head and tail of long output, so the middle of a failing build or test run was cut and the check had to be rerun to
+  see it. Same as osrs-tracker-web's and osrs-tracker-aws's (#183).
+
 ## 2026-10-14
 
 ### Player counts

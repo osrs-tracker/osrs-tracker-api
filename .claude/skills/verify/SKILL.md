@@ -14,7 +14,9 @@ Run the script from the checkout's root (the worktree, not the main checkout), i
 ```
 
 It runs these checks at once (about 5s instead of 13s one after another), never stopping at a failure, then prints the
-output of each failed check and a summary line per check; it exits 1 when any failed:
+output of each failed check (the last 60 lines of a log over 80, with the full log's path) and a summary line per check;
+it exits 1 when any failed. The logs are kept when a check fails: when the tail isn't enough, find the lines in the full
+log with `rg -n` and read that range, rather than rerunning the check.
 
 1. `npm run prettier:ci`
 2. `npm run lint:ci`
