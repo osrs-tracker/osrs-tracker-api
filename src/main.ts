@@ -8,7 +8,7 @@ import { AppModule } from './app.module';
 import { NestLogger } from './common/logger/nest-logger';
 import { logger } from './common/logger/logger';
 import { routeLabel } from './common/route/route-label';
-import { ROUTE_CONFLICT_POLICY } from './config/app-options';
+import { ROUTE_CONFLICT_POLICY, SECURITY_HEADERS } from './config/app-options';
 import { corsOptions } from './config/cors';
 import { Env } from './config/env';
 
@@ -34,7 +34,8 @@ async function bootstrap() {
   // Exit with process.exit() once closed: by default Nest re-sends the signal to itself, which the kernel ignores for
   // PID 1 (node in the container), so the pod would hang until the kubelet SIGKILLs it at the grace period
   app.enableShutdownHooks(undefined, { useProcessExit: true });
-  app.getHttpAdapter().getInstance().disable('x-powered-by');
+  // Also removes X-Powered-By
+  app.useSecurityHeaders(SECURITY_HEADERS);
   // Traefik is the only hop in front of the API and overwrites any client-sent X-Forwarded-For, so req.ip is the client
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.use(metrics);

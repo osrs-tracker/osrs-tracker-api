@@ -3,6 +3,17 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-10-18
+
+### Behind the scenes
+
+- The API sends security headers on every response, through Nest 12.1's `app.useSecurityHeaders()` (helmet 8's defaults:
+  `X-Content-Type-Options: nosniff`, HSTS, a `default-src 'self'` CSP, `Referrer-Policy: no-referrer` and the rest). It
+  only removed `X-Powered-By` before, so a browser could sniff a JSON or image response as another type.
+  `Cross-Origin-Resource-Policy` is `cross-origin` instead of the default `same-origin`, which would stop the web app
+  (another origin) from showing `/news/image` images. `localhost:4200` stays in the CORS allow-list in production, now
+  with a comment why: the web app's dev server runs there against the live API.
+
 ## 2026-10-16
 
 ### Behind the scenes
