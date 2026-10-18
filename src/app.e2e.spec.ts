@@ -11,7 +11,7 @@ import { AGENT, IMAGE_AGENT } from './common/agent/agent.provider';
 import { CACHE_CONTROL, PLAYER_MAX_AGE_SECONDS } from './common/http/cache-control';
 import { HISCORE_LAYOUTS_COLLECTION } from './common/mongo/collections';
 import { MONGO_CLIENT, MONGODB_DATABASE } from './common/mongo/mongo.provider';
-import { ROUTE_CONFLICT_POLICY } from './config/app-options';
+import { ROUTE_CONFLICT_POLICY, SECURITY_HEADERS } from './config/app-options';
 import { encodeNewsCursor } from './features/news/news-archive';
 import { PlayerCountsService } from './features/player-counts/player-counts.service';
 import { encodeWorldList } from './features/player-counts/world-list.fixture';
@@ -320,6 +320,7 @@ describe('GET routes', () => {
       .compile();
 
     app = moduleRef.createNestApplication({ logger: false, routeConflictPolicy: ROUTE_CONFLICT_POLICY });
+    app.useSecurityHeaders(SECURITY_HEADERS);
     await app.listen(0, '127.0.0.1');
     baseUrl = `http://127.0.0.1:${((app.getHttpServer() as Server).address() as AddressInfo).port}`;
   });
@@ -447,6 +448,15 @@ describe('GET routes', () => {
       // Not counted here: process-players owns the 404 bookkeeping (pause/resume contract)
       expect(writes()).toEqual([]);
     });
+  });
+
+  it('sends the security headers, letting other origins show its images', async () => {
+    const response = await fetch(`${baseUrl}/news/image?url=https://cdn.runescape.com/news.png`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('cross-origin-resource-policy')).toBe('cross-origin');
+    expect(response.headers.has('x-powered-by')).toBe(false);
   });
 
   describe('request ID', () => {
