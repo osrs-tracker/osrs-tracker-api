@@ -1,20 +1,6 @@
+import { PlayerCountRange } from '@osrs-tracker/models';
 import { millisecondsInDay as DAY } from 'date-fns/constants';
 import { Document } from 'mongodb';
-
-export const PLAYER_COUNT_RANGES = ['24h', '7d', '30d', '1y', 'all'] as const;
-export type PlayerCountRange = (typeof PLAYER_COUNT_RANGES)[number];
-
-/** One point of the history: a sample, or the averages over the UTC hour or day starting at `date`. */
-export interface PlayerCountPoint {
-  date: Date;
-  total: number;
-  members: number;
-  f2p: number;
-  /** Players per raw location code (`PlayerCount['byLocation']`); in a bucket, the average per code. */
-  byLocation: Record<string, number>;
-  /** Daily points only: the highest `total` sampled that day. */
-  peak?: number;
-}
 
 /**
  * How far back each range reaches (`all`: every point) and its points: every sample, hourly averages of the samples, or

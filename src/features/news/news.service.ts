@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BulkheadFullError, ResiliencePolicy, ResilienceService } from '@nestjs/resilience';
-import { OsrsNewsItem } from '@osrs-tracker/models';
+import { NewsArchivePage, OsrsNewsItem, StoredNewsItem } from '@osrs-tracker/models';
 import { XMLParser } from 'fast-xml-parser';
 import { LRUCache } from 'lru-cache';
 import { AnyBulkWriteOperation, Collection, Db } from 'mongodb';
@@ -22,16 +22,9 @@ import { XML_PARSER } from '../../common/xml/xml.provider';
 import { Env } from '../../config/env';
 import { buildNewsArchiveFilter, encodeNewsCursor, NEWS_ARCHIVE_SORT, NewsArchiveCursor } from './news-archive';
 import { MAX_IMAGE_PIXELS, NEWS_IMAGES } from './news.config';
-import { StoredNewsItem } from './news.types';
 
 /** The most posts `getNewsSince` returns. */
 export const MAX_NEWS_SINCE = 200;
-
-/** A page of `GET /news/archive`: `next` is the `before` of the following page, `null` on the last one. */
-export interface NewsArchivePage {
-  posts: StoredNewsItem[];
-  next: string | null;
-}
 
 /** A category of the stored posts and how many posts it has, for the archive's filter. */
 export interface NewsCategory {
@@ -53,6 +46,10 @@ export class NewsService {
   private readonly evictionWarning = new ThrottledWarning();
 
   private readonly imagesPolicy: ResiliencePolicy;
+  /**
+   * The stored posts. The Wiki's older posts were backfilled once, then Jagex's teasers and images; both backfill
+   * scripts were removed (`CHANGELOG.md`, 2026-10-13 and 2026-10-14).
+   */
   private readonly news: Collection<StoredNewsItem>;
 
   /**

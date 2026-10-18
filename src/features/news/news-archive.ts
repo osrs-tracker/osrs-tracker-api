@@ -1,5 +1,5 @@
 import { Filter, Sort } from 'mongodb';
-import type { StoredNewsItem } from './news.types';
+import type { StoredNewsItem } from '@osrs-tracker/models';
 
 /** Where a page of `GET /news/archive` ends: the last post it returned. The next page starts after it. */
 export interface NewsArchiveCursor {
