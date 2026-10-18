@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
-import { PLAYER_COUNT_RANGES, PlayerCountRange } from './player-count-history';
+import { PLAYER_COUNT_RANGES, PlayerCountRange } from '@osrs-tracker/models';
 
 /** Parses the `range` query param of the player count history: one of `PLAYER_COUNT_RANGES`, `24h` when absent. */
 @Injectable()

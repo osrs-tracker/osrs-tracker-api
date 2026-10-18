@@ -1,18 +1,13 @@
 import { BadGatewayException, Inject, Injectable, Logger } from '@nestjs/common';
 import { fetchWorldList, parseWorldList } from '@osrs-tracker/hiscores';
-import { PlayerCount, PlayerCountDay } from '@osrs-tracker/models';
+import { PlayerCount, PlayerCountDay, PlayerCountPoint, PlayerCountRange } from '@osrs-tracker/models';
 import { LRUCache } from 'lru-cache';
 import { Collection, Db } from 'mongodb';
 import { Agent, fetch } from 'undici';
 import { AGENT, USER_AGENT } from '../../common/agent/agent.provider';
 import { PLAYER_COUNTS_COLLECTION, PLAYER_COUNTS_DAILY_COLLECTION } from '../../common/mongo/collections';
 import { MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
-import {
-  buildPlayerCountHistoryPipeline,
-  PlayerCountPoint,
-  PlayerCountRange,
-  readsDailyAverages,
-} from './player-count-history';
+import { buildPlayerCountHistoryPipeline, readsDailyAverages } from './player-count-history';
 
 /** How long a live count (or a failure to get one) is kept: Jagex asks for at most one world list poll a minute. */
 export const LIVE_PLAYER_COUNT_TTL_MS = 60_000;

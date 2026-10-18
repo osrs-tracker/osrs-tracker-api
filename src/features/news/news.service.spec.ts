@@ -2,6 +2,7 @@ import { Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/
 import { ConfigService } from '@nestjs/config';
 import { ResilienceModule, ResilienceService } from '@nestjs/resilience';
 import { Test } from '@nestjs/testing';
+import { StoredNewsItem } from '@osrs-tracker/models';
 import { XMLParser } from 'fast-xml-parser';
 import { createServer, IncomingHttpHeaders, Server } from 'node:http';
 import { AddressInfo } from 'node:net';
@@ -22,7 +23,6 @@ import {
   NEWS_IMAGES_PRESET,
 } from './news.config';
 import { MAX_NEWS_SINCE, NewsService } from './news.service';
-import { StoredNewsItem } from './news.types';
 
 vi.mock('undici', async (importOriginal) => ({ ...(await importOriginal<typeof import('undici')>()), fetch: vi.fn() }));
 

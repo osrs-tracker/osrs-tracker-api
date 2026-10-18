@@ -31,6 +31,10 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 - The specs no longer import `levelForXp` from `@osrs-tracker/models` or `WORLD_LIST_URL` from `@osrs-tracker/hiscores`,
   both deprecated exports due to be removed: the two fixture levels and the world list URL are written out instead, so
   the major bumps that drop them need no change here. Production code used neither.
+- The player count history and news archive response types (`PLAYER_COUNT_RANGES`, `PlayerCountRange`,
+  `PlayerCountPoint`, `StoredNewsItem`, `NewsArchivePage`) come from `@osrs-tracker/models` 2.6, which the web app reads
+  too, instead of local copies it kept by hand; `news/news.types.ts` is gone. The shapes are unchanged. Bumps
+  `@osrs-tracker/hiscores` to 5.0, which no longer re-exports models' names; the API imported none of them (#197).
 
 ## 2026-10-16
 

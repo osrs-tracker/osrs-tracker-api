@@ -1,8 +1,8 @@
 import { Controller, Get, Header, NotFoundException, Query, Res } from '@nestjs/common';
+import type { PlayerCountRange } from '@osrs-tracker/models';
 import { Response } from 'express';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ParsePlayerCountRangePipe } from './parse-player-count-range.pipe';
-import type { PlayerCountRange } from './player-count-history';
 import { PlayerCountsService } from './player-counts.service';
 
 @Controller('player-counts')
