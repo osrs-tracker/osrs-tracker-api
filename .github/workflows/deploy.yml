@@ -4,8 +4,11 @@ run-name: ${{ github.event.workflow_run.display_title }}
 
 # Builds and pushes the image, then commits its digest to `osrs-tracker-api.yaml` on main. Flux in the cluster applies
 # that commit and reports the rollout as the `Flux / sync` commit status. Nothing here has cluster access.
+# zizmor flags `workflow_run` as a dangerous trigger. The check job's `if:` lets only CI's push runs on main from this
+# repository through, so pull requests and forks never start a deploy; it checks out main and takes nothing from the CI
+# run but its head SHA, id and title. Making CD a job of CI (zizmor's suggestion) would be a redesign.
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: ['CI']
     types: [completed]
     branches: ['main']
@@ -64,9 +67,10 @@ jobs:
       SHA: ${{ github.event.workflow_run.head_sha }}
 
     steps:
-      # The deploy key is the only way past main's PR rule; GITHUB_TOKEN can't push the digest commit
+      # The deploy key is the only way past main's PR rule; GITHUB_TOKEN can't push the digest commit. It keeps the key
+      # on purpose (zizmor's artipacked): the commit step pushes with it. The job uploads no artifacts
       - name: Check out main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # zizmor: ignore[artipacked]
         with:
           ref: main
           fetch-depth: 0

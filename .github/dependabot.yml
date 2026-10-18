@@ -1,11 +1,15 @@
-# Weekly update PRs. CI runs on them like on any PR; merging one deploys (it changes package*.json, Dockerfile or
-# .github/). A CHANGELOG.md entry follows only when a bump changes behaviour (see the osrs-tracker-api skill).
+# Weekly update PRs, each waiting 7 days after a release (cooldown), so a compromised release is usually pulled before
+# we take it; Dependabot never applies a cooldown to security updates. CI runs on them like on any PR; merging one
+# deploys (it changes package*.json, Dockerfile or .github/). A CHANGELOG.md entry follows only when a bump changes
+# behaviour (see the osrs-tracker-api skill).
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: chore
       include: scope
@@ -28,6 +32,8 @@ updates:
     directories: [/, /.github/actions/*]
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
     groups:
@@ -39,6 +45,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: chore
       include: scope

@@ -53,7 +53,8 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.
 - Build and runtime: `rspack.config.js` (bundling), `Dockerfile` (image, `sharp` beside the bundle), `vitest.config.mjs`
   (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies, with the Traefik rate-limit and compress
-  Middlewares); `.github/workflows/` `CI` (`nodejs.yml`) and `CD` (`deploy.yml`), `.github/dependabot.yml`.
+  Middlewares); `.github/workflows/` `CI` (`nodejs.yml`), `CD` (`deploy.yml`) and `zizmor` (the workflows' security
+  audit; findings ignored inline), `.github/dependabot.yml`.
 - `.claude/agents/conventions-reviewer.md` reviews diffs against the skill (its `## Review rules`) and this file, its
   Bash limited to one git, gh or grep read command per call by `.claude/hooks/read-only-bash.sh` (byte-identical across
   the osrs-tracker repos: change it in all three); `.claude/hooks/pre-push-check.sh` lints and prettier-checks the
