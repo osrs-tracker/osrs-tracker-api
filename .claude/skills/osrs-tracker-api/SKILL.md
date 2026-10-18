@@ -362,7 +362,8 @@ Run end to end without asking; stop only on failure. Verify locally once before 
    before fixing it and drop the ones that don't hold. Fix both and push.
 3. Get current with `main` before waiting on checks, and again before merging:
    `git fetch origin && git rebase origin/main`, fold `CHANGELOG.md` under one day's heading, verify only if the rebase
-   had conflicts (a clean rebase leaves the checks to CI), `git push --force-with-lease`. Then poll
+   had conflicts (a clean rebase leaves the checks to CI), `git push --force-with-lease --force-if-includes` (worktrees
+   share `origin/*`, so another session's fetch can widen a bare lease and drop commits). Then poll
    `gh pr view <n> --json mergeable,mergeStateStatus` until it isn't `UNKNOWN`; on `CONFLICTING` (recheck once, it lags
    a push), rebase again: GitHub runs no PR CI on a conflicting PR, so `--watch` would hang.
 4. Run `gh pr checks <n> --watch` as a background Bash command (`run_in_background`) and carry on meanwhile: the session
@@ -391,8 +392,11 @@ Run end to end without asking; stop only on failure. Verify locally once before 
   `build`, `lint`, `test` and `zizmor` pass and `gh pr checks <n>` lists no `CodeQL`, merge with
   `gh pr merge <n> --merge --admin`. `--admin` skips every rule, so never use it while a check fails or is pending
   (osrs-tracker/osrs-tracker-packages#11).
-- `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push, watch its **CI**
-  run, not CD: `gh run watch <run-id> --exit-status` as a background Bash command, as in Release step 4 (the ID from
+- `main` or a PR: see `CLAUDE.md`. Doc-only changes skip the verify skill, but CI's link check (lychee, in `lint`) fails
+  `main` on a broken local link or `#anchor`: run it first on the tracked files (a glob would also check
+  `node_modules`), `lychee --offline --include-fragments $(git ls-files '*.md')`. The admin account bypasses `main`'s PR
+  rule; after a direct push, watch its **CI** run, not CD: `gh run watch <run-id> --exit-status` as a background Bash
+  command, as in Release step 4 (the ID from
   `gh run list --commit "$(git rev-parse HEAD)" --workflow CI --json databaseId`, the full SHA; empty right after the
   push, so ask again). A direct push to `main` with source changes deploys it. From a worktree, push with
   `git push origin HEAD:main`.

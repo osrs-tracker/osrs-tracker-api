@@ -27,10 +27,11 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 ## Hard rules
 
 - Every change, tooling included, gets a `CHANGELOG.md` entry under today's `## YYYY-MM-DD`; doc-only changes
-  (`README.md`, `CLAUDE.md`, `.claude/skills/`, `.claude/agents/`) don't, and a Dependabot bump only when it changes
-  behaviour. `.claude/hooks/` and `.claude/settings.json` are tooling, not docs. A comment-only change elsewhere (e.g. a
-  workflow comment) counts as doc-only. Parallel PRs all add that heading: when merging one after another, rebase and
-  fold the entries under one heading. The format and the Dependabot steps are in the skill's Commit and push.
+  (`README.md`, `CLAUDE.md`, the Markdown files in `.claude/skills/` and `.claude/agents/`) don't, and a Dependabot bump
+  only when it changes behaviour. `.claude/hooks/`, `.claude/settings.json` and `.claude/skills/verify/verify.sh` are
+  tooling, not docs. A comment-only change elsewhere (e.g. a workflow comment) counts as doc-only. Parallel PRs all add
+  that heading: when merging one after another, rebase and fold the entries under one heading. The format and the
+  Dependabot steps are in the skill's Commit and push.
 - Doc-only changes go straight to `main`; for anything else, ask: `main` or a PR (unless releasing: "release it" or
   "ship it", see the skill's Release steps).
 - Deploying is merging to `main` (GitHub Actions → Flux). Never build, push or `kubectl apply` by hand.
@@ -58,5 +59,6 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
   audit; findings ignored inline), `.github/dependabot.yml`.
 - `.claude/agents/conventions-reviewer.md` reviews diffs against the skill (its `## Review rules`) and this file, its
   Bash limited to one git, gh or grep read command per call by `.claude/hooks/read-only-bash.sh` (byte-identical across
-  the osrs-tracker repos: change it in all three); `.claude/hooks/pre-push-check.sh` lints and prettier-checks the
-  pushed checkout before every `git push`, and `.claude/settings.json` runs Prettier on every file Claude edits.
+  the four osrs-tracker repos: change it here, and through an issue in each of osrs-tracker-aws, osrs-tracker-web and
+  osrs-tracker-packages); `.claude/hooks/pre-push-check.sh` lints and prettier-checks the pushed checkout before every
+  `git push`, and `.claude/settings.json` runs Prettier on every file Claude edits.
