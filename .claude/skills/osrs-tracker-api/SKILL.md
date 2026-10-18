@@ -385,9 +385,10 @@ Run end to end without asking; stop only on failure. Verify locally once before 
   image PRs bump the digest in both `FROM` lines. Actions are pinned to commit SHAs with a `# vX.Y.Z` comment, which the
   actions PRs bump together: pin a new action the same way (`gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`),
   never by tag. npm majors are ignored in the config: upgrade them by hand from an issue, together with whatever must
-  move with them (e.g. NestJS 12 needed TypeScript 6). TypeScript `>=6.1` is ignored too, until `typescript-eslint`
-  allows it (its peer range is `<6.1.0`): drop that ignore when it does. TypeScript 7 also waits for a
-  `typescript-eslint` release whose peer range includes it; upgrade by hand from an issue then.
+  move with them (e.g. NestJS 12 needed TypeScript 6). TypeScript `>=6.1` is ignored too, which keeps it on 6.0.x: no
+  6.1 will ship, so the ignore blocks TypeScript 7. Lift it, and upgrade by hand from an issue, once both
+  `typescript-eslint` (its peer range is `<6.1.0`) and the Nest CLI accept TypeScript 7: the CLI needs the compiler API,
+  which 7.0 doesn't ship (expected back in 7.1), so `npm run build` fails on 7.0.
 - GPG "Inappropriate ioctl for device": ask the user to run `echo test | gpg --clearsign > /dev/null` in their terminal.
 - If `gh pr edit` fails on a Projects (classic) error:
   `gh api -X PATCH repos/osrs-tracker/osrs-tracker-api/pulls/<n> -F body=@<file>`.
