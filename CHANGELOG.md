@@ -30,7 +30,10 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   with a comment why: the web app's dev server runs there against the live API.
 - The specs no longer import `levelForXp` from `@osrs-tracker/models` or `WORLD_LIST_URL` from `@osrs-tracker/hiscores`,
   both deprecated exports due to be removed: the two fixture levels and the world list URL are written out instead, so
-  the major bumps that drop them need no change here. Production code used neither.
+  the major bumps that drop them need no change here. Production code used neither. Those bumps followed:
+  `@osrs-tracker/models` 3.0, `@osrs-tracker/hiscores` 6.0, `@osrs-tracker/logger` 0.3 and
+  `@osrs-tracker/express-metrics` 0.2, now published from osrs-tracker-packages instead of osrs-tracker-aws. The exports
+  they dropped were unused here, and the log lines and metrics are unchanged (#199).
 - The player count history and news archive response types (`PLAYER_COUNT_RANGES`, `PlayerCountRange`,
   `PlayerCountPoint`, `StoredNewsItem`, `NewsArchivePage`) come from `@osrs-tracker/models` 2.6, which the web app reads
   too, instead of local copies it kept by hand; `news/news.types.ts` is gone. The shapes are unchanged. Bumps
