@@ -17,6 +17,11 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   compromised release is usually pulled before we take it; security updates still arrive at once. Actions stay pinned by
   full SHA, GitHub's own included, which is zizmor's default, so unlike osrs-tracker-web it needs no `ref-pin` policy
   (#191).
+- CI checks the licences of dependencies a PR adds (`dependency-review` in `nodejs.yml`, GitHub's
+  dependency-review-action), so a copyleft licence such as AGPL can't arrive unnoticed through Dependabot or an agent.
+  It allows the permissive licences osrs-tracker-web does, and exempts sharp's LGPL prebuilt binaries (`@img/sharp-*`)
+  by name, so any other LGPL dependency is still flagged. Not a required check: a failure is for the maintainer to judge
+  (#192).
 - The API sends security headers on every response, through Nest 12.1's `app.useSecurityHeaders()` (helmet 8's defaults:
   `X-Content-Type-Options: nosniff`, HSTS, a `default-src 'self'` CSP, `Referrer-Policy: no-referrer` and the rest). It
   only removed `X-Powered-By` before, so a browser could sniff a JSON or image response as another type.
