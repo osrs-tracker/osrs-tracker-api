@@ -375,6 +375,11 @@ Run end to end without asking; stop only on failure. Verify locally once before 
   `CHANGELOG.md` (it's a vulnerability report in a public repo). `build` also builds the image and checks that `sharp`
   converts in it, so a `Dockerfile` change is tested on the PR (CD only builds after merging, and there is no Docker
   locally).
+- That CodeQL rule also blocks a PR CodeQL never analysed: default setup skips a PR that changes no JS/TS or workflow
+  file (seen in osrs-tracker-packages; GitHub doesn't document it), so the PR stays BLOCKED with no `CodeQL` check. Once
+  `build`, `lint`, `test` and `zizmor` pass and `gh pr checks <n>` lists no `CodeQL`, merge with
+  `gh pr merge <n> --merge --admin`. `--admin` skips every rule, so never use it while a check fails or is pending
+  (osrs-tracker/osrs-tracker-packages#11).
 - `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push, watch its **CI**
   run, not CD: `gh run watch <run-id> --exit-status` as a background Bash command, as in Release step 4 (the ID from
   `gh run list --commit "$(git rev-parse HEAD)" --workflow CI --json databaseId`, the full SHA; empty right after the
