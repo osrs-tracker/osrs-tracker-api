@@ -365,8 +365,11 @@ Run end to end without asking; stop only on failure. Verify locally once before 
 ## Commit and push
 
 - PRs need the `build`, `lint` and `test` checks (the `main` ruleset); `build` and `test` report as skipped when CI
-  finds no source changes, which still passes. `build` also builds the image and checks that `sharp` converts in it, so
-  a `Dockerfile` change is tested on the PR (CD only builds after merging, and there is no Docker locally).
+  finds no source changes, which still passes. The same ruleset blocks a merge on CodeQL code scanning (default setup,
+  `default` suite) alerts of high severity or higher, or of `error` level: fix the alert, or dismiss it with a reason in
+  the Security tab, and never copy an open alert's details into an issue, PR, commit or `CHANGELOG.md` (it's a
+  vulnerability report in a public repo). `build` also builds the image and checks that `sharp` converts in it, so a
+  `Dockerfile` change is tested on the PR (CD only builds after merging, and there is no Docker locally).
 - `main` or a PR: see `CLAUDE.md`. The admin account bypasses `main`'s PR rule; after a direct push, watch its **CI**
   run, not CD: `gh run watch <run-id> --exit-status` as a background Bash command, as in Release step 4 (the ID from
   `gh run list --commit "$(git rev-parse HEAD)" --workflow CI --json databaseId`, the full SHA; empty right after the
