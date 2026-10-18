@@ -99,6 +99,32 @@ jobs:
           args: --offline --hidden --include-fragments --no-progress --exclude-path node_modules './**/*.md'
           fail: true
 
+  # Fails a PR that adds a dependency under a licence not in the list, so copyleft can't arrive unnoticed through
+  # Dependabot or an agent. Not a required check: a failure is for the maintainer to judge. A missing licence is reported
+  # without failing. sharp's prebuilt binaries are LGPL-3.0-or-later (libvips, loaded dynamically and unmodified), so
+  # they're exempted by name rather than allowing LGPL for every package; version-less purls match every version.
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          license-check: true
+          vulnerability-check: false
+          allow-licenses: >-
+            MIT, MIT-0, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, 0BSD, BlueOak-1.0.0, CC0-1.0, MPL-2.0, Unlicense
+          allow-dependencies-licenses: >-
+            pkg:npm/@img/sharp-libvips-darwin-arm64, pkg:npm/@img/sharp-libvips-darwin-x64,
+            pkg:npm/@img/sharp-libvips-linux-arm, pkg:npm/@img/sharp-libvips-linux-arm64,
+            pkg:npm/@img/sharp-libvips-linux-ppc64, pkg:npm/@img/sharp-libvips-linux-riscv64,
+            pkg:npm/@img/sharp-libvips-linux-s390x, pkg:npm/@img/sharp-libvips-linux-x64,
+            pkg:npm/@img/sharp-libvips-linuxmusl-arm64, pkg:npm/@img/sharp-libvips-linuxmusl-x64,
+            pkg:npm/@img/sharp-wasm32, pkg:npm/@img/sharp-win32-arm64, pkg:npm/@img/sharp-win32-ia32,
+            pkg:npm/@img/sharp-win32-x64
+
   build:
     needs: changes
     # `!cancelled()` runs it when `changes` itself fails, so a broken check can't skip the build
