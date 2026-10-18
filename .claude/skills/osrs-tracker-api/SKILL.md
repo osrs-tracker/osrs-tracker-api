@@ -81,29 +81,29 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
   globals are needed. It resolves packages through `exports`, so a package that lists `types` after `require` gets its
   CJS typings (`@osrs-tracker/models` before 0.10.1).
 - `@osrs-tracker/models` (the stored shapes) and `@osrs-tracker/hiscores` (the hiscore client, also used by
-  process-players) are published from osrs-tracker-aws: a change to either is an issue there. Right after a publish,
-  bump with `--prefer-online` (dist-tags lag).
+  process-players) are published from `../osrs-tracker-packages`, like `logger` and `express-metrics`: a change to any
+  of them is an issue there. Right after a publish, bump with `--prefer-online` (dist-tags lag).
 - Logs go to Loki unparsed, so their shape is a contract: one JSON object per line with a top-level string `level` of
   `info`, `warn` or `error` (Loki keeps a level it doesn't know, like Nest's `log` or a number, as its own
   `detected_level`), an ISO `time`, a `type`, and `route` on request lines (Grafana's Express dashboard filters on it).
-  The format comes from `@osrs-tracker/logger` (pino, published from osrs-tracker-aws and shared with osrs-tracker-web:
-  a format change is an issue there). `common/logger/logger.ts` creates the one logger (`logger`; specs build their own
-  with `createApiLogger(destination)`, since pino doesn't write through `process.stdout.write`). `NestLogger`
-  (`common/logger/nest-logger.ts`, set in `main.ts`) passes Nest's and the app's lines to it, with `log` as `info`, the
-  class name as `context`, structured params (`logger.warn('…', { username })`) as fields, except the format's own
-  (`level`, `time`, `type`, `message`, `requestId`), an error as one string under `error` (Node's `util.inspect`: the
-  stack, the error's own fields such as `code`, and its cause as `[cause]: …`), and `type` from the context: `lifecycle`
-  (Nest's startup classes and `MONGO_LOG_CONTEXT`, the Mongo connect and close; `LIFECYCLE_CONTEXTS`), `uncaught`
-  (`ExceptionsHandler`), else `app` (`ApiLogType`). A new startup or shutdown logger gets its context from a constant in
-  that list, never a copied string. It's a `ConsoleLogger` that overrides only `printMessages` and `printStackTrace`
-  (which would write the stack again as plain lines on stderr), so Nest still parses the arguments and filters the
-  levels: `debug` and `verbose` are off, `fatal` stays on (Loki knows it). Log through Nest's `Logger`, never `console`.
-  A warning that can repeat per request (evictions, rejections) goes through `ThrottledWarning`
-  (`common/logger/throttled-warning.ts`): at most one per key and minute, with the count since. The request log (the
-  package's `requestLogger`, applied in `AppModule`) is `type: 'incoming'`: 5xx `error`, 4xx `warn`, else `info`; a
-  client that disconnects before the response is `warn` with `aborted: true` and no `status`. `main.ts` calls
-  `logOutgoingRequests` once (twice would log every request twice), so every `fetch` (hiscores, news feed, images) is
-  logged as `type: 'outgoing'` with its status and duration, and the `requestId` read when the `fetch` starts.
+  The format comes from `@osrs-tracker/logger` (pino, published from osrs-tracker-packages and shared with
+  osrs-tracker-web: a format change is an issue there). `common/logger/logger.ts` creates the one logger (`logger`;
+  specs build their own with `createApiLogger(destination)`, since pino doesn't write through `process.stdout.write`).
+  `NestLogger` (`common/logger/nest-logger.ts`, set in `main.ts`) passes Nest's and the app's lines to it, with `log` as
+  `info`, the class name as `context`, structured params (`logger.warn('…', { username })`) as fields, except the
+  format's own (`level`, `time`, `type`, `message`, `requestId`), an error as one string under `error` (Node's
+  `util.inspect`: the stack, the error's own fields such as `code`, and its cause as `[cause]: …`), and `type` from the
+  context: `lifecycle` (Nest's startup classes and `MONGO_LOG_CONTEXT`, the Mongo connect and close;
+  `LIFECYCLE_CONTEXTS`), `uncaught` (`ExceptionsHandler`), else `app` (`ApiLogType`). A new startup or shutdown logger
+  gets its context from a constant in that list, never a copied string. It's a `ConsoleLogger` that overrides only
+  `printMessages` and `printStackTrace` (which would write the stack again as plain lines on stderr), so Nest still
+  parses the arguments and filters the levels: `debug` and `verbose` are off, `fatal` stays on (Loki knows it). Log
+  through Nest's `Logger`, never `console`. A warning that can repeat per request (evictions, rejections) goes through
+  `ThrottledWarning` (`common/logger/throttled-warning.ts`): at most one per key and minute, with the count since. The
+  request log (the package's `requestLogger`, applied in `AppModule`) is `type: 'incoming'`: 5xx `error`, 4xx `warn`,
+  else `info`; a client that disconnects before the response is `warn` with `aborted: true` and no `status`. `main.ts`
+  calls `logOutgoingRequests` once (twice would log every request twice), so every `fetch` (hiscores, news feed, images)
+  is logged as `type: 'outgoing'` with its status and duration, and the `requestId` read when the `fetch` starts.
 - Request IDs: `nestjs-cls` (`common/logger/request-id.ts`) gives each request a context with a new UUID (never a
   client's `X-Request-Id`: nothing upstream sends one, and a client could reuse one), sent back as `X-Request-Id`. Every
   line logged while handling a request carries it as top-level `requestId` (the logger's `context`): the request line,
@@ -112,11 +112,13 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
   request log reads the ID when the request starts, so the CLS middleware must run first: it does because `ClsModule` is
   global, and Nest applies global modules' middleware first.
 - Metrics: `/metrics` on `METRICS_PORT` comes from `@osrs-tracker/express-metrics` (HTTP durations and `up`, shared with
-  osrs-tracker-web, plus Node's `nodejs_*`/`process_*`). Import `Counter`, `Gauge`, `Histogram` and `register` from it,
-  never `prom-client` or `@prometheus-io/client` directly, so there's one registry. `metricsMiddleware` clears that
-  registry when called, so `main.ts` calls it before creating `AppModule`: register app metrics in a provider's
-  `onModuleInit` (like `ResilienceEventsListener`), never at import time, and remove them on shutdown so the e2e spec
-  can boot the app again. Keep labels low-cardinality: route patterns (`routeLabel`), never usernames or IDs.
+  osrs-tracker-web, plus Node's `nodejs_*`/`process_*`). Import `Counter`, `Gauge` and `register` from it, never from
+  `prom-client` or `@prometheus-io/client`, so there's one registry; it stopped re-exporting `Histogram` and `Summary`
+  in 0.2.0, so a first one adds `@prometheus-io/client` as a dependency in the range express-metrics uses (one copy, one
+  registry). `metricsMiddleware` clears that registry when called, so `main.ts` calls it before creating `AppModule`:
+  register app metrics in a provider's `onModuleInit` (like `ResilienceEventsListener`), never at import time, and
+  remove them on shutdown so the e2e spec can boot the app again. Keep labels low-cardinality: route patterns
+  (`routeLabel`), never usernames or IDs.
 - Traefik compresses JSON for browsers (the `osrs-tracker-api-compress` Middleware in `osrs-tracker-api.yaml`, last in
   the Ingress's chain), adding `Vary: Accept-Encoding`; the web's SSR calls the Service directly and gets it plain. Its
   `encodings` are `br, gzip`: browsers send `Accept-Encoding` unweighted, so Traefik picks by that list's order, and its
