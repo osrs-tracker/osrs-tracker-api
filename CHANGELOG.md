@@ -7,6 +7,10 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 
 ### Behind the scenes
 
+- CI's `GITHUB_TOKEN` is read-only by default (`permissions: contents: read` at the top of `nodejs.yml`), so `npm ci`,
+  the build and the tests, which run code from every installed package, no longer get the repository's default write
+  token on pushes to `main`. The `changes` job keeps its own block, which adds `checks: read`. Same as
+  osrs-tracker-web's (#185).
 - The API sends security headers on every response, through Nest 12.1's `app.useSecurityHeaders()` (helmet 8's defaults:
   `X-Content-Type-Options: nosniff`, HSTS, a `default-src 'self'` CSP, `Referrer-Policy: no-referrer` and the rest). It
   only removed `X-Powered-By` before, so a browser could sniff a JSON or image response as another type.
