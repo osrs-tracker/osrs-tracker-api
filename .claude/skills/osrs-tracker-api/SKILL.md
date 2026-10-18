@@ -165,6 +165,17 @@ the result with other state, as `PlayersService.refreshPlayerInfo` returns `Refr
 against the stored player (failed with a stored player is a 200, without one a 503). Don't convert one into the other
 (#173).
 
+## Security
+
+CodeQL default setup doesn't check these, nor does `/security-review` (it skips missing hardening), so review does:
+
+- CORS stays the explicit origin list from `corsOptions` (`config/cors.ts`): never `enableCors()` without options, and
+  never `origin: true` together with `credentials: true`.
+- No token, `Authorization` header or full request body in a log line or an error message.
+- No hard-coded secret as a fallback (`process.env.X || '…'`): config comes through the validated env (`config/env.ts`).
+- A server-side fetch of a URL from input needs an allow-list, checked on the parsed origin, and must not follow
+  redirects (`redirect: 'error'`), like `ParseNewsImageUrlPipe` and the image fetch in `NewsService`.
+
 ## Mongo pipeline updates
 
 Wrap player data and user input in `$literal` (strings starting with `$` read as field paths). Merge offsets with
