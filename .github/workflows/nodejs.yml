@@ -10,6 +10,11 @@ on:
   pull_request:
     branches: ['main']
 
+# Read-only unless a job asks for more: build and test run code from every installed package, so they get a token that
+# can't push or approve pull requests, whatever the repository's default is
+permissions:
+  contents: read
+
 jobs:
   # Build and test only run when something they depend on changed since the previous push, so commits like a deploy
   # digest or docs skip them. A skipped job still satisfies the required check; a workflow-level `paths` filter wouldn't.
