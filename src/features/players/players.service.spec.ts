@@ -6,7 +6,6 @@ import {
   createHiscoreLayout,
   encodeHiscoreEntry,
   HiscoreEntry,
-  levelForXp,
   SkillEnum,
   StoredHiscoreEntry,
   stripUnchangedValues,
@@ -257,11 +256,13 @@ describe('PlayersService hiscore lookups', () => {
 describe('PlayersService stored hiscore entries', () => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const layout = createHiscoreLayout({ skills: [...COMBAT_SKILLS], activities: ['Clue Scrolls (all)'] }, new Date(0));
+  /** The level `decode` derives for each XP value these specs use. */
+  const LEVEL_FOR_XP: Record<number, number> = { 1000: 9, 2000: 13 };
   /** A domain entry where every skill has `xp` (levels as `decode` derives them) and the activity `score`. */
   const entry = (day: number, xp: number, score: number): HiscoreEntry => ({
     date: new Date(day * DAY_MS),
     scrapingOffset: 0,
-    skills: Object.fromEntries(COMBAT_SKILLS.map((name) => [name, { rank: 5, level: levelForXp(xp), xp }])),
+    skills: Object.fromEntries(COMBAT_SKILLS.map((name) => [name, { rank: 5, level: LEVEL_FOR_XP[xp], xp }])),
     activities: { 'Clue Scrolls (all)': { rank: 7, score } },
   });
 
@@ -340,7 +341,7 @@ describe('PlayersService stored hiscore entries', () => {
           {
             date: new Date(3 * DAY_MS),
             scrapingOffset: 0,
-            skills: { [SkillEnum.Overall]: { rank: 5, level: levelForXp(2000), xp: 2000 } },
+            skills: { [SkillEnum.Overall]: { rank: 5, level: LEVEL_FOR_XP[2000], xp: 2000 } },
             activities: {},
           },
         ],

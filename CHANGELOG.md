@@ -28,6 +28,9 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   `Cross-Origin-Resource-Policy` is `cross-origin` instead of the default `same-origin`, which would stop the web app
   (another origin) from showing `/news/image` images. `localhost:4200` stays in the CORS allow-list in production, now
   with a comment why: the web app's dev server runs there against the live API.
+- The specs no longer import `levelForXp` from `@osrs-tracker/models` or `WORLD_LIST_URL` from `@osrs-tracker/hiscores`,
+  both deprecated exports due to be removed: the two fixture levels and the world list URL are written out instead, so
+  the major bumps that drop them need no change here. Production code used neither.
 
 ## 2026-10-16
 

@@ -1,6 +1,5 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { WORLD_LIST_URL } from '@osrs-tracker/hiscores';
 import { createHiscoreLayout, encodeHiscoreEntry } from '@osrs-tracker/models';
 import { Server } from 'node:http';
 import { AddressInfo } from 'node:net';
@@ -293,7 +292,7 @@ async function fakeJagex(url: string): Promise<Response> {
     if (fakes.hiscores === 'found') return Response.json(HISCORE);
     return new Response('', { status: fakes.hiscores === 'notFound' ? 404 : 503 });
   }
-  if (url === WORLD_LIST_URL)
+  if (url === 'https://www.runescape.com/g=oldscape/slr.ws?order=LPWM')
     return fakes.worldList === 'found' ? new Response(WORLD_LIST) : new Response('', { status: 503 });
   throw new Error(`Unexpected fetch: ${url}`);
 }

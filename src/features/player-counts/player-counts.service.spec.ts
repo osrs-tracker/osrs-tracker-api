@@ -1,5 +1,4 @@
 import { BadGatewayException, Logger } from '@nestjs/common';
-import { WORLD_LIST_URL } from '@osrs-tracker/hiscores';
 import { Db } from 'mongodb';
 import { Agent, fetch } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
@@ -49,7 +48,7 @@ describe('PlayerCountsService.getLive', () => {
       byLocation: { 0: 1500 },
     });
     expect(mockFetch).toHaveBeenCalledWith(
-      WORLD_LIST_URL,
+      'https://www.runescape.com/g=oldscape/slr.ws?order=LPWM',
       expect.objectContaining({ headers: expect.objectContaining({ 'user-agent': USER_AGENT }), dispatcher: {} }),
     );
   });
