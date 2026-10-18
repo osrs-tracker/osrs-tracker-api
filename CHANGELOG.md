@@ -11,6 +11,12 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   the build and the tests, which run code from every installed package, no longer get the repository's default write
   token on pushes to `main`. The `changes` job keeps its own block, which adds `checks: read`. Same as
   osrs-tracker-web's (#185).
+- Every pull request and push to `main` now runs zizmor, a security audit of the GitHub Actions workflows, as its own
+  `zizmor` check (`.github/workflows/zizmor.yml`), and checkouts no longer keep their git credentials, apart from the
+  deploy's, which pushes the digest commit. Dependabot waits 7 days after a release before suggesting it, so a
+  compromised release is usually pulled before we take it; security updates still arrive at once. Actions stay pinned by
+  full SHA, GitHub's own included, which is zizmor's default, so unlike osrs-tracker-web it needs no `ref-pin` policy
+  (#191).
 - The API sends security headers on every response, through Nest 12.1's `app.useSecurityHeaders()` (helmet 8's defaults:
   `X-Content-Type-Options: nosniff`, HSTS, a `default-src 'self'` CSP, `Referrer-Policy: no-referrer` and the rest). It
   only removed `X-Powered-By` before, so a browser could sniff a JSON or image response as another type.

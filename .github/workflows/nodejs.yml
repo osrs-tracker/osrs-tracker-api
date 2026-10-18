@@ -32,6 +32,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - id: diff
         name: Check for source or dependency changes
         env:
@@ -84,7 +85,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-deps
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-deps # zizmor: ignore[self-repository]
       - run: npm run lint:ci
       - run: npm run prettier:ci
       # Local links and #anchors in the Markdown, here because lint also runs for docs-only pushes. --hidden includes
@@ -104,7 +107,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-deps
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-deps # zizmor: ignore[self-repository]
       - run: npm run build
       # CD builds the image only after merging; build it here too, so a broken Dockerfile fails the PR, and check that
       # the image's sharp (installed apart from the bundle) loads and converts as the node user
@@ -125,5 +130,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-deps
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-deps # zizmor: ignore[self-repository]
       - run: npm test
