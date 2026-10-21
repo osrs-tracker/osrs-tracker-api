@@ -55,8 +55,8 @@ export class ItemsController {
   }
 
   /**
-   * Up to 20 items whose name has a word starting with each word of the query (`ItemSearchIndex`), best match first,
-   * with only `id`, `icon` and `name`; `[]` when none match. 400 for a query over 64 characters. `ITEM_SEARCH` on
+   * Up to 20 items whose name matches every word of the query: as the start of a word, across words (`tbow`), inside a
+   * word or with a typo (`ItemSearchIndex`). Best match first, with only `id`, `icon` and `name`; `[]` when none match. 400 for a query over 64 characters. `ITEM_SEARCH` on
    * every response.
    */
   @Get('search/:query')

@@ -10,7 +10,7 @@ import { ItemSearchIndex, ItemSearchResult } from './item-search';
 /** How long item search uses the item names it loaded: the hourly items refresh adds new items at most once an hour. */
 export const ITEM_SEARCH_TTL_MS = 600_000;
 /** After a failed reload, search the stale names this long before retrying. */
-const ITEM_SEARCH_RETRY_MS = 60_000;
+export const ITEM_SEARCH_RETRY_MS = 60_000;
 
 @Injectable()
 export class ItemsService {
