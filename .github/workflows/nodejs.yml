@@ -103,6 +103,8 @@ jobs:
   # Dependabot or an agent. Not a required check: a failure is for the maintainer to judge. A missing licence is reported
   # without failing. sharp's prebuilt binaries are LGPL-3.0-or-later (libvips, loaded dynamically and unmodified), so
   # they're exempted by name rather than allowing LGPL for every package; version-less purls match every version.
+  # bowser (through @aws-sdk/core, browser-only, not bundled) is MIT, which GitHub detects as `MIT AND MITNFA` (MIT plus
+  # a no-false-attribution clause, permissive): exempted by name too, so an SDK bump doesn't flag it again.
   dependency-review:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -123,7 +125,7 @@ jobs:
             pkg:npm/@img/sharp-libvips-linux-s390x, pkg:npm/@img/sharp-libvips-linux-x64,
             pkg:npm/@img/sharp-libvips-linuxmusl-arm64, pkg:npm/@img/sharp-libvips-linuxmusl-x64,
             pkg:npm/@img/sharp-wasm32, pkg:npm/@img/sharp-win32-arm64, pkg:npm/@img/sharp-win32-ia32,
-            pkg:npm/@img/sharp-win32-x64
+            pkg:npm/@img/sharp-win32-x64, pkg:npm/bowser
 
   build:
     needs: changes

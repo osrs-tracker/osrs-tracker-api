@@ -33,7 +33,8 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   `forIngester()`, which creates no indexes and doesn't connect at startup, so the ingester starts during a Mongo
   outage. A new hiscore layout's `since` is now the scrape time of its first entry when the ingester stores it. CD's
   digest commit updates both Deployments' `image:` lines. Adds `@aws-sdk/client-sqs` and bumps `@osrs-tracker/models` to
-  3.2, for the message types (#203).
+  3.2, for the message types. CI's licence check exempts `bowser` by name, which the SDK brings in: it's MIT, but GitHub
+  detects `MIT AND MITNFA` (#203).
 
 ## 2026-10-18
 
