@@ -5,6 +5,21 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 
 ## 2026-10-21
 
+### Items
+
+- Item search runs in memory instead of on the Atlas Search index `name_autocomplete`, which self-managed MongoDB
+  doesn't have (Search for Community needs MongoDB 8.3 and a JVM sized to a quarter of the RAM, for 4.7k names), so the
+  database can move into the cluster (#206, roadmap osrs-tracker/osrs-tracker-aws#162). The API loads every item's id,
+  icon and name every 10 minutes (items change at most hourly) and keeps the stale names when MongoDB fails. The API no
+  longer creates the search index, and results no longer carry the unused `score`.
+  - As before: every query word from 2 characters has to start a word of the name, shorter words only rank, diacritics
+    are folded. Ranked by how each word matches, then shorter names, then a matching first word: the same top results as
+    Atlas on 49 sample queries.
+  - New: words match across spaces (`tbow` finds Twisted bow, `deathrune` Death rune), inside compound words (`axe`
+    finds Rune battleaxe, ranked below Rune axe) and with a typo (`abysal whip`, `saradomim brew`, `shrak`), the latter
+    only when no item word contains the query word, so correct words don't pull in near misses. Apostrophes are ignored
+    (`dhide` finds D'hide).
+
 ### Ingester
 
 - The ingester, a second entrypoint of the same image (`node ingest`, the `osrs-tracker-ingester` Deployment, one

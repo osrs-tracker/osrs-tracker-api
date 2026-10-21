@@ -1,7 +1,7 @@
 import { FactoryProvider, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RetryPolicy } from '@nestjs/resilience';
-import { Db, MongoClient, ServerApiVersion } from 'mongodb';
+import { MongoClient, ServerApiVersion } from 'mongodb';
 import { MongoEnv } from '../../config/env';
 import { ITEMS_COLLECTION, NEWS_COLLECTION, PLAYERS_COLLECTION } from './collections';
 import { MONGO_LOG_CONTEXT } from '../logger/nest-logger';
@@ -55,49 +55,6 @@ export function connectWithRetry(createClient: () => MongoClient): Promise<Mongo
  */
 export const ITEM_NAME_COLLATION = { locale: 'en', strength: 2 } as const;
 
-/** The Atlas Search index item search runs on (`buildItemSearchPipeline`). */
-export const ITEM_SEARCH_INDEX = 'name_autocomplete';
-/** The shortest word prefix the index matches. */
-export const ITEM_SEARCH_MIN_GRAMS = 2;
-
-/**
- * Creates the item search index when it's missing. Unlike `createIndex`, `createSearchIndex` fails when the name exists,
- * and it doesn't change an existing index: a changed definition has to be applied by hand (`updateSearchIndex` or the
- * Atlas UI). Atlas builds it in the background; until it's ready, item search returns nothing. A failure is logged
- * rather than thrown, so search alone breaks instead of the whole API.
- */
-async function ensureItemSearchIndex(db: Db): Promise<void> {
-  const items = db.collection(ITEMS_COLLECTION);
-  try {
-    if ((await items.listSearchIndexes(ITEM_SEARCH_INDEX).toArray()).length) return;
-
-    await items.createSearchIndex({
-      name: ITEM_SEARCH_INDEX,
-      definition: {
-        mappings: {
-          dynamic: false,
-          fields: {
-            name: [
-              // maxGrams 15 covers the longest word in an item name (Superantipoison)
-              {
-                type: 'autocomplete',
-                tokenization: 'edgeGram',
-                minGrams: ITEM_SEARCH_MIN_GRAMS,
-                maxGrams: 15,
-                foldDiacritics: true,
-              },
-              { type: 'string' },
-            ],
-          },
-        },
-      },
-    });
-    logger.log(`Created the ${ITEM_SEARCH_INDEX} search index on items`);
-  } catch (error) {
-    logger.error(`Couldn't ensure the ${ITEM_SEARCH_INDEX} search index on items: ${error}`);
-  }
-}
-
 /** A client for the configured database, not connected yet. */
 function createMongoClient(config: ConfigService<MongoEnv, true>): MongoClient {
   return new MongoClient(config.get('MONGODB_URI', { infer: true }), {
@@ -135,7 +92,6 @@ export const mongoDBProvider: FactoryProvider = {
       .collection(ITEMS_COLLECTION)
       .createIndex({ lastFetch: -1 }, { partialFilterExpression: { lastFetch: { $exists: true } } });
     await db.collection(ITEMS_COLLECTION).createIndex({ name: 1 }, { collation: ITEM_NAME_COLLATION });
-    await ensureItemSearchIndex(db);
 
     // Ensure news indexes are created: the feed upserts on `link`, `/news/since/:date` reads by `pubDate`
     await db.collection(NEWS_COLLECTION).createIndex({ link: 1 }, { unique: true });

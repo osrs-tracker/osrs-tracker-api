@@ -313,9 +313,8 @@ fails. `npm test` runs once (CI's `test` job), `npm run test:watch` watches.
     (`throttled-warning.spec.ts`, `resilience-events.spec.ts`).
   - A local server with `undici`'s real `fetch`, where `undici` itself is the point: the outgoing log lines
     (`logger.spec.ts`) and the image size limit through `IMAGE_AGENT` (`news.service.spec.ts`).
-  - Pipelines only Atlas runs are checked as built, not run: the item search's `$search` (`item-search.spec.ts`) and the
-    player count history (`player-count-history.spec.ts`). The `name_autocomplete` Atlas Search index is created in
-    `mongo.provider.ts` only when missing: a changed definition is applied by hand.
+  - Pipelines are checked as built, not run: the player count history (`player-count-history.spec.ts`). Item search runs
+    in memory (`ItemSearchIndex`), so `item-search.spec.ts` searches a list of names.
   - `news.service.spec.ts` pages the archive with a fake `find` that applies the filter; world lists come from
     `player-counts/world-list.fixture.ts`.
   - `resilience-events.spec.ts` feeds a `Subject` as `events$` and uses the shared metrics registry, which the listener
