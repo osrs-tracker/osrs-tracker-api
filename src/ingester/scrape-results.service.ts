@@ -33,7 +33,10 @@ export type ApplyResult = 'applied' | 'stale';
 
 /**
  * Writes the scraping Lambdas' results to MongoDB, as process-players and record-player-count did (osrs-tracker-aws).
- * Every write can be repeated: a message whose write failed halfway is applied again when it comes back.
+ * A message whose write failed halfway is applied again whole when it comes back, so the writes must survive a repeat:
+ * the slot guard skips stored entries and `$setOnInsert` stored samples. A repeated not-found only counts the player
+ * once more (`hiscoreNotFoundCount` is only read as "more than 0"; pausing goes by `hiscoreNotFoundSince`, which a
+ * repeat keeps), though a pause recorded before a failure in the same message gets no alert on the retry.
  */
 @Injectable()
 export class ScrapeResultsService {
