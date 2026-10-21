@@ -30,7 +30,7 @@ import { NoIndexMiddleware } from './middleware/robots.middleware';
     }),
     ClsModule.forRoot(CLS_OPTIONS),
     AgentModule,
-    MongoModule,
+    MongoModule.forApi(),
     XMLModule,
     PlayersModule,
     NewsModule,

@@ -3,6 +3,39 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-10-21
+
+### Ingester
+
+- The ingester, a second entrypoint of the same image (`node ingest`, the `osrs-tracker-ingester` Deployment, one
+  replica, `Recreate`), applies the scraping Lambdas' results from the SQS FIFO queue `osrs-tracker_scrape-results.fifo`
+  to MongoDB. This is what lets the database move into the cluster, which the Lambdas can't reach, without losing
+  scrapes while the cluster is down: the queue keeps them for 14 days (roadmap osrs-tracker/osrs-tracker-aws#162).
+  - It receives once a minute, and again at once while messages keep coming, and only while MongoDB answers a ping:
+    every receive counts towards the dead-letter limit.
+  - It applies a batch one message at a time, in order, deletes each only after its write, and stops at the first
+    failure, so the rest come back in order. A message with an unknown `v` is never deleted.
+  - Each hiscore prepend has a slot guard: it skips the entry when the player already has one for that offset since the
+    start of its scrape slot. That catches duplicate deliveries, repeated scrapes and late entries, which would break
+    the stored order.
+  - Players not on the hiscores are counted by their scrape time, not the time of applying, and paused after 7 days. The
+    "Paused scraping" alert moves here from process-players.
+  - Player counts are upserted with `$setOnInsert`, so a repeated sample changes nothing, and the daily averages are
+    recomputed from the start of the sample's own UTC day, so a late sample reaches its day.
+  - Its `/healthy` reports the poll loop's progress, not MongoDB: an outage pauses the loop instead of restarting the
+    pod. Metrics: `ingester_job_last_success_timestamp_seconds{job="ingest"}` and `ingester_messages_total`.
+  - Nothing reaches the queue until the Lambdas send their results (osrs-tracker/osrs-tracker-aws#165). Until then it
+    logs one empty poll a minute (#203).
+
+### Behind the scenes
+
+- `MongoModule` comes in two forms: `forApi()` (unchanged: connects at startup and creates the indexes) and
+  `forIngester()`, which creates no indexes and doesn't connect at startup, so the ingester starts during a Mongo
+  outage. A new hiscore layout's `since` is now the scrape time of its first entry when the ingester stores it. CD's
+  digest commit updates both Deployments' `image:` lines. Adds `@aws-sdk/client-sqs` and bumps `@osrs-tracker/models` to
+  3.2, for the message types. CI's licence check exempts `bowser` by name, which the SDK brings in: it's MIT, but GitHub
+  detects `MIT AND MITNFA` (#203).
+
 ## 2026-10-18
 
 ### Behind the scenes

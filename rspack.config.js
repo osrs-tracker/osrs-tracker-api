@@ -18,6 +18,9 @@ module.exports = (options, rspack) => {
 
   return {
     ...options,
+    // The ingester is a second entrypoint of the same image (`node ingest`, osrs-tracker-api.yaml), next to `main`
+    entry: { main: options.entry, ingest: './src/ingest.ts' },
+    output: { ...options.output, filename: '[name].js' },
     // The CLI follows tsconfig.json's sourceMap; webpack emitted none, and node doesn't read them without
     // --enable-source-maps
     devtool: false,

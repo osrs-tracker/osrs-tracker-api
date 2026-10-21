@@ -83,6 +83,71 @@ spec:
               port: 9090
             periodSeconds: 5
 ---
+# The ingester (src/ingest.ts): applies the scraping Lambdas' results from SQS to MongoDB. Same image as the API.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osrs-tracker-ingester
+  namespace: osrs-tracker
+  labels:
+    app: osrs-tracker-ingester
+spec:
+  # Never two consumers: the queue's messages are applied in order, one at a time
+  replicas: 1
+  strategy:
+    type: Recreate
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: osrs-tracker-ingester
+  template:
+    metadata:
+      labels:
+        app: osrs-tracker-ingester
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: '9090'
+        prometheus.io/scrape: 'true'
+    spec:
+      # Covers a batch being applied when the pod stops (seconds); the long poll is aborted at once
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: osrs-tracker-ingester
+          # The same digest as osrs-tracker-api's: CD's deploy commit updates both
+          image: freekmencke/osrs-tracker-api@sha256:e6a717609298f3d38b0b48130c9165904579d88c4137d56068c67fe1dbd2c092
+          imagePullPolicy: IfNotPresent
+          command: [node, ingest]
+          envFrom:
+            - secretRef:
+                name: aws-mongodb-credentials
+            # The AWS key, the queue URL and the Discord webhook (FreekMencke/fremen-cluster's secrets.example.yaml)
+            - secretRef:
+                name: osrs-tracker-ingester
+          ports:
+            - containerPort: 9090
+          resources:
+            requests:
+              cpu: 10m
+              memory: 96Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          # On the poll loop's progress, never on Mongo or SQS: the loop waits their outages out, and restarting the pod
+          # wouldn't end them. Mongo isn't connected at startup, so /healthy answers within a second or two.
+          livenessProbe:
+            httpGet:
+              path: /healthy
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
 # Node drains evict one replica at a time
 apiVersion: policy/v1
 kind: PodDisruptionBudget

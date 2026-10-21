@@ -32,12 +32,34 @@ The [OSRS Tracker website](https://osrs-tracker.freekmencke.com)
 everything is stored in MongoDB. Which fields and indexes each of them owns is described in osrs-tracker-aws's
 [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md).
 
+## The ingester
+
+A second process from the same image (`node ingest`, the `osrs-tracker-ingester` Deployment, one replica) writes the
+scraping jobs' results to MongoDB. The Lambdas in osrs-tracker-aws send their hiscores and player counts to an SQS FIFO
+queue, `osrs-tracker_scrape-results.fifo`, which keeps them for up to 14 days, so scraping goes on while the cluster is
+down. The ingester:
+
+- receives from the queue once a minute, and again at once while messages keep coming, but only while MongoDB answers a
+  ping;
+- applies the messages one at a time, in order, and deletes each only after its write. At the first that fails it stops,
+  and that one and the rest come back once their visibility timeout runs out. A message it can't read is never deleted,
+  so it ends in the dead-letter queue;
+- skips a hiscore entry when the player already has one for that offset's scrape slot, since the start of its hour. That
+  catches duplicates, repeated scrapes and late entries, which would otherwise break the stored history's order;
+- counts the days a player isn't on the hiscores, pauses their scraping after 7 (with a Discord alert), and recomputes
+  the daily player counts.
+
+It has no public port: `/healthy`, which reports whether the poll loop is still making progress, and `/metrics`
+(`ingester_job_last_success_timestamp_seconds`, `ingester_messages_total`) are on port 9090. Its settings are the
+MongoDB ones plus the ingester section of `.env.example`, from the cluster's `osrs-tracker-ingester` secret. Its AWS key
+only works from the server's IP, so `npm run start:ingest` can't receive anything from elsewhere.
+
 ## Running it locally
 
 You need Node 24 or newer. Copy `.env.example` to `.env` and fill in the MongoDB credentials (`MONGODB_URI`,
 `MONGODB_USERNAME`, `MONGODB_PASSWORD`): the MongoDB Atlas cluster's URI, username and password, the same values as the
 cluster's `aws-mongodb-credentials` secret (its template is `cluster/osrs-tracker/secrets.example.yaml` in
-`home-cluster`; the username and password are kept in a password manager). Your IP address must be on the Atlas
+`fremen-cluster`; the username and password are kept in a password manager). Your IP address must be on the Atlas
 project's IP access list. The database name and the OSRS API URL come prefilled. It also lists the optional settings
 (`CORS_ORIGIN`, `PORT`, `METRICS_PORT`). The API won't start while a required one is missing or a value is invalid; the
 error lists them all. Then run:

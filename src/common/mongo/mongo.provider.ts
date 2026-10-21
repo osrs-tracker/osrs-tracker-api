@@ -2,7 +2,7 @@ import { FactoryProvider, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RetryPolicy } from '@nestjs/resilience';
 import { Db, MongoClient, ServerApiVersion } from 'mongodb';
-import { Env } from '../../config/env';
+import { MongoEnv } from '../../config/env';
 import { ITEMS_COLLECTION, NEWS_COLLECTION, PLAYERS_COLLECTION } from './collections';
 import { MONGO_LOG_CONTEXT } from '../logger/nest-logger';
 
@@ -98,26 +98,29 @@ async function ensureItemSearchIndex(db: Db): Promise<void> {
   }
 }
 
+/** A client for the configured database, not connected yet. */
+function createMongoClient(config: ConfigService<MongoEnv, true>): MongoClient {
+  return new MongoClient(config.get('MONGODB_URI', { infer: true }), {
+    auth: {
+      username: config.get('MONGODB_USERNAME', { infer: true }),
+      password: config.get('MONGODB_PASSWORD', { infer: true }),
+    },
+    serverApi: { version: ServerApiVersion.v1, deprecationErrors: true },
+    serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS,
+  });
+}
+
+/** The API's client: connected before the app starts, retrying (`connectWithRetry`). */
 export const mongoClientProvider: FactoryProvider = {
   provide: MONGO_CLIENT,
-  useFactory: (config: ConfigService<Env, true>) =>
-    connectWithRetry(
-      () =>
-        new MongoClient(config.get('MONGODB_URI', { infer: true }), {
-          auth: {
-            username: config.get('MONGODB_USERNAME', { infer: true }),
-            password: config.get('MONGODB_PASSWORD', { infer: true }),
-          },
-          serverApi: { version: ServerApiVersion.v1, deprecationErrors: true },
-          serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS,
-        }),
-    ),
+  useFactory: (config: ConfigService<MongoEnv, true>) => connectWithRetry(() => createMongoClient(config)),
   inject: [ConfigService],
 };
 
+/** The API's database, once its indexes are ensured. */
 export const mongoDBProvider: FactoryProvider = {
   provide: MONGODB_DATABASE,
-  useFactory: async (mongoClient: MongoClient, config: ConfigService<Env, true>) => {
+  useFactory: async (mongoClient: MongoClient, config: ConfigService<MongoEnv, true>) => {
     const db = mongoClient.db(config.get('MONGODB_DATABASE', { infer: true }));
 
     // Ensure player indexes are created
@@ -140,5 +143,24 @@ export const mongoDBProvider: FactoryProvider = {
 
     return db;
   },
+  inject: [MONGO_CLIENT, ConfigService],
+};
+
+/**
+ * The ingester's client, not connected at startup, so the ingester starts during a Mongo outage. Its poll loop connects
+ * it before each receive (`IngesterService`): a failed connect leaves the client closed, and only an explicit
+ * `connect()` opens it again, not the driver's connect on first use.
+ */
+export const ingesterMongoClientProvider: FactoryProvider = {
+  provide: MONGO_CLIENT,
+  useFactory: createMongoClient,
+  inject: [ConfigService],
+};
+
+/** The ingester's database. It creates no indexes: the API and the Lambdas own them. */
+export const ingesterMongoDBProvider: FactoryProvider = {
+  provide: MONGODB_DATABASE,
+  useFactory: (mongoClient: MongoClient, config: ConfigService<MongoEnv, true>) =>
+    mongoClient.db(config.get('MONGODB_DATABASE', { infer: true })),
   inject: [MONGO_CLIENT, ConfigService],
 };

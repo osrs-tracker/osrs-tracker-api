@@ -31,26 +31,31 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
   read with `forceFetch`: it shares the fetch in flight per key and doesn't cache a rejection, so don't add a pending
   map beside it; to keep a stale value on failure, return it from `fetchMethod` (setting `options.ttl` for the retry
   delay).
-- `MongoModule` is global, retries the initial connect (12 x 10s, a standalone `RetryPolicy`, sized against the
-  `startupProbe` in `osrs-tracker-api.yaml`: change both together) and closes the client on shutdown (bounded to 5s).
-  New indexes go in `mongo.provider.ts`, the only place the API creates indexes (never per request). `/healthy` only
-  answers once bootstrap, including the Mongo connect, is done (the metrics server starts listening then, which is what
-  the `startupProbe` waits for); after that it stays liveness only and never checks Mongo.
+- `MongoModule` is global and closes the client on shutdown (bounded to 5s). The API's, `MongoModule.forApi()`, retries
+  the initial connect (12 x 10s, a standalone `RetryPolicy`, sized against the `startupProbe` in
+  `osrs-tracker-api.yaml`: change both together). New indexes go in `mongo.provider.ts`, the only place the API creates
+  indexes (never per request); the ingester's, `MongoModule.forIngester()`, creates none and doesn't connect at startup
+  (see The ingester). `/healthy` only answers once bootstrap, including the Mongo connect, is done (the metrics server
+  starts listening then, which is what the `startupProbe` waits for); after that it stays liveness only and never checks
+  Mongo.
 - Collection names are constants in `common/mongo/collections.ts` (never a string literal); a service opens its
   collection once, in its constructor. The collections, their fields, writers and index owners are described in
   osrs-tracker-aws's [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new
   or changed index or stored field also needs an update there: open an issue in osrs-tracker-aws.
 - Env: `.env.example` lists the vars, `.env` holds local values (points at prod). In the cluster they come from the
   `aws-mongodb-credentials` secret (the `MONGODB_*` vars and `OSRS_API_BASE_URL`; its template is
-  `cluster/osrs-tracker/secrets.example.yaml` in `../home-cluster`, and the user applies it, never this repo), with the
-  `env:` block in `osrs-tracker-api.yaml` setting `CORS_ORIGIN` and overriding `OSRS_API_BASE_URL` (an API Gateway proxy
-  to `https://secure.runescape.com` that passes Jagex's headers through). `validateEnv` (`src/config/env.ts`,
+  `cluster/osrs-tracker/secrets.example.yaml` in `../fremen-cluster`, and the user applies it, never this repo), with
+  the `env:` block in `osrs-tracker-api.yaml` setting `CORS_ORIGIN` and overriding `OSRS_API_BASE_URL` (an API Gateway
+  proxy to `https://secure.runescape.com` that passes Jagex's headers through). `validateEnv` (`src/config/env.ts`,
   `ConfigModule`'s `validate` in `AppModule`) checks and types them at startup; read them with
   `ConfigService<Env, true>` (`config.get('X', { infer: true })`), never `process.env`. A new var goes in `Env`,
   `validateEnv`, its spec and `.env.example`; a required one also in `app.e2e.spec.ts`'s `vi.stubEnv` calls (validation
   runs when `AppModule` is imported) and in the cluster: the `env:` block for a plain value, or, for a secret, an issue
-  in home-cluster for the secret's template plus asking the user to apply it.
-- Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert).
+  in fremen-cluster for the secret's template plus asking the user to apply it. The ingester's are `IngesterEnv` and
+  `validateIngesterEnv`, in the same file and spec, from the same secret plus `osrs-tracker-ingester` (`.env.example`'s
+  last section).
+- Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert), until
+  the ingester takes their writes over (roadmap osrs-tracker/osrs-tracker-aws#162).
 - `npm run build` (`nest build -b rspack`, configured by `rspack.config.js`) bundles `node_modules` into `dist/` (only
   `sharp` is external; the image ships just `dist/` plus `sharp`, which the `Dockerfile` installs at the exact version
   `package.json` pins: keep it exact, with no `^`). It compiles with SWC and type checks with
@@ -195,11 +200,41 @@ on the stored document inside the pipeline (like prepending the initial entry on
 offset), never from a read made before the update, and treat `matchedCount` (or `upsertedCount`) as success, never
 `modifiedCount`, which is 0 when the second update writes the same values.
 
+## The ingester
+
+`src/ingest.ts` (`node ingest`, the `osrs-tracker-ingester` Deployment) applies the scraping Lambdas' results
+(`ScrapeResultMessage` from models, `v: 1`) from the SQS FIFO queue `osrs-tracker_scrape-results.fifo` to MongoDB. Its
+writes are process-players' and record-player-count's, ported; the hiscore and not-found writes, the slot guard and the
+player count upsert are pure builders in `ingester/scrape-results.ts`, so they're tested without Mongo.
+
+- One consumer: `replicas: 1` and `strategy: Recreate`. Never import `IngesterModule` or a `ScheduleModule` into
+  `AppModule`: the API runs 2 replicas, and each would run the jobs.
+- Order: apply a batch one message at a time, in receive order, delete each only after its write, and stop at the first
+  failure (`applyInOrder`): never in parallel and never past a failed message, since a later entry stored first makes
+  the guard drop the earlier one for good. A message `parseScrapeResult` rejects (an unknown `v`) is never deleted: it
+  ends in the dead-letter queue.
+- Every hiscore prepend carries the slot guard (`hiscoreEntryUpdate`): it matches nothing when the player has an entry
+  for the offset since the start of its scrape slot (`slotStart`), which counts as stale and is still acknowledged.
+  Every write must be safe to repeat, since a message that failed halfway comes back whole: the guard covers entries,
+  `$setOnInsert` the player counts.
+- Dates in messages are ISO strings: `new Date()` them before encoding, storing or comparing. Use the scrape time
+  (`scrapedAt`), never the time of applying, for entries, layouts' `since` and the not-found streak, so a drained
+  backlog lands where it would have.
+- Mongo is pinged (and connected, `client.connect()`) before every receive, and nothing is received while that fails:
+  every receive counts towards the dead-letter limit. `/healthy` is the poll loop's progress (`HEARTBEAT_MAX_AGE_MS`),
+  never Mongo or SQS.
+- It doesn't call `logOutgoingRequests`: that logs every `fetch` URL in full, and its one `fetch`, the Discord webhook
+  (`DiscordAlerts`), has its token in the URL. Never log `WEBHOOK_URL`.
+- Metrics (`IngesterMetrics`): `ingester_job_last_success_timestamp_seconds{job}` after each completed job (`ingest`: a
+  poll cycle without a failure, empty or not), `ingester_messages_total{type,result}`.
+- Both Deployments run the same image: CD's digest commit updates both `image:` lines and fails unless it changed two.
+
 ## Pausing and resuming players
 
 The full contract with the `process-players` Lambda (which pauses players whose hiscores keep 404ing) is in
-[`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). The API's side, in
-`refreshPlayerInfo`:
+[`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md); the ingester takes the
+Lambda's side over once process-players sends its not-found players (osrs-tracker/osrs-tracker-aws#166). The API's side,
+in `refreshPlayerInfo`:
 
 - Success: resume in the same update — merge `pausedScrapingOffsets` into `scrapingOffsets`, unset it,
   `hiscoreNotFoundSince` and `hiscoreNotFoundCount`.
@@ -288,8 +323,9 @@ agent.
   an interceptor or a shared provider (`src/common/`), not only in a caller.
 - Rules that span files, checked against the whole diff: a new index and `mongo.provider.ts`; a GET route and its
   `Cache-Control`; a GET's `Cache-Control` outcomes and `CASES` in `src/app.e2e.spec.ts`; a route's statuses and its
-  handler's JSDoc; a protected rule and its spec; a new env var and `Env`/`validateEnv`/`.env.example`; a change that
-  needs an entry under `CLAUDE.md`'s changelog rule and `CHANGELOG.md`.
+  handler's JSDoc; a protected rule and its spec; a new env var and `Env`/`validateEnv`/`.env.example` (the ingester's:
+  `IngesterEnv`/`validateIngesterEnv`); a new `image:` line in `osrs-tracker-api.yaml` and the count `deploy.yml`
+  checks; a change that needs an entry under `CLAUDE.md`'s changelog rule and `CHANGELOG.md`.
 - **breaks** here also covers: corrupts stored data, makes the web app refetch on hydration. A typical **check**:
   behaviour against production data, or the Lambdas in `../osrs-tracker-aws` (name the query or the Lambda to verify).
 
@@ -322,15 +358,15 @@ nothing) and with the expected counts.
 ## Deploy
 
 **Deploying is merging to `main`.** Never build, push or `kubectl apply` by hand: Flux in the cluster (set up in
-`../home-cluster`, `cluster/osrs-tracker/flux.yaml`) applies `osrs-tracker-api.yaml` from `main` and reverts manual
+`../fremen-cluster`, `cluster/osrs-tracker/flux.yaml`) applies `osrs-tracker-api.yaml` from `main` and reverts manual
 changes within 10 minutes.
 
 1. When `CI` passes on a push to `main` whose `build` job ran, `.github/workflows/deploy.yml` builds the image, pushes
-   it to Docker Hub as `freekmencke/osrs-tracker-api:latest` and `:<commit sha>`, and commits the digest to the `image:`
-   line as `chore(deploy): deploy sha256:<first 8>` (pushed with the `DEPLOY_KEY` deploy key, which bypasses the PR
-   rule). Pushes without source or image changes (docs) skip `build` and so don't deploy; pushes that only change
-   `osrs-tracker-api.yaml` (digest commits, rollbacks) don't run CI at all. Changes under `.github/` count as source:
-   merging them rebuilds and redeploys the same code.
+   it to Docker Hub as `freekmencke/osrs-tracker-api:latest` and `:<commit sha>`, and commits the digest to both
+   `image:` lines (the API's and the ingester's) as `chore(deploy): deploy sha256:<first 8>` (pushed with the
+   `DEPLOY_KEY` deploy key, which bypasses the PR rule). Pushes without source or image changes (docs) skip `build` and
+   so don't deploy; pushes that only change `osrs-tracker-api.yaml` (digest commits, rollbacks) don't run CI at all.
+   Changes under `.github/` count as source: merging them rebuilds and redeploys the same code.
 2. Flux applies that commit within a minute and reports the rollout as the `Flux / sync` commit status (failures also
    reach Discord). Flux applies `main`'s tip, so a push right after the digest commit gets the status instead; the
    workflow then takes it from `main`'s tip when that contains the digest commit (same logic as osrs-tracker-web's
