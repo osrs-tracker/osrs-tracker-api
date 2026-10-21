@@ -12,3 +12,5 @@ export const NEWS_COLLECTION = 'news';
 export const PLAYER_COUNTS_COLLECTION = 'playerCounts';
 /** One document per UTC day of player count averages and peak, recomputed by osrs-tracker-aws after every sample. */
 export const PLAYER_COUNTS_DAILY_COLLECTION = 'playerCountsDaily';
+/** One document per ingester job, `_id` its name, with when it last succeeded (`JobRunsService`). */
+export const JOB_RUNS_COLLECTION = 'jobRuns';

@@ -21,3 +21,16 @@ export const HEARTBEAT_MAX_AGE_MS = 5 * MINUTE;
 
 /** Bounds each SQS request: the long poll plus a margin. The SDK retries a timed-out request (3 attempts in all). */
 export const SQS_REQUEST_TIMEOUT_MS = (WAIT_TIME_SECONDS + 10) * 1000;
+
+/** The subscriptions sync's schedule, in UTC, and the interval it amounts to (`JobRunsService.catchUp`): change both. */
+export const SUBSCRIPTIONS_SYNC_CRON = '*/15 * * * *';
+export const SUBSCRIPTIONS_SYNC_INTERVAL_MS = 15 * MINUTE;
+
+/**
+ * The gap after each write to the subscriptions table: 4 writes a second against its 5 WCU (an item is well under 1 KB,
+ * so one unit), which the first fill's ~520 puts would otherwise exceed. The SDK retries a throttled write.
+ */
+export const SUBSCRIPTION_WRITE_GAP_MS = 250;
+
+/** Bounds each DynamoDB request, so a hung one can't hold the sync (and with it every later run) forever. */
+export const DYNAMODB_REQUEST_TIMEOUT_MS = 10_000;

@@ -26,6 +26,18 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
     pod. Metrics: `ingester_job_last_success_timestamp_seconds{job="ingest"}` and `ingester_messages_total`.
   - Nothing reaches the queue until the Lambdas send their results (osrs-tracker/osrs-tracker-aws#165). Until then it
     logs one empty poll a minute (#203).
+- The ingester keeps the DynamoDB table `osrs-tracker_subscriptions` a copy of `players.scrapingOffsets`, every 15
+  minutes. queue-players will read who to scrape from it (osrs-tracker/osrs-tracker-aws#164), since it can't reach a
+  database in the cluster, and scraping goes on from the last copy while the cluster is down (#204).
+  - Each run reads every player and the whole table first, then puts each player whose offsets differ or who's missing
+    and deletes each item without a player to scrape (gone, or paused, or no offsets left): whole items, never deltas,
+    so a run repairs what the last one missed. Offset 12 isn't written, since queue-players queues it with -12.
+  - A mass-delete guard: when MongoDB returns no players, or over 10% of the items would go, the deletes are skipped,
+    with a warning and a Discord alert, so an empty or wrong database can't empty the table and stop all scraping.
+  - Writes are paced to 4 a second against the table's 5 WCU (the first fill is about 540 puts).
+  - Scheduled jobs (`@nestjs/schedule`, in the ingester only) store their last success in a new `jobRuns` collection and
+    run on boot when overdue, since Nest doesn't replay runs missed while the pod was down; a shutdown stops a run at
+    its next write. Metric: `ingester_job_last_success_timestamp_seconds{job="subscriptions"}`.
 
 ### Behind the scenes
 

@@ -1,8 +1,8 @@
 import { Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { Counter, Gauge, register } from '@osrs-tracker/express-metrics';
 
-/** The ingester's jobs: `ingest` is the poll loop. */
-export type IngesterJob = 'ingest';
+/** The ingester's jobs: `ingest` is the poll loop, `subscriptions` the sync to DynamoDB (`SubscriptionsSyncService`). */
+export type IngesterJob = 'ingest' | 'subscriptions';
 
 /** A message's `type`, `unknown` when it couldn't be parsed. */
 export type MessageType = 'hiscores' | 'playerCount' | 'unknown';
@@ -21,7 +21,7 @@ export class IngesterMetrics implements OnModuleInit, OnApplicationShutdown {
   onModuleInit(): void {
     this.jobLastSuccess = new Gauge({
       name: METRICS.jobLastSuccess,
-      help: 'When an ingester job last completed, in Unix seconds: for ingest, a poll cycle, empty or not',
+      help: 'When an ingester job last completed, in Unix seconds: for ingest, a poll cycle, empty or not; for the others, a run',
       labelNames: ['job'],
     });
     this.messages = new Counter({
@@ -35,8 +35,8 @@ export class IngesterMetrics implements OnModuleInit, OnApplicationShutdown {
     for (const name of Object.values(METRICS)) register.removeSingleMetric(name);
   }
 
-  jobSucceeded(job: IngesterJob): void {
-    this.jobLastSuccess?.set({ job }, Date.now() / 1000);
+  jobSucceeded(job: IngesterJob, at = new Date()): void {
+    this.jobLastSuccess?.set({ job }, at.getTime() / 1000);
   }
 
   message(type: MessageType, result: 'applied' | 'stale' | 'failed'): void {

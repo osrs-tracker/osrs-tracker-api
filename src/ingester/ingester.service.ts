@@ -6,6 +6,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { MONGO_CLIENT, MONGODB_DATABASE } from '../common/mongo/mongo.provider';
 import { IngesterEnv } from '../config/env';
 import { applyInOrder } from './apply-in-order';
+import { awsClientConfig } from './aws';
 import {
   HEARTBEAT_MAX_AGE_MS,
   MAX_MESSAGES,
@@ -43,11 +44,7 @@ export class IngesterService implements OnApplicationBootstrap, BeforeApplicatio
   ) {
     this.queueUrl = config.get('SCRAPE_RESULTS_QUEUE_URL', { infer: true });
     this.sqs = new SQSClient({
-      region: config.get('AWS_REGION', { infer: true }),
-      credentials: {
-        accessKeyId: config.get('AWS_ACCESS_KEY_ID', { infer: true }),
-        secretAccessKey: config.get('AWS_SECRET_ACCESS_KEY', { infer: true }),
-      },
+      ...awsClientConfig(config),
       requestHandler: { connectionTimeout: 5_000, requestTimeout: SQS_REQUEST_TIMEOUT_MS },
     });
   }

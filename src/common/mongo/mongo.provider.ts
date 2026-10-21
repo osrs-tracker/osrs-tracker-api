@@ -148,7 +148,8 @@ export const mongoDBProvider: FactoryProvider = {
 
 /**
  * The ingester's client, not connected at startup, so the ingester starts during a Mongo outage. Its poll loop connects
- * it before each receive (`IngesterService`): a failed connect leaves the client closed, and only an explicit
+ * it before each receive (`IngesterService`), and `JobRunsService` before each job: a failed connect leaves the client
+ * closed, and only an explicit
  * `connect()` opens it again, not the driver's connect on first use.
  */
 export const ingesterMongoClientProvider: FactoryProvider = {

@@ -55,7 +55,8 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
   by `main.ts` and the e2e spec (`app-options.ts`, the route conflict policy).
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.
 - `src/ingest.ts` and `src/ingester/`: the ingester (`node ingest`, the `osrs-tracker-ingester` Deployment): the poll
-  loop (`ingester.service.ts`), the writes and the slot guard (`scrape-results.ts`), its env (`IngesterEnv` in
+  loop (`ingester.service.ts`), the writes and the slot guard (`scrape-results.ts`), the scheduled jobs
+  (`job-runs.service.ts`) and the DynamoDB subscriptions sync (`subscriptions*.ts`), its env (`IngesterEnv` in
   `config/env.ts`) and `MongoModule.forIngester()`.
 - Build and runtime: `rspack.config.js` (bundling), `Dockerfile` (image, `sharp` beside the bundle), `vitest.config.mjs`
   (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies: both Deployments, which CD gives the same
