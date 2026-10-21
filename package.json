@@ -31,12 +31,15 @@
     "lint:ci": "eslint \"src/**/*.ts\""
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1154.0",
     "@aws-sdk/client-sqs": "^3.1154.0",
+    "@aws-sdk/lib-dynamodb": "^3.1154.0",
     "@nestjs/common": "^12.1.3",
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.1.3",
     "@nestjs/platform-express": "^12.1.3",
     "@nestjs/resilience": "0.0.2",
+    "@nestjs/schedule": "^12.0.2",
     "@osrs-tracker/express-metrics": "^0.2.0",
     "@osrs-tracker/hiscores": "^6.0.0",
     "@osrs-tracker/logger": "^0.3.0",
@@ -53,6 +56,7 @@
     "undici": "^8.12.1"
   },
   "devDependencies": {
+    "@aws-sdk/util-dynamodb": "^3.996.9",
     "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^12.0.8",
     "@nestjs/schematics": "^12.0.7",

@@ -225,8 +225,19 @@ player count upsert are pure builders in `ingester/scrape-results.ts`, so they'r
   never Mongo or SQS.
 - It doesn't call `logOutgoingRequests`: that logs every `fetch` URL in full, and its one `fetch`, the Discord webhook
   (`DiscordAlerts`), has its token in the URL. Never log `WEBHOOK_URL`.
+- Scheduled jobs are `@Cron(…, { timeZone: 'UTC', waitForCompletion: true })` handlers in `IngesterModule`'s providers
+  (its `ScheduleModule`), never `@Interval` (a slow run would overlap), and run through `JobRunsService`: `run` joins a
+  run in progress, connects Mongo, stores the success in `jobRuns` and sets the metric; each job also calls `catchUp`
+  from `onApplicationBootstrap` (Nest doesn't replay missed runs). A task checks its `AbortSignal` between writes, so a
+  shutdown stops it within the 60 s grace period.
+- The subscriptions sync (`SubscriptionsSyncService`, every 15 minutes) is the only writer of the DynamoDB table
+  `osrs-tracker_subscriptions`, which queue-players reads: whole items per player (`diffSubscriptions` in
+  `subscriptions.ts`), `scrapingOffsets` as a `Set` (lib-dynamodb writes an array as a List, and a Number Set can't be
+  empty, so no offsets means no item), never offset 12, never ADD/REMOVE deltas. Keep `deleteGuard`: an empty or wrong
+  database must never empty the table. The IAM user allows Scan, PutItem and DeleteItem only (no BatchWriteItem).
 - Metrics (`IngesterMetrics`): `ingester_job_last_success_timestamp_seconds{job}` after each completed job (`ingest`: a
-  poll cycle without a failure, empty or not), `ingester_messages_total{type,result}`.
+  poll cycle without a failure, empty or not; a scheduled job: a run, and at startup its stored last success),
+  `ingester_messages_total{type,result}`.
 - Both Deployments run the same image: CD's digest commit updates both `image:` lines and fails unless it changed two.
 
 ## Pausing and resuming players

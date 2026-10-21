@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AgentModule } from '../common/agent/agent.module';
 import { MongoModule } from '../common/mongo/mongo.module';
 import { validateIngesterEnv } from '../config/env';
@@ -8,7 +9,9 @@ import { DiscordAlerts } from './discord-alerts';
 import { IngesterHealthController } from './ingester-health.controller';
 import { IngesterMetrics } from './ingester-metrics';
 import { IngesterService } from './ingester.service';
+import { JobRunsService } from './job-runs.service';
 import { ScrapeResultsService } from './scrape-results.service';
+import { SubscriptionsSyncService } from './subscriptions-sync.service';
 
 /**
  * The ingester's root module (`ingest.ts`). Its only routes are `/healthy` and `/metrics`, on `METRICS_PORT`. Never
@@ -19,8 +22,17 @@ import { ScrapeResultsService } from './scrape-results.service';
     ConfigModule.forRoot({ isGlobal: true, validate: validateIngesterEnv }),
     AgentModule,
     MongoModule.forIngester(),
+    ScheduleModule.forRoot(),
   ],
   controllers: [IngesterHealthController],
-  providers: [IngesterMetrics, DiscordAlerts, HiscoreLayoutsService, ScrapeResultsService, IngesterService],
+  providers: [
+    IngesterMetrics,
+    DiscordAlerts,
+    HiscoreLayoutsService,
+    ScrapeResultsService,
+    IngesterService,
+    JobRunsService,
+    SubscriptionsSyncService,
+  ],
 })
 export class IngesterModule {}
