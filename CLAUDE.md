@@ -1,7 +1,8 @@
 # osrs-tracker-api
 
-NestJS + MongoDB Atlas (native driver) API, deployed to Kubernetes at https://osrs-tracker-api.freekmencke.com. Main
-consumer: the Angular SSR app in `../osrs-tracker-web`; `../osrs-tracker-aws` Lambdas also write to the same database;
+NestJS + MongoDB Atlas (native driver) API, deployed to Kubernetes at https://osrs-tracker-api.freekmencke.com, plus the
+ingester, a second entrypoint of the same image that applies the scraping Lambdas' results from SQS. Main consumer: the
+Angular SSR app in `../osrs-tracker-web`; `../osrs-tracker-aws` Lambdas also write to the same database;
 `../osrs-tracker-packages` publishes the `@osrs-tracker/*` packages. `../<repo>` in these docs (and the skill and
 agents) means a sibling of the main checkout; from a worktree in `.claude/worktrees/<name>/` that's
 `../../../../<repo>`.
@@ -53,10 +54,13 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 - `src/config/`: the env, validated at startup (`env.ts`, read through `ConfigService`), CORS and the app options shared
   by `main.ts` and the e2e spec (`app-options.ts`, the route conflict policy).
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.
+- `src/ingest.ts` and `src/ingester/`: the ingester (`node ingest`, the `osrs-tracker-ingester` Deployment): the poll
+  loop (`ingester.service.ts`), the writes and the slot guard (`scrape-results.ts`), its env (`IngesterEnv` in
+  `config/env.ts`) and `MongoModule.forIngester()`.
 - Build and runtime: `rspack.config.js` (bundling), `Dockerfile` (image, `sharp` beside the bundle), `vitest.config.mjs`
-  (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies, with the Traefik rate-limit and compress
-  Middlewares); `.github/workflows/` `CI` (`nodejs.yml`), `CD` (`deploy.yml`) and `zizmor` (the workflows' security
-  audit; findings ignored inline), `.github/dependabot.yml`.
+  (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies: both Deployments, which CD gives the same
+  image digest, and the Traefik rate-limit and compress Middlewares); `.github/workflows/` `CI` (`nodejs.yml`), `CD`
+  (`deploy.yml`) and `zizmor` (the workflows' security audit; findings ignored inline), `.github/dependabot.yml`.
 - `.claude/agents/conventions-reviewer.md` reviews diffs against the skill (its `## Review rules`) and this file, its
   Bash limited to one git, gh or grep read command per call by `.claude/hooks/read-only-bash.sh` (byte-identical across
   the four osrs-tracker repos: change it here, and through an issue in each of osrs-tracker-aws, osrs-tracker-web and

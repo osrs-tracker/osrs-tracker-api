@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateEnv } from './env';
+import { validateEnv, validateIngesterEnv } from './env';
 
 const VALID = {
   MONGODB_URI: 'mongodb+srv://cluster.example.net',
@@ -53,6 +53,32 @@ describe('validateEnv', () => {
   it('rejects a base URL without a protocol', () => {
     expect(() => validateEnv({ ...VALID, OSRS_API_BASE_URL: 'runescape-api.freekmencke.com/rs' })).toThrow(
       'OSRS_API_BASE_URL must start with https:// or http://.',
+    );
+  });
+});
+
+describe('validateIngesterEnv', () => {
+  const MONGO = Object.fromEntries(Object.entries(VALID).filter(([name]) => name.startsWith('MONGODB_')));
+  const INGESTER = {
+    ...MONGO,
+    AWS_REGION: 'eu-central-1',
+    AWS_ACCESS_KEY_ID: 'AKIAEXAMPLE',
+    AWS_SECRET_ACCESS_KEY: 'secret',
+    SCRAPE_RESULTS_QUEUE_URL: 'https://sqs.eu-central-1.amazonaws.com/123456789012/osrs-tracker_scrape-results.fifo',
+    WEBHOOK_URL: 'https://discord.com/api/webhooks/1/token',
+  };
+
+  it("needs the Mongo, AWS and webhook values but not the API's", () => {
+    expect(validateIngesterEnv(INGESTER)).toEqual({ ...INGESTER, METRICS_PORT: 9090 });
+  });
+
+  it.each(Object.keys(INGESTER))('throws when %s is missing', (name) => {
+    expect(() => validateIngesterEnv({ ...INGESTER, [name]: '' })).toThrow(`- ${name} is required.`);
+  });
+
+  it('rejects URLs that are not https', () => {
+    expect(() => validateIngesterEnv({ ...INGESTER, WEBHOOK_URL: 'http://discord.com/api/webhooks/1/token' })).toThrow(
+      'WEBHOOK_URL must start with https://.',
     );
   });
 });

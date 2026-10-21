@@ -1,21 +1,40 @@
-import { Global, Inject, Logger, Module, OnApplicationShutdown } from '@nestjs/common';
+import { DynamicModule, Global, Inject, Logger, Module, OnApplicationShutdown, Provider } from '@nestjs/common';
 import { MongoClient } from 'mongodb';
 import { setTimeout } from 'node:timers/promises';
 import { MONGO_LOG_CONTEXT } from '../logger/nest-logger';
-import { MONGO_CLIENT, mongoClientProvider, mongoDBProvider } from './mongo.provider';
+import {
+  ingesterMongoClientProvider,
+  ingesterMongoDBProvider,
+  MONGO_CLIENT,
+  mongoClientProvider,
+  MONGODB_DATABASE,
+  mongoDBProvider,
+} from './mongo.provider';
 
 /** Bounds closing the client on shutdown, so an unreachable Atlas can't keep a terminating pod alive. */
 const CLOSE_TIMEOUT_MS = 5_000;
 
+/** `MONGO_CLIENT` and `MONGODB_DATABASE` for every module, closing the client on shutdown. */
 @Global()
-@Module({
-  providers: [mongoClientProvider, mongoDBProvider],
-  exports: [mongoClientProvider, mongoDBProvider],
-})
+@Module({})
 export class MongoModule implements OnApplicationShutdown {
   private readonly logger = new Logger(MONGO_LOG_CONTEXT);
 
   constructor(@Inject(MONGO_CLIENT) private readonly client: MongoClient) {}
+
+  /** The API's: connected at startup, with the indexes ensured. */
+  static forApi(): DynamicModule {
+    return MongoModule.with(mongoClientProvider, mongoDBProvider);
+  }
+
+  /** The ingester's: connected by its poll loop, without indexes. */
+  static forIngester(): DynamicModule {
+    return MongoModule.with(ingesterMongoClientProvider, ingesterMongoDBProvider);
+  }
+
+  private static with(...providers: Provider[]): DynamicModule {
+    return { module: MongoModule, providers, exports: [MONGO_CLIENT, MONGODB_DATABASE] };
+  }
 
   /**
    * Runs after the HTTP server has finished its requests, so none is cut off mid-query. Doesn't throw: Nest exits the

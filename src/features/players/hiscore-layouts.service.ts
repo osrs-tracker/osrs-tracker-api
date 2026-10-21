@@ -39,9 +39,11 @@ export class HiscoreLayoutsService {
   /**
    * Stores the layout for `names` if it's new (call before writing the entry that uses it) and returns it. Throws when
    * a stored layout with the same id has other names (a hash collision).
+   *
+   * @param since Stored only when the layout is new: the scrape time of the first entry that uses it.
    */
-  async ensure(names: HiscoreLayoutNames): Promise<HiscoreLayout> {
-    const layout = createHiscoreLayout(names, new Date());
+  async ensure(names: HiscoreLayoutNames, since = new Date()): Promise<HiscoreLayout> {
+    const layout = createHiscoreLayout(names, since);
     const cached = this.cache.get(layout._id);
     if (cached && sameNames(cached, names)) return cached;
 

@@ -122,9 +122,10 @@ jobs:
           DIGEST: ${{ steps.image.outputs.digest }}
         run: |
           case "$DIGEST" in sha256:*) ;; *) echo "::error::Unexpected digest '$DIGEST'"; exit 1 ;; esac
+          # Two image lines, one image: the API's Deployment and the ingester's
           sed -i -E "s#^([[:space:]]*image: $IMAGE)@sha256:[0-9a-f]+\$#\1@$DIGEST#" osrs-tracker-api.yaml
-          if [ "$(grep -c "image: $IMAGE@$DIGEST\$" osrs-tracker-api.yaml)" != 1 ]; then
-            echo "::error::Couldn't set the image line in osrs-tracker-api.yaml"
+          if [ "$(grep -c "image: $IMAGE@$DIGEST\$" osrs-tracker-api.yaml)" != 2 ]; then
+            echo "::error::Couldn't set both image lines in osrs-tracker-api.yaml"
             exit 1
           fi
           if git diff --quiet; then
