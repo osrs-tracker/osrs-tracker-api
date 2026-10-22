@@ -32,9 +32,9 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
   map beside it; to keep a stale value on failure, return it from `fetchMethod` (setting `options.ttl` for the retry
   delay).
 - `MongoModule` is global and closes the client on shutdown (bounded to 5s). The API's, `MongoModule.forApi()`, retries
-  the initial connect (12 x 10s, a standalone `RetryPolicy`, sized against the `startupProbe` in
-  `osrs-tracker-api.yaml`: change both together). New indexes go in `mongo.provider.ts`, the only place the API creates
-  indexes (never per request); the ingester's, `MongoModule.forIngester()`, doesn't connect at startup (see The
+  the initial connect (6 attempts of up to 30s, 10s apart, a standalone `RetryPolicy`, sized against the `startupProbe`
+  in `osrs-tracker-api.yaml`: change both together). New indexes go in `mongo.provider.ts`, the only place the API
+  creates indexes (never per request); the ingester's, `MongoModule.forIngester()`, doesn't connect at startup (see The
   ingester), and its poll loop creates the ingester's own indexes (`ScrapeResultsService.ensureIndexes`, the player
   count collections) once Mongo answers. `/healthy` only answers once bootstrap, including the Mongo connect, is done
   (the metrics server starts listening then, which is what the `startupProbe` waits for); after that it stays liveness

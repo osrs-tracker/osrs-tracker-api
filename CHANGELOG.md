@@ -22,6 +22,13 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 - `DATA-MODEL.md` (who writes each field and owns each index) moved here from osrs-tracker-aws, since every MongoDB
   writer now lives in this repo.
 
+### MongoDB
+
+- Queries wait up to 30 s for a server instead of 10 s, so the API and the ingester ride out a restart of the in-cluster
+  MongoDB (a single-member replica set, 14 to 30 s without a server, e.g. on an upgrade): requests slow down instead of
+  failing (#212). The API's startup connect now makes 6 attempts instead of 12, so its worst case stays at 230 s, inside
+  the `startupProbe`.
+
 ## 2026-10-21
 
 ### Items

@@ -11,20 +11,22 @@ export const MONGODB_DATABASE = 'MONGODB_DATABASE';
 
 const logger = new Logger(MONGO_LOG_CONTEXT);
 
-export const MAX_CONNECT_ATTEMPTS = 12;
+export const MAX_CONNECT_ATTEMPTS = 6;
 export const RETRY_DELAY_MS = 10_000;
 /**
- * Bounds each connect attempt (the driver's default is 30s), and how long a query waits for a server: long enough to
- * ride out an Atlas primary election, which usually takes a few seconds.
+ * How long a query waits for a server, and so bounds each connect attempt: long enough to ride out a restart of the
+ * single-member replica set (14 to 30s, e.g. a MongoDB upgrade), during which there is no server. A read or write the
+ * restart cuts off is retried once (the driver's `retryReads`/`retryWrites`), with the same wait. The driver's default,
+ * set here so the connect retry below is sized against it.
  */
-const SERVER_SELECTION_TIMEOUT_MS = 10_000;
+const SERVER_SELECTION_TIMEOUT_MS = 30_000;
 
 /**
  * Retries the initial connect, so the API survives cluster DNS not being ready yet (e.g. right after a node reboot)
- * instead of crash-looping. Worst case 12 attempts of up to 10s with 10s between them: 230s, which the `startupProbe` in
- * osrs-tracker-api.yaml allows for. A standalone `RetryPolicy` (the provider runs before any service): a backoff
- * function gives a constant delay without jitter, and its events don't reach `ResilienceEventsListener`, so the warn
- * line is the record.
+ * instead of crash-looping. Worst case 6 attempts of up to 30s with 10s between them: 230s, which the `startupProbe` in
+ * osrs-tracker-api.yaml allows for: raising either means raising its `failureThreshold`. A standalone `RetryPolicy` (the
+ * provider runs before any service): a backoff function gives a constant delay without jitter, and its events don't
+ * reach `ResilienceEventsListener`, so the warn line is the record.
  */
 export function connectWithRetry(createClient: () => MongoClient): Promise<MongoClient> {
   const retry = new RetryPolicy({
