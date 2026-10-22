@@ -56,8 +56,11 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 - `src/app-metrics.*` the metrics and `/healthy` server on `METRICS_PORT` (9090), not exposed publicly.
 - `src/ingest.ts` and `src/ingester/`: the ingester (`node ingest`, the `osrs-tracker-ingester` Deployment): the poll
   loop (`ingester.service.ts`), the writes and the slot guard (`scrape-results.ts`), the scheduled jobs
-  (`job-runs.service.ts`) and the DynamoDB subscriptions sync (`subscriptions*.ts`), its env (`IngesterEnv` in
+  (`job-runs.service.ts`): the DynamoDB subscriptions sync (`subscriptions*.ts`), the items refresh
+  (`items-refresh.service.ts`) and the hiscores clean-up (`clean-hiscores*.ts`), its env (`IngesterEnv` in
   `config/env.ts`) and `MongoModule.forIngester()`.
+- `DATA-MODEL.md`: every collection's fields, which process writes them, and each index's owner. A change to a stored
+  field or an index updates it.
 - Build and runtime: `rspack.config.js` (bundling), `Dockerfile` (image, `sharp` beside the bundle), `vitest.config.mjs`
   (tests), `osrs-tracker-api.yaml` (the Kubernetes manifest Flux applies: both Deployments, which CD gives the same
   image digest, and the Traefik rate-limit and compress Middlewares); `.github/workflows/` `CI` (`nodejs.yml`), `CD`

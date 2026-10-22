@@ -34,6 +34,8 @@ export class IngesterService implements OnApplicationBootstrap, BeforeApplicatio
   /** When the loop last finished a cycle or a message (`isAlive`). */
   private lastProgress = Date.now();
   private mongoDown = false;
+  /** Whether `ensureIndexes` succeeded since startup: it's tried after each successful ping until then. */
+  private indexesEnsured = false;
 
   constructor(
     config: ConfigService<IngesterEnv, true>,
@@ -88,6 +90,7 @@ export class IngesterService implements OnApplicationBootstrap, BeforeApplicatio
    */
   private async cycle(): Promise<boolean> {
     if (!(await this.pingMongo())) return false;
+    if (!this.indexesEnsured) await this.ensureIndexes();
 
     let messages: Message[];
     try {
@@ -151,6 +154,19 @@ export class IngesterService implements OnApplicationBootstrap, BeforeApplicatio
 
   private async delete({ ReceiptHandle }: Message): Promise<void> {
     await this.sqs.send(new DeleteMessageCommand({ QueueUrl: this.queueUrl, ReceiptHandle }));
+  }
+
+  /**
+   * Creates the ingester's indexes once Mongo answers (it isn't connected at startup), retrying each cycle until that
+   * succeeds. Receiving goes on meanwhile: the indexes already exist in every database but a new one.
+   */
+  private async ensureIndexes(): Promise<void> {
+    try {
+      await this.results.ensureIndexes();
+      this.indexesEnsured = true;
+    } catch (error) {
+      this.logger.error(`Creating the ingester's indexes failed: ${error}`);
+    }
   }
 
   /**

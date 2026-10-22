@@ -34,14 +34,16 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
 - `MongoModule` is global and closes the client on shutdown (bounded to 5s). The API's, `MongoModule.forApi()`, retries
   the initial connect (12 x 10s, a standalone `RetryPolicy`, sized against the `startupProbe` in
   `osrs-tracker-api.yaml`: change both together). New indexes go in `mongo.provider.ts`, the only place the API creates
-  indexes (never per request); the ingester's, `MongoModule.forIngester()`, creates none and doesn't connect at startup
-  (see The ingester). `/healthy` only answers once bootstrap, including the Mongo connect, is done (the metrics server
-  starts listening then, which is what the `startupProbe` waits for); after that it stays liveness only and never checks
-  Mongo.
+  indexes (never per request); the ingester's, `MongoModule.forIngester()`, doesn't connect at startup (see The
+  ingester), and its poll loop creates the ingester's own indexes (`ScrapeResultsService.ensureIndexes`, the player
+  count collections) once Mongo answers. `/healthy` only answers once bootstrap, including the Mongo connect, is done
+  (the metrics server starts listening then, which is what the `startupProbe` waits for); after that it stays liveness
+  only and never checks Mongo.
 - Collection names are constants in `common/mongo/collections.ts` (never a string literal); a service opens its
   collection once, in its constructor. The collections, their fields, writers and index owners are described in
-  osrs-tracker-aws's [`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md). A new
-  or changed index or stored field also needs an update there: open an issue in osrs-tracker-aws.
+  [`DATA-MODEL.md`](../../../DATA-MODEL.md): a new or changed index or stored field updates it in the same diff, and
+  needs an issue in osrs-tracker-aws only when a Lambda has to follow (the scrape result messages, the subscriptions
+  table).
 - Env: `.env.example` lists the vars, `.env` holds local values (points at prod). In the cluster they come from the
   `aws-mongodb-credentials` secret (the `MONGODB_*` vars and `OSRS_API_BASE_URL`; its template is
   `cluster/osrs-tracker/secrets.example.yaml` in `../fremen-cluster`, and the user applies it, never this repo), with
@@ -54,8 +56,8 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
   in fremen-cluster for the secret's template plus asking the user to apply it. The ingester's are `IngesterEnv` and
   `validateIngesterEnv`, in the same file and spec, from the same secret plus `osrs-tracker-ingester` (`.env.example`'s
   last section).
-- Lambdas in `../osrs-tracker-aws` also write to `players` (hiscore entries, pausing) and `items` (hourly upsert), until
-  the ingester takes their writes over (roadmap osrs-tracker/osrs-tracker-aws#162).
+- No Lambda writes to MongoDB: the ingester applies the scraping Lambdas' results and runs the jobs that were Lambdas
+  (roadmap osrs-tracker/osrs-tracker-aws#162).
 - `npm run build` (`nest build -b rspack`, configured by `rspack.config.js`) bundles `node_modules` into `dist/` (only
   `sharp` is external; the image ships just `dist/` plus `sharp`, which the `Dockerfile` installs at the exact version
   `package.json` pins: keep it exact, with no `^`). It compiles with SWC and type checks with
@@ -203,9 +205,10 @@ offset), never from a read made before the update, and treat `matchedCount` (or 
 ## The ingester
 
 `src/ingest.ts` (`node ingest`, the `osrs-tracker-ingester` Deployment) applies the scraping Lambdas' results
-(`ScrapeResultMessage` from models, `v: 1`) from the SQS FIFO queue `osrs-tracker_scrape-results.fifo` to MongoDB. Its
-writes are process-players' and record-player-count's, ported; the hiscore and not-found writes, the slot guard and the
-player count upsert are pure builders in `ingester/scrape-results.ts`, so they're tested without Mongo.
+(`ScrapeResultMessage` from models, `v: 1`) from the SQS FIFO queue `osrs-tracker_scrape-results.fifo` to MongoDB, and
+runs the scheduled jobs. Its writes are process-players', record-player-count's, refresh-items' and clean-hiscores',
+ported; the hiscore and not-found writes, the slot guard and the player count upsert are pure builders in
+`ingester/scrape-results.ts`, so they're tested without Mongo.
 
 - One consumer: `replicas: 1` and `strategy: Recreate`. Never import `IngesterModule` or a `ScheduleModule` into
   `AppModule`: the API runs 2 replicas, and each would run the jobs.
@@ -223,8 +226,9 @@ player count upsert are pure builders in `ingester/scrape-results.ts`, so they'r
 - Mongo is pinged (and connected, `client.connect()`) before every receive, and nothing is received while that fails:
   every receive counts towards the dead-letter limit. `/healthy` is the poll loop's progress (`HEARTBEAT_MAX_AGE_MS`),
   never Mongo or SQS.
-- It doesn't call `logOutgoingRequests`: that logs every `fetch` URL in full, and its one `fetch`, the Discord webhook
-  (`DiscordAlerts`), has its token in the URL. Never log `WEBHOOK_URL`.
+- It doesn't call `logOutgoingRequests`: that logs every `fetch` URL in full, and the Discord webhook's
+  (`DiscordAlerts`) has its token in the URL. Never log `WEBHOOK_URL`. Its other `fetch`, the Wiki's item list, logs its
+  own result.
 - Scheduled jobs are `@Cron(…, { timeZone: 'UTC', waitForCompletion: true })` handlers in `IngesterModule`'s providers
   (its `ScheduleModule`), never `@Interval` (a slow run would overlap), and run through `JobRunsService`: `run` joins a
   run in progress, connects Mongo, stores the success in `jobRuns` and sets the metric; each job also calls `catchUp`
@@ -235,6 +239,11 @@ player count upsert are pure builders in `ingester/scrape-results.ts`, so they'r
   `subscriptions.ts`), `scrapingOffsets` as a `Set` (lib-dynamodb writes an array as a List, and a Number Set can't be
   empty, so no offsets means no item), never offset 12, never ADD/REMOVE deltas. Keep `deleteGuard`: an empty or wrong
   database must never empty the table. The IAM user allows Scan, PutItem and DeleteItem only (no BatchWriteItem).
+- The items refresh (`ItemsRefreshService`, hourly) and the hiscores clean-up (`CleanHiscoresService`, 00:00 UTC) are
+  refresh-items' and clean-hiscores' writes, ported. Keep their guards: the items refresh never deletes more than
+  `MAX_REMOVED_ITEMS` items (a truncated Wiki response), and the clean-up's steps stay in order (drop offsets, pull old
+  entries, delete unused layouts, then players without entries) with the layouts' 1-day guard. Its "No hiscores scraped"
+  alert throws, so that run isn't stored as a success.
 - Metrics (`IngesterMetrics`): `ingester_job_last_success_timestamp_seconds{job}` after each completed job (`ingest`: a
   poll cycle without a failure, empty or not; a scheduled job: a run, and at startup its stored last success),
   `ingester_messages_total{type,result}`.
@@ -242,10 +251,8 @@ player count upsert are pure builders in `ingester/scrape-results.ts`, so they'r
 
 ## Pausing and resuming players
 
-The full contract with the `process-players` Lambda (which pauses players whose hiscores keep 404ing) is in
-[`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md); the ingester takes the
-Lambda's side over once process-players sends its not-found players (osrs-tracker/osrs-tracker-aws#166). The API's side,
-in `refreshPlayerInfo`:
+The full contract with the ingester (which pauses players whose hiscores keep 404ing, from process-players' `notFound`
+usernames) is in [`DATA-MODEL.md`](../../../DATA-MODEL.md). The API's side, in `refreshPlayerInfo`:
 
 - Success: resume in the same update — merge `pausedScrapingOffsets` into `scrapingOffsets`, unset it,
   `hiscoreNotFoundSince` and `hiscoreNotFoundCount`.

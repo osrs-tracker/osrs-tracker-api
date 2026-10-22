@@ -41,13 +41,13 @@ export class PlayerCountsService {
   getLatest(): Promise<PlayerCount | null> {
     return this.collection.findOne<PlayerCount>(
       {},
-      { sort: { date: -1 }, hint: { date: 1 }, projection: { _id: 0 } }, // `{ date: 1 }`: record-player-count's index
+      { sort: { date: -1 }, hint: { date: 1 }, projection: { _id: 0 } }, // `{ date: 1 }`: the ingester's index
     );
   }
 
   getHistory(range: PlayerCountRange): Promise<PlayerCountPoint[]> {
     const pipeline = buildPlayerCountHistoryPipeline(range);
-    const options = { hint: { date: 1 } }; // record-player-count's index, on both collections
+    const options = { hint: { date: 1 } }; // the ingester's index, on both collections
 
     return (
       readsDailyAverages(range)

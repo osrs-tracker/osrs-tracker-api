@@ -27,7 +27,7 @@ export class MongoModule implements OnApplicationShutdown {
     return MongoModule.with(mongoClientProvider, mongoDBProvider);
   }
 
-  /** The ingester's: connected by its poll loop, without indexes. */
+  /** The ingester's: connected by its poll loop, which also creates its indexes. */
   static forIngester(): DynamicModule {
     return MongoModule.with(ingesterMongoClientProvider, ingesterMongoDBProvider);
   }

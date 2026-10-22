@@ -43,6 +43,7 @@ export class ScrapeResultsService {
   private readonly logger = new Logger(ScrapeResultsService.name);
   private readonly players: Collection<StoredPlayer>;
   private readonly playerCounts: Collection<PlayerCount>;
+  private readonly playerCountsDaily: Collection<PlayerCountDay>;
 
   constructor(
     @Inject(MONGODB_DATABASE) db: Db,
@@ -51,6 +52,17 @@ export class ScrapeResultsService {
   ) {
     this.players = db.collection<StoredPlayer>(PLAYERS_COLLECTION);
     this.playerCounts = db.collection<PlayerCount>(PLAYER_COUNTS_COLLECTION);
+    this.playerCountsDaily = db.collection<PlayerCountDay>(PLAYER_COUNTS_DAILY_COLLECTION);
+  }
+
+  /**
+   * Creates the indexes the ingester owns (`DATA-MODEL.md`): `{ date: 1 }`, unique, on both player count collections.
+   * The upsert on `date` relies on `playerCounts`', the `$merge` (its `on`) on `playerCountsDaily`'. A no-op when they
+   * exist; throws when one exists with other options.
+   */
+  async ensureIndexes(): Promise<void> {
+    await this.playerCounts.createIndex({ date: 1 }, { unique: true });
+    await this.playerCountsDaily.createIndex({ date: 1 }, { unique: true });
   }
 
   /** Applies one message, from `parseScrapeResult`. Throws when a write fails. */
@@ -122,7 +134,7 @@ export class ScrapeResultsService {
     const { upsertedCount } = await this.playerCounts.updateOne(filter, update, { upsert: true });
 
     // `$merge` writes as the cursor is read, and returns no documents. Its `on` needs the unique `{ date: 1 }` index on
-    // `playerCountsDaily`, which record-player-count ensures
+    // `playerCountsDaily` (`ensureIndexes`)
     await this.playerCounts
       .aggregate<PlayerCountDay>([
         ...playerCountDaysPipeline(startOfUTCDay(sample.date)),

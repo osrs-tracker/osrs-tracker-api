@@ -79,8 +79,8 @@ export function hiscoreEntryUpdate(
  * Update pipeline for a player that is not on the hiscores at `scrapedAt`: starts or continues the not-found streak,
  * and once the streak is `HISCORE_NOT_FOUND_PAUSE_DAYS` old, moves `scrapingOffsets` to `pausedScrapingOffsets` so the
  * player is no longer queued. The data is kept, and the API restores the offsets when the player is found again. The
- * scrape time, not the time it's applied: a drained backlog would otherwise delay pauses. Ported from process-players
- * (osrs-tracker-aws `MU.hiscoreNotFoundPipeline`).
+ * scrape time, not the time it's applied: a drained backlog would otherwise delay pauses. Ported from process-players,
+ * which wrote it until osrs-tracker/osrs-tracker-aws#166.
  */
 export function hiscoreNotFoundPipeline(scrapedAt: Date): Document[] {
   const shouldPause = {

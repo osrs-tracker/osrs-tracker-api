@@ -5,10 +5,12 @@ import { AgentModule } from '../common/agent/agent.module';
 import { MongoModule } from '../common/mongo/mongo.module';
 import { validateIngesterEnv } from '../config/env';
 import { HiscoreLayoutsService } from '../features/players/hiscore-layouts.service';
+import { CleanHiscoresService } from './clean-hiscores.service';
 import { DiscordAlerts } from './discord-alerts';
 import { IngesterHealthController } from './ingester-health.controller';
 import { IngesterMetrics } from './ingester-metrics';
 import { IngesterService } from './ingester.service';
+import { ItemsRefreshService } from './items-refresh.service';
 import { JobRunsService } from './job-runs.service';
 import { ScrapeResultsService } from './scrape-results.service';
 import { SubscriptionsSyncService } from './subscriptions-sync.service';
@@ -33,6 +35,8 @@ import { SubscriptionsSyncService } from './subscriptions-sync.service';
     IngesterService,
     JobRunsService,
     SubscriptionsSyncService,
+    ItemsRefreshService,
+    CleanHiscoresService,
   ],
 })
 export class IngesterModule {}

@@ -27,10 +27,10 @@ Each route's statuses, `Cache-Control` and parameters are described in a short c
 ## How it fits together
 
 The [OSRS Tracker website](https://osrs-tracker.freekmencke.com)
-([osrs-tracker-web](https://github.com/osrs-tracker/osrs-tracker-web)) gets its data from this API. Background jobs in
-[osrs-tracker-aws](https://github.com/osrs-tracker/osrs-tracker-aws) keep the player and item data up to date, and
-everything is stored in MongoDB. Which fields and indexes each of them owns is described in osrs-tracker-aws's
-[`DATA-MODEL.md`](https://github.com/osrs-tracker/osrs-tracker-aws/blob/main/DATA-MODEL.md).
+([osrs-tracker-web](https://github.com/osrs-tracker/osrs-tracker-web)) gets its data from this API. Scraping Lambdas in
+[osrs-tracker-aws](https://github.com/osrs-tracker/osrs-tracker-aws) fetch the hiscores and player counts, and the
+ingester below stores them in MongoDB and keeps the item list and old hiscores tidy. Which process writes each field and
+owns each index is described in [`DATA-MODEL.md`](DATA-MODEL.md).
 
 ## The ingester
 
@@ -48,6 +48,12 @@ down. The ingester:
   catches duplicates, repeated scrapes and late entries, which would otherwise break the stored history's order;
 - counts the days a player isn't on the hiscores, pauses their scraping after 7 (with a Discord alert), and recomputes
   the daily player counts.
+
+It also runs scheduled jobs, each also at startup when its last success (stored in `jobRuns`) is overdue: every 15
+minutes the copy of who to scrape to DynamoDB, which the Lambdas read; every hour the item list from the
+[OSRS Wiki](https://prices.runescape.wiki/api/v2/osrs/mapping); and every night at 00:00 UTC the clean-up of hiscores
+older than 90 days, offsets not looked up for 180 days, unused layouts and players left without entries, alerting on
+Discord when no hiscores were scraped for 2 days.
 
 It has no public port: `/healthy`, which reports whether the poll loop is still making progress, and `/metrics`
 (`ingester_job_last_success_timestamp_seconds`, `ingester_messages_total`) are on port 9090. Its settings are the

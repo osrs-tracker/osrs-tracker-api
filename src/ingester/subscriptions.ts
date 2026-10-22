@@ -8,7 +8,7 @@ export const MAX_DELETED_SHARE = 0.1;
 
 /**
  * Not written: queue-players queues it together with -12 (the same hour), and nothing writes it to `players` either
- * (osrs-tracker-aws `DATA-MODEL.md`).
+ * (`DATA-MODEL.md`).
  */
 const QUEUED_WITH_MINUS_12 = 12;
 
