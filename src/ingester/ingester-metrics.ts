@@ -1,8 +1,12 @@
 import { Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { Counter, Gauge, register } from '@osrs-tracker/express-metrics';
 
-/** The ingester's jobs: `ingest` is the poll loop, `subscriptions` the sync to DynamoDB (`SubscriptionsSyncService`). */
-export type IngesterJob = 'ingest' | 'subscriptions';
+/**
+ * The ingester's jobs: `ingest` is the poll loop, `subscriptions` the sync to DynamoDB (`SubscriptionsSyncService`),
+ * `items` the refresh from the Wiki (`ItemsRefreshService`), `clean` the nightly hiscores clean-up
+ * (`CleanHiscoresService`).
+ */
+export type IngesterJob = 'ingest' | 'subscriptions' | 'items' | 'clean';
 
 /** A message's `type`, `unknown` when it couldn't be parsed. */
 export type MessageType = 'hiscores' | 'playerCount' | 'unknown';

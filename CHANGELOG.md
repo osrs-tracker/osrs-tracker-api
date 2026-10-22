@@ -3,6 +3,25 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-10-22
+
+### Ingester
+
+- The ingester takes over the last two Lambdas that wrote to MongoDB, so the database can move into the cluster, which
+  the Lambdas can't reach (#205, roadmap osrs-tracker/osrs-tracker-aws#162). Neither produces history worth queueing, so
+  they run as scheduled jobs instead of going through SQS, and like the subscriptions sync run at startup when overdue
+  (metrics `job="items"` and `job="clean"`):
+  - `items`, every hour: refresh-items' upsert of the OSRS Wiki's item list, then the delete of the items it no longer
+    lists, skipped when more than 50 would go.
+  - `clean`, every night at 00:00 UTC: clean-hiscores' drop of scraping offsets not looked up for 180 days, pull of
+    entries older than 90 days, deletes of unused layouts and of players left without entries, and the Discord alert
+    when nothing was scraped for 2 days.
+- The ingester now owns the player count collections' `{ date: 1 }` indexes, which record-player-count stopped creating
+  (osrs-tracker/osrs-tracker-aws#166): it creates them once MongoDB answers after a start. `playerCounts`' is now
+  unique, so a sample can't be stored twice.
+- `DATA-MODEL.md` (who writes each field and owns each index) moved here from osrs-tracker-aws, since every MongoDB
+  writer now lives in this repo.
+
 ## 2026-10-21
 
 ### Items

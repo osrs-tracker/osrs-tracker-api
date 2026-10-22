@@ -8,10 +8,11 @@ import { IngesterModule } from './ingester/ingester.module';
 
 /**
  * The ingester (`node ingest`, the Deployment `osrs-tracker-ingester`): applies the scraping Lambdas' results from SQS to
- * MongoDB (`IngesterService`). Same image as the API, without its HTTP server: it listens only on `METRICS_PORT`.
+ * MongoDB (`IngesterService`), and runs the scheduled jobs (`JobRunsService`). Same image as the API, without its HTTP
+ * server: it listens only on `METRICS_PORT`.
  *
- * No `logOutgoingRequests`: its one `fetch` is the Discord webhook, whose URL, which that logs in full, holds the
- * webhook's token. The AWS SDK doesn't use `fetch`.
+ * No `logOutgoingRequests`: it logs every `fetch` URL in full, and the Discord webhook's holds the webhook's token. The
+ * AWS SDK doesn't use `fetch`.
  */
 async function bootstrap() {
   const app = await NestFactory.create(IngesterModule, { logger: new NestLogger(logger) });

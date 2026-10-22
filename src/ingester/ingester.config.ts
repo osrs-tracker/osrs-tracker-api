@@ -34,3 +34,29 @@ export const SUBSCRIPTION_WRITE_GAP_MS = 250;
 
 /** Bounds each DynamoDB request, so a hung one can't hold the sync (and with it every later run) forever. */
 export const DYNAMODB_REQUEST_TIMEOUT_MS = 10_000;
+
+/** The items refresh's schedule, in UTC, and the interval it amounts to (`JobRunsService.catchUp`): change both. */
+export const ITEMS_REFRESH_CRON = '0 * * * *';
+export const ITEMS_REFRESH_INTERVAL_MS = 60 * MINUTE;
+
+/** Bounds the Wiki's item list request (about 1 MB). */
+export const ITEMS_FETCH_TIMEOUT_MS = 15_000;
+
+/**
+ * More items missing from the Wiki's list than this in one run means its response is truncated or broken, not that Jagex
+ * removed them from the GE (19 had piled up on 2026-10-10): the delete is skipped then.
+ */
+export const MAX_REMOVED_ITEMS = 50;
+
+/** The hiscores clean-up's schedule, in UTC, and the interval it amounts to (`JobRunsService.catchUp`): change both. */
+export const CLEAN_HISCORES_CRON = '0 0 * * *';
+export const CLEAN_HISCORES_INTERVAL_MS = 24 * 60 * MINUTE;
+
+/** Days of hiscore entries kept: older ones are pulled every night, counted from the start of the UTC day. */
+export const MAX_AGE_IN_DAYS = 90;
+
+/** Days without a lookup after which a player's scraping offset is dropped, together with its hiscore entries. */
+export const UNUSED_SCRAPING_OFFSET_DAYS = 180;
+
+/** Days without any new hiscore entry after which the clean-up alerts that scraping stopped. */
+export const MAX_DAYS_WITHOUT_SCRAPES = 2;

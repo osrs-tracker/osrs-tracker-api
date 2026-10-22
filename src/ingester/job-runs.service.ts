@@ -16,7 +16,9 @@ export type JobTask = (signal: AbortSignal) => Promise<void>;
 /**
  * Runs the ingester's scheduled jobs (`@Cron` handlers in its root module only, never the API's): one run per job at a
  * time, each success stored in `jobRuns` and set on `ingester_job_last_success_timestamp_seconds`. Nest doesn't replay
- * runs missed while the pod was down, so each job also calls `catchUp` on boot.
+ * runs missed while the pod was down, so each job also calls `catchUp` on boot. Our own rather than Agenda (a MongoDB
+ * job scheduler) for now: its handlers get no `AbortSignal` and its `start()` needs Mongo up, so most of this would stay
+ * as glue; osrs-tracker/osrs-tracker-api#210 weighs the switch.
  */
 @Injectable()
 export class JobRunsService implements BeforeApplicationShutdown {

@@ -25,13 +25,17 @@ export class DiscordAlerts {
     this.webhookUrl = config.get('WEBHOOK_URL', { infer: true });
   }
 
+  /** Sends a red embed listing `names`, after `summary`. See `sendText`. */
+  send(title: string, summary: string, names: string[]): Promise<void> {
+    const description = `${summary} ${names.length} player${names.length > 1 ? 's' : ''}:\n`;
+    return this.sendText(title, description + names.map((name) => `- ${name}`).join('\n'));
+  }
+
   /**
-   * Sends a red embed listing `names`. Never rejects: a failed alert is logged, never with the URL, which holds the
-   * webhook's token. A description over Discord's limit is truncated (it would reject the alert).
+   * Sends a red embed. Never rejects: a failed alert is logged, never with the URL, which holds the webhook's token. A
+   * description over Discord's limit is truncated (it would reject the alert).
    */
-  async send(title: string, summary: string, names: string[]): Promise<void> {
-    let description = `${summary} ${names.length} player${names.length > 1 ? 's' : ''}:\n`;
-    description += names.map((name) => `- ${name}`).join('\n');
+  async sendText(title: string, description: string): Promise<void> {
     if (description.length > DISCORD_DESCRIPTION_MAX_LENGTH)
       description = `${description.slice(0, DISCORD_DESCRIPTION_MAX_LENGTH - 1)}…`;
 

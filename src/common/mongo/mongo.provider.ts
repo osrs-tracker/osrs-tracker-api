@@ -114,7 +114,10 @@ export const ingesterMongoClientProvider: FactoryProvider = {
   inject: [ConfigService],
 };
 
-/** The ingester's database. It creates no indexes: the API and the Lambdas own them. */
+/**
+ * The ingester's database. Creates no indexes here, since the client isn't connected yet: the poll loop creates the
+ * ingester's own (`ScrapeResultsService.ensureIndexes`) once Mongo answers, and the API owns the rest.
+ */
 export const ingesterMongoDBProvider: FactoryProvider = {
   provide: MONGODB_DATABASE,
   useFactory: (mongoClient: MongoClient, config: ConfigService<MongoEnv, true>) =>
