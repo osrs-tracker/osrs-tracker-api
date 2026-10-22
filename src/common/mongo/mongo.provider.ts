@@ -20,6 +20,13 @@ export const RETRY_DELAY_MS = 10_000;
  * set here so the connect retry below is sized against it.
  */
 const SERVER_SELECTION_TIMEOUT_MS = 30_000;
+/**
+ * Bounds opening a connection, the driver's server monitor's included (the driver's default is 30s). A connect inside
+ * the cluster takes milliseconds, but one made while the old mongod's pod goes away can hang: with the default, the
+ * monitor only found the restarted mongod 30s after it shut down, though it was primary again within 4s, so requests
+ * that arrived early in the restart failed.
+ */
+const CONNECT_TIMEOUT_MS = 5_000;
 
 /**
  * Retries the initial connect, so the API survives cluster DNS not being ready yet (e.g. right after a node reboot)
@@ -66,6 +73,7 @@ function createMongoClient(config: ConfigService<MongoEnv, true>): MongoClient {
     },
     serverApi: { version: ServerApiVersion.v1, deprecationErrors: true },
     serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS,
+    connectTimeoutMS: CONNECT_TIMEOUT_MS,
   });
 }
 
