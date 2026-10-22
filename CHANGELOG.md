@@ -28,6 +28,9 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   MongoDB (a single-member replica set, 14 to 30 s without a server, e.g. on an upgrade): requests slow down instead of
   failing (#212). The API's startup connect now makes 6 attempts instead of 12, so its worst case stays at 230 s, inside
   the `startupProbe`.
+- A connect to MongoDB now gives up after 5 s instead of the driver's 30 s. A test restart showed why: mongod was
+  primary again within 4 s, but the API only reached it 30 s after the restart, when a connect that hung while the old
+  pod went away timed out, so requests that arrived first still failed. An in-cluster connect takes milliseconds.
 
 ## 2026-10-21
 
