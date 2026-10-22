@@ -57,27 +57,43 @@ Discord when no hiscores were scraped for 2 days.
 
 It has no public port: `/healthy`, which reports whether the poll loop is still making progress, and `/metrics`
 (`ingester_job_last_success_timestamp_seconds`, `ingester_messages_total`) are on port 9090. Its settings are the
-MongoDB ones plus the ingester section of `.env.example`, from the cluster's `osrs-tracker-ingester` secret. Its AWS key
-only works from the server's IP, so `npm run start:ingest` can't receive anything from elsewhere.
+MongoDB ones plus the ingester section of `.env.example`, from the cluster's `osrs-tracker-ingester` secret, which also
+gives it its own database user (`osrs-tracker-ingester`, overriding the API's `MONGODB_USERNAME` and
+`MONGODB_PASSWORD`). Its AWS key only works from the server's IP, so `npm run start:ingest` can't receive anything from
+elsewhere.
 
 ## Running it locally
 
-You need Node 24 or newer. Copy `.env.example` to `.env` and fill in the MongoDB credentials (`MONGODB_URI`,
-`MONGODB_USERNAME`, `MONGODB_PASSWORD`): the MongoDB Atlas cluster's URI, username and password, the same values as the
-cluster's `aws-mongodb-credentials` secret (its template is `cluster/osrs-tracker/secrets.example.yaml` in
-`fremen-cluster`; the username and password are kept in a password manager). Your IP address must be on the Atlas
-project's IP access list. The database name and the OSRS API URL come prefilled. It also lists the optional settings
-(`CORS_ORIGIN`, `PORT`, `METRICS_PORT`). The API won't start while a required one is missing or a value is invalid; the
-error lists them all. Then run:
+You need Node 24 or newer, and `kubectl` with the cluster's admin kubeconfig (`~/.kube/admin.yaml`). MongoDB runs in the
+cluster (the `mongodb` namespace, a single-member replica set) with no public port, so reach it through a port-forward,
+and keep it running while the API runs:
+
+```bash
+kubectl --kubeconfig ~/.kube/admin.yaml -n mongodb port-forward svc/mongodb 27017:27017
+```
+
+Copy `.env.example` to `.env` and fill in the MongoDB settings:
+
+- `MONGODB_URI`: `mongodb://localhost:27017/?directConnection=true&authSource=admin`. `directConnection=true` is
+  required: without it the driver looks up the replica set member's in-cluster name, which doesn't resolve outside the
+  cluster.
+- `MONGODB_USERNAME` and `MONGODB_PASSWORD`: the user `osrs-tracker-api` and its password from the password manager, the
+  same as the cluster's `aws-mongodb-credentials` secret (its template is `cluster/osrs-tracker/secrets.example.yaml` in
+  `fremen-cluster`).
+
+The database name and the OSRS API URL come prefilled. It also lists the optional settings (`CORS_ORIGIN`, `PORT`,
+`METRICS_PORT`). The API won't start while a required one is missing or a value is invalid; the error lists them all.
+Then run:
 
 ```bash
 npm ci
 npm run start:dev
 ```
 
-If it logs a MongoDB connect warning every 40 seconds instead of starting, the credentials are wrong or your IP isn't on
-the Atlas access list. It gives up after 6 attempts (about 4 minutes) and stops with the connect error. If port 3000 is
-taken, set `PORT` in `.env`.
+If it logs a MongoDB connect warning every 40 seconds instead of starting, the port-forward isn't running (it also stops
+when the MongoDB pod restarts: start it again) or the credentials are wrong. It gives up after 6 attempts (about 4
+minutes) and stops with the connect error. If port 3000 is taken, set `PORT` in `.env`; if 27017 is, forward another
+local port (`27018:27017`) and use it in `MONGODB_URI`.
 
 **Careful:** there is no separate development database, so `.env` points at the **production** data. The POST lookup
 endpoints write to it: looking up a player stores their latest hiscores, and looking up an item moves it to the top of

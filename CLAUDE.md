@@ -1,11 +1,11 @@
 # osrs-tracker-api
 
-NestJS + MongoDB Atlas (native driver) API, deployed to Kubernetes at https://osrs-tracker-api.freekmencke.com, plus the
-ingester, a second entrypoint of the same image that applies the scraping Lambdas' results from SQS. Main consumer: the
-Angular SSR app in `../osrs-tracker-web`; `../osrs-tracker-aws` Lambdas also write to the same database;
-`../osrs-tracker-packages` publishes the `@osrs-tracker/*` packages. `../<repo>` in these docs (and the skill and
-agents) means a sibling of the main checkout; from a worktree in `.claude/worktrees/<name>/` that's
-`../../../../<repo>`.
+NestJS + MongoDB (native driver; a single-member replica set in the cluster's `mongodb` namespace) API, deployed to
+Kubernetes at https://osrs-tracker-api.freekmencke.com, plus the ingester, a second entrypoint of the same image that
+applies the scraping Lambdas' results from SQS. Main consumer: the Angular SSR app in `../osrs-tracker-web`;
+`../osrs-tracker-aws` holds those Lambdas (they never touch the database); `../osrs-tracker-packages` publishes the
+`@osrs-tracker/*` packages. `../<repo>` in these docs (and the skill and agents) means a sibling of the main checkout;
+from a worktree in `.claude/worktrees/<name>/` that's `../../../../<repo>`.
 
 **Load the `osrs-tracker-api` skill before writing, reviewing, running, deploying or committing anything here.** It
 holds the Cache-Control, param validation, route doc comment, Mongo, player pause/resume, logging, resilience and test
@@ -16,7 +16,9 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 - Verify: `.claude/skills/verify/verify.sh` runs `npm run prettier:ci`, `npm run lint:ci`,
   `npx tsc --noEmit -p tsconfig.json`, `npm run build` and `npm test` at once and reports every failure. The `verify`
   skill (`.claude/skills/verify/`) runs it, and Claude Code runs that skill before each commit of a code change.
-- Dev server: `npm run start:dev` on port 3000. `.env` points at production data.
+- Dev server: `npm run start:dev` on port 3000. `.env` points at production data, through a port-forward to the
+  cluster's MongoDB that the user runs with the admin kubeconfig (README, Running it locally): the `claude-agent`
+  ServiceAccount can't port-forward, so when the connect fails, ask the user to start it.
 - A `git push` blocked by Claude's pre-push hook (a Claude Code hook, not a git hook): run `npm run lint` and
   `npm run prettier` (both fix what they can), fix the rest by hand, commit and push again.
 - Worktrees in `.claude/worktrees/` use the main checkout's `node_modules` (found in a parent folder); run `npm ci` in

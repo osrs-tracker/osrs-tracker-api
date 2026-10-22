@@ -11,9 +11,10 @@ description: >-
 
 # osrs-tracker-api
 
-NestJS + MongoDB Atlas (native driver), deployed as a Docker image to Kubernetes. Main consumer: the Angular SSR app in
-`../osrs-tracker-web`. The `conventions-reviewer` agent reviews diffs against this file and `CLAUDE.md` at runtime, so
-keep code rules here, not in the agent; repo-specific review rules go in `## Review rules`.
+NestJS + MongoDB (native driver; a single-member replica set in the cluster's `mongodb` namespace), deployed as a Docker
+image to Kubernetes. Main consumer: the Angular SSR app in `../osrs-tracker-web`. The `conventions-reviewer` agent
+reviews diffs against this file and `CLAUDE.md` at runtime, so keep code rules here, not in the agent; repo-specific
+review rules go in `## Review rules`.
 
 ## Setup gotchas
 
@@ -44,18 +45,19 @@ keep code rules here, not in the agent; repo-specific review rules go in `## Rev
   [`DATA-MODEL.md`](../../../DATA-MODEL.md): a new or changed index or stored field updates it in the same diff, and
   needs an issue in osrs-tracker-aws only when a Lambda has to follow (the scrape result messages, the subscriptions
   table).
-- Env: `.env.example` lists the vars, `.env` holds local values (points at prod). In the cluster they come from the
-  `aws-mongodb-credentials` secret (the `MONGODB_*` vars and `OSRS_API_BASE_URL`; its template is
-  `cluster/osrs-tracker/secrets.example.yaml` in `../fremen-cluster`, and the user applies it, never this repo), with
-  the `env:` block in `osrs-tracker-api.yaml` setting `CORS_ORIGIN` and overriding `OSRS_API_BASE_URL` (an API Gateway
-  proxy to `https://secure.runescape.com` that passes Jagex's headers through). `validateEnv` (`src/config/env.ts`,
-  `ConfigModule`'s `validate` in `AppModule`) checks and types them at startup; read them with
-  `ConfigService<Env, true>` (`config.get('X', { infer: true })`), never `process.env`. A new var goes in `Env`,
-  `validateEnv`, its spec and `.env.example`; a required one also in `app.e2e.spec.ts`'s `vi.stubEnv` calls (validation
-  runs when `AppModule` is imported) and in the cluster: the `env:` block for a plain value, or, for a secret, an issue
-  in fremen-cluster for the secret's template plus asking the user to apply it. The ingester's are `IngesterEnv` and
-  `validateIngesterEnv`, in the same file and spec, from the same secret plus `osrs-tracker-ingester` (`.env.example`'s
-  last section).
+- Env: `.env.example` lists the vars, `.env` holds local values (prod, through the user's port-forward: `CLAUDE.md`'s
+  Dev server). In the cluster they come from the `aws-mongodb-credentials` secret (the `MONGODB_*` vars and
+  `OSRS_API_BASE_URL`; its template is `cluster/osrs-tracker/secrets.example.yaml` in `../fremen-cluster`, and the user
+  applies it, never this repo), with the `env:` block in `osrs-tracker-api.yaml` setting `CORS_ORIGIN` and overriding
+  `OSRS_API_BASE_URL` (an API Gateway proxy to `https://secure.runescape.com` that passes Jagex's headers through).
+  `validateEnv` (`src/config/env.ts`, `ConfigModule`'s `validate` in `AppModule`) checks and types them at startup; read
+  them with `ConfigService<Env, true>` (`config.get('X', { infer: true })`), never `process.env`. A new var goes in
+  `Env`, `validateEnv`, its spec and `.env.example`; a required one also in `app.e2e.spec.ts`'s `vi.stubEnv` calls
+  (validation runs when `AppModule` is imported) and in the cluster: the `env:` block for a plain value, or, for a
+  secret, an issue in fremen-cluster for the secret's template plus asking the user to apply it. The ingester's are
+  `IngesterEnv` and `validateIngesterEnv`, in the same file and spec, from the same secret plus `osrs-tracker-ingester`
+  (`.env.example`'s last section), which also sets the ingester's own database user over the API's
+  `MONGODB_USERNAME`/`MONGODB_PASSWORD`.
 - No Lambda writes to MongoDB: the ingester applies the scraping Lambdas' results and runs the jobs that were Lambdas
   (roadmap osrs-tracker/osrs-tracker-aws#162).
 - `npm run build` (`nest build -b rspack`, configured by `rspack.config.js`) bundles `node_modules` into `dist/` (only
@@ -359,18 +361,20 @@ item's `lastFetch` (it moves to the top of `GET /items`), so it needs nothing re
 database: they run on fakes (Tests).
 
 Live data is read and written through the `mongodb` MCP server (`.mcp.json`, database `osrs-tracker`), which connects
-with `OSRS_TRACKER_MONGO_URI` from the user's environment: a database user with `readWrite` on `osrs-tracker` only, and
-no Atlas API tools. In the desktop app on WSL it must be a Windows user variable passed through `WSLENV`
+with `OSRS_TRACKER_MONGO_URI` from the user's environment: the user `osrs-tracker-api` (`readWrite` on `osrs-tracker`
+only) at `localhost:27017` with `directConnection=true&authSource=admin`, through the same port-forward as a local run
+(`CLAUDE.md`'s Dev server), and the server's Atlas tools disabled. When it fails to connect, ask the user to start the
+port-forward. In the desktop app on WSL it must be a Windows user variable passed through `WSLENV`
 (`OSRS_TRACKER_MONGO_URI/u`): the app doesn't load `~/.profile`, which reaches terminal sessions only. Reads (`find`,
 `count`, `aggregate`) need no prompt; every write tool asks first, even in auto mode (`permissions.ask` in
 `.claude/settings.json`; a write tool a server bump adds goes there too), and the drops, `delete-many` and
-`$out`/`$merge` pipelines also ask through the server's own confirmation. The cluster has no backups, so before a write
-that can touch more than one document: save the affected documents (the server's `export` with the same filter, or a
-`mongodump` of the collection), or at least show a `find` with that filter and its `count`; state the counts to expect
-(`matchedCount`, `modifiedCount`, `deletedCount`), so a no-op or a too-wide filter shows; and read the documents again
-afterwards. Cloud sessions and routines don't have the variable, so there the server fails to connect: hand the user a
-mongosh snippet instead, starting with `use('osrs-tracker')` (mongosh starts in `test`, where a write silently matches
-nothing) and with the expected counts.
+`$out`/`$merge` pipelines also ask through the server's own confirmation. The cluster's MongoDB has no backups, so
+before a write that can touch more than one document: save the affected documents (the server's `export` with the same
+filter, or a `mongodump` of the collection), or at least show a `find` with that filter and its `count`; state the
+counts to expect (`matchedCount`, `modifiedCount`, `deletedCount`), so a no-op or a too-wide filter shows; and read the
+documents again afterwards. Cloud sessions and routines don't have the variable, so there the server fails to connect:
+hand the user a mongosh snippet to run through the port-forward instead, starting with `use('osrs-tracker')` (mongosh
+starts in `test`, where a write silently matches nothing) and with the expected counts.
 
 ## Deploy
 

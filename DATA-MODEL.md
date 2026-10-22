@@ -250,11 +250,11 @@ What the live database holds beyond what the code above writes. Recheck (read-on
   `scrapingOffsets`); a lookup gives them an offset again. Otherwise their entries age out and the clean job deletes
   them.
 - **Offsets in use**: -12, -6, -4, -3, 0, 1, 2, 3; 0 for over 90% of entries. Per player (2026-10-10): 469 have one
-  offset, 32 two, 5 three. No `scrapingOffsetLookups` yet: the clean-hiscores Lambda dated every current offset on its
-  first run after 2026-10-10, so the first drops come 180 days after that.
-- **Size**: Atlas's free tier allows 512 MB of uncompressed data plus indexes. Since the compact format (2026-10-10), an
-  entry is about 0.8 KB (24.2 MB for 31,822 entries of 514 players, was 223.9 MB); 90 days of entries for today's
-  tracked players settles near 37 MB (60 days, until 2026-10-13: near 25 MB), so about ten times the tracked players
-  fit. The migration also put the few out-of-order entries in date order and dropped the extra `name` some older API
-  entries carried.
+  offset, 32 two, 5 three. None had `scrapingOffsetLookups` then: the clean-hiscores Lambda dated every current offset
+  on its first run after 2026-10-10, so the first drops come 180 days after that (about April 2027).
+- **Size**: the cluster's MongoDB volume is 10 GiB (fremen-cluster `cluster/mongodb/volume.yaml`; Atlas's free tier,
+  until 2026-10-22, allowed 512 MB). Since the compact format (2026-10-10), an entry is about 0.8 KB (24.2 MB for 31,822
+  entries of 514 players, was 223.9 MB); 90 days of entries for the players tracked on 2026-10-10 settles near 37 MB (60
+  days, until 2026-10-13: near 25 MB). The migration also put the few out-of-order entries in date order and dropped the
+  extra `name` some older API entries carried.
 - **`items`**: `limit`, `lowalch`, `highalch` and `value` are missing on some items (the Wiki omits them).
