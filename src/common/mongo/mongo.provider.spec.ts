@@ -47,9 +47,9 @@ describe('connectWithRetry', () => {
     await connecting;
     expect(stats).toEqual({ created: 4, closed: 3 });
     expect(warn.mock.calls.map(([message]) => message)).toEqual([
-      'MongoDB connect attempt 1/12 failed, retrying: Error: querySrv ENOTFOUND',
-      'MongoDB connect attempt 2/12 failed, retrying: Error: querySrv ENOTFOUND',
-      'MongoDB connect attempt 3/12 failed, retrying: Error: querySrv ENOTFOUND',
+      'MongoDB connect attempt 1/6 failed, retrying: Error: querySrv ENOTFOUND',
+      'MongoDB connect attempt 2/6 failed, retrying: Error: querySrv ENOTFOUND',
+      'MongoDB connect attempt 3/6 failed, retrying: Error: querySrv ENOTFOUND',
     ]);
   });
 
@@ -62,7 +62,7 @@ describe('connectWithRetry', () => {
     expect(await connecting).toEqual(new Error('querySrv ENOTFOUND'));
     expect(stats).toEqual({ created: MAX_CONNECT_ATTEMPTS, closed: MAX_CONNECT_ATTEMPTS });
     expect(warn).toHaveBeenCalledTimes(MAX_CONNECT_ATTEMPTS - 1);
-    expect(warn).toHaveBeenLastCalledWith('MongoDB connect attempt 11/12 failed, retrying: Error: querySrv ENOTFOUND');
+    expect(warn).toHaveBeenLastCalledWith('MongoDB connect attempt 5/6 failed, retrying: Error: querySrv ENOTFOUND');
   });
 
   it('keeps the connect error when closing the failed client fails too', async () => {

@@ -75,8 +75,8 @@ npm ci
 npm run start:dev
 ```
 
-If it logs a MongoDB connect warning every 10 seconds instead of starting, the credentials are wrong or your IP isn't on
-the Atlas access list. It gives up after 12 attempts (about 4 minutes) and stops with the connect error. If port 3000 is
+If it logs a MongoDB connect warning every 40 seconds instead of starting, the credentials are wrong or your IP isn't on
+the Atlas access list. It gives up after 6 attempts (about 4 minutes) and stops with the connect error. If port 3000 is
 taken, set `PORT` in `.env`.
 
 **Careful:** there is no separate development database, so `.env` points at the **production** data. The POST lookup
