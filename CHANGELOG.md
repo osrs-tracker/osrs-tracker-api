@@ -5,6 +5,8 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 
 ## 2026-10-25
 
+### API
+
 - New `GET /new-items?limit=` (1 to 100, default 25, `public, max-age=3600`): the items the hourly items job added,
   newest first, `[{ id, icon, name, addedAt }]`, for a "New on the GE" page on the web (#217,
   osrs-tracker/osrs-tracker-web#444). New items get a large share of the site's search impressions, and ids aren't a
@@ -28,11 +30,21 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   the cluster allows `https://osrs-tracker.net` beside `https://osrs-tracker.freekmencke.com` (#219, roadmap
   osrs-tracker/osrs-tracker-web#448). The website moves to the new domain, and its browser requests from there would
   otherwise fail CORS; the old origin stays until the switch is live.
+
+### Ingester
+
 - The ingester's hourly items job now writes only the items that are new or changed, instead of all ~4,700 every hour
   (#215). The Wiki's list changes only on game updates, so nearly every write was a no-op, but MongoDB counts each
   statement in a bulk write, and the job showed as a spike of ~4,700 ops at every hour that hid real traffic. It reads
   the stored items in one `find` first, which also gives the count for the delete guard. Its log line now reads
   `Items refreshed: <n> changed, <n> removed`.
+
+### Behind the scenes
+
+- Dependency updates: `undici` 8.12.2 and `body-parser` 2.4.0, security fixes in the outgoing requests' client and the
+  request body parsing; and an `overrides` entry lifting `multer` to 2.5.0 (GHSA-q7qp-rjg7-q26m), since
+  `@nestjs/platform-express` pins 2.4.0 exactly, up to its latest 12.2.0. No route takes uploads, so it wasn't
+  reachable; drop the override once platform-express ships 2.5.0 or later.
 
 ## 2026-10-22
 
