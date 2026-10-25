@@ -55,6 +55,12 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   the stored items in one `find` first, which also gives the count for the delete guard. Its log line now reads
   `Items refreshed: <n> changed, <n> removed`.
 
+- The items job leaves out the Wiki's placeholder entries, whose examine text is just "placeholder": unobtainable copies
+  of real items that Jagex lists on the GE and that never trade (`Placeholder`, a copy of the Hallowfell, and
+  `Dummy stymphike feather`). They showed in item browse and search, and as thin pages in the web's sitemap, and a
+  future one would have shown in "New on the GE" next to the real item. The two stored are deleted on the job's next
+  run, like any item missing from the list.
+
 ### Behind the scenes
 
 - Dependency updates: `undici` 8.12.2 and `body-parser` 2.4.0, security fixes in the outgoing requests' client and the

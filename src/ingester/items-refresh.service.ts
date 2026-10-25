@@ -19,6 +19,12 @@ import { JobRunsService } from './job-runs.service';
 export const ITEM_MAPPING_URL = 'https://prices.runescape.wiki/api/v2/osrs/mapping';
 
 /**
+ * Unobtainable copies of real items that Jagex leaves listed on the GE, examined as just "placeholder" (`Placeholder`,
+ * a Hallowfell copy; `Dummy stymphike feather`). They never trade, so they're left out of `items`.
+ */
+const isPlaceholder = (item: Item) => /^placeholder\.?$/i.test(item.examine ?? '');
+
+/**
  * Keeps `items` a copy of the OSRS Wiki's item list, every hour: upserts the items that are new or changed, then deletes
  * the ones the list no longer has. Ported from osrs-tracker-aws's refresh-items Lambda.
  */
@@ -50,7 +56,8 @@ export class ItemsRefreshService implements OnApplicationBootstrap {
    * every item each hour showed as a spike of ~4,700 ops. A new item gets `addedAt` and every written one `updatedAt`
    * (one time per run), so `updatedAt` moves only when a Wiki field changed: the comparison iterates the Wiki's keys, so
    * the stored dates never count as a change. Then deletes the items missing from the list (taken off the GE), unless
-   * more than `MAX_REMOVED_ITEMS` would go, so a truncated response never wipes the collection.
+   * more than `MAX_REMOVED_ITEMS` would go, so a truncated response never wipes the collection. Placeholders
+   * (`isPlaceholder`) count as missing.
    */
   async refresh(signal: AbortSignal): Promise<void> {
     const list = await this.fetchItems(signal);
@@ -98,9 +105,12 @@ export class ItemsRefreshService implements OnApplicationBootstrap {
     if (!response.ok) throw new Error(`Item mapping request failed: HTTP ${response.status}`);
 
     const list = (await response.json()) as Item[];
+    if (!Array.isArray(list)) throw new Error('Item mapping response has no items');
+
+    const items = list.filter((item) => !isPlaceholder(item));
     // bulkWrite rejects an empty batch with a less telling error
-    if (!Array.isArray(list) || !list.length) throw new Error('Item mapping response has no items');
-    return list;
+    if (!items.length) throw new Error('Item mapping response has no items');
+    return items;
   }
 
   /**
