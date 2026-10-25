@@ -113,6 +113,8 @@ One document per OSRS item, keyed by `id`.
 
 The items job deletes the items missing from the Wiki's list after its upsert (items Jagex took off the GE), but skips
 that run's delete when more than 50 would go (`MAX_REMOVED_ITEMS`), so a truncated response never wipes the collection.
+It leaves out the Wiki's placeholder entries (examine text just "placeholder": unobtainable copies of real items Jagex
+lists on the GE), so they're never stored and the ones stored before 2026-10-25 were deleted as missing.
 
 ## `playerCounts`
 

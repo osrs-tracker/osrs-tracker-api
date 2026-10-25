@@ -63,6 +63,19 @@ describe('ItemsRefreshService', () => {
     expect(items.find).toHaveBeenCalledWith({}, { projection: { _id: 0, lastFetch: 0 } });
   });
 
+  it('leaves out placeholder items, so stored ones are deleted like any item missing from the list', async () => {
+    const placeholders = [
+      { id: 34035, name: 'Placeholder', examine: 'placeholder.' },
+      { id: 33644, name: 'Dummy stymphike feather', examine: 'Placeholder' },
+    ];
+    mockFetch.mockImplementation(async () => Response.json([...ITEMS, ...placeholders]) as never);
+    const { refresh, items } = setup(placeholders);
+    await refresh();
+
+    expect(items.bulkWrite).toHaveBeenCalledWith(ITEMS.map(upsert));
+    expect(items.deleteMany).toHaveBeenCalledWith({ id: { $nin: [4151, 11802] } }, { hint: { id: 1 } });
+  });
+
   it('writes nothing when every item matches its stored copy', async () => {
     // a field the Wiki omits keeps its stored value, and the stored dates aren't Wiki fields, so neither is compared
     const dates = { addedAt: new Date('2026-01-01'), updatedAt: new Date('2026-02-01') };
