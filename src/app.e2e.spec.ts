@@ -115,6 +115,20 @@ const CASES: Record<string, Case[]> = {
       cacheControl: CACHE_CONTROL.REVALIDATE,
     },
     { name: 'invalid entry', url: '/players?entry=all', status: 400, cacheControl: CACHE_CONTROL.REVALIDATE },
+    {
+      name: 'top gainers',
+      url: '/players?sort=gain&limit=10',
+      docs: [{ username: 'toxsick', hiscoreEntries: [storedEntry] }],
+      status: 200,
+      cacheControl: CACHE_CONTROL.TOP_GAINERS,
+    },
+    {
+      name: 'top gainers, invalid limit',
+      url: '/players?sort=gain&limit=51',
+      status: 400,
+      cacheControl: CACHE_CONTROL.REVALIDATE,
+    },
+    { name: 'invalid sort', url: '/players?sort=xp', status: 400, cacheControl: CACHE_CONTROL.REVALIDATE },
   ],
   '/players/:username': [
     {
@@ -138,6 +152,12 @@ const CASES: Record<string, Case[]> = {
       status: 503,
       cacheControl: CACHE_CONTROL.REVALIDATE,
     },
+    {
+      name: 'unknown, no preview',
+      url: '/players/toxsick?preview=false',
+      status: 404,
+      cacheControl: CACHE_CONTROL.REVALIDATE,
+    },
   ],
   '/players/:username/hiscores': [
     {
@@ -155,16 +175,25 @@ const CASES: Record<string, Case[]> = {
       cacheControl: CACHE_CONTROL.PLAYER_SITEMAP,
     },
   ],
-  '/top-gainers': [
+  '/items': [
+    { url: '/items', status: 200, cacheControl: CACHE_CONTROL.REVALIDATE },
+    { name: 'search', url: '/items?search=whip', docs: [item], status: 200, cacheControl: CACHE_CONTROL.ITEM_SEARCH },
+    { name: 'letter', url: '/items?letter=a', docs: [item], status: 200, cacheControl: CACHE_CONTROL.ITEM_BROWSE },
     {
-      url: '/top-gainers?limit=10',
-      docs: [{ username: 'toxsick', hiscoreEntries: [storedEntry] }],
+      name: 'added',
+      url: '/items?sort=added&limit=25',
+      docs: [item],
       status: 200,
-      cacheControl: CACHE_CONTROL.TOP_GAINERS,
+      cacheControl: CACHE_CONTROL.NEW_ITEMS,
     },
-    { name: 'invalid limit', url: '/top-gainers?limit=51', status: 400, cacheControl: CACHE_CONTROL.TOP_GAINERS },
+    {
+      name: 'added, invalid limit',
+      url: '/items?sort=added&limit=101',
+      status: 400,
+      cacheControl: CACHE_CONTROL.REVALIDATE,
+    },
+    { name: 'two modes', url: '/items?search=whip&letter=a', status: 400, cacheControl: CACHE_CONTROL.REVALIDATE },
   ],
-  '/items': [{ url: '/items', status: 200, cacheControl: CACHE_CONTROL.REVALIDATE }],
   '/items/:id': [{ url: '/items/4151', docs: [item], status: 200, cacheControl: CACHE_CONTROL.REVALIDATE }],
   '/items/search/:query': [
     { name: 'found', url: '/items/search/whip', docs: [item], status: 200, cacheControl: CACHE_CONTROL.ITEM_SEARCH },
@@ -172,10 +201,6 @@ const CASES: Record<string, Case[]> = {
   ],
   '/items/browse/:letter': [
     { url: '/items/browse/a', docs: [item], status: 200, cacheControl: CACHE_CONTROL.ITEM_BROWSE },
-  ],
-  '/new-items': [
-    { url: '/new-items?limit=25', docs: [item], status: 200, cacheControl: CACHE_CONTROL.NEW_ITEMS },
-    { name: 'invalid limit', url: '/new-items?limit=101', status: 400, cacheControl: CACHE_CONTROL.NEW_ITEMS },
   ],
   '/player-counts': [
     { url: '/player-counts?range=1y', docs: [playerCount], status: 200, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
@@ -196,15 +221,6 @@ const CASES: Record<string, Case[]> = {
     },
   ],
   '/news': [{ url: '/news', status: 200, cacheControl: CACHE_CONTROL.NEWS, writes: FEED_STORE }],
-  '/news/since/:date': [
-    {
-      url: '/news/since/2026-10-01',
-      docs: [post],
-      status: 200,
-      cacheControl: CACHE_CONTROL.NEWS_SINCE,
-      writes: FEED_STORE,
-    },
-  ],
   '/news/archive': [
     {
       name: 'first page',
@@ -224,14 +240,6 @@ const CASES: Record<string, Case[]> = {
     { name: 'invalid before', url: '/news/archive?before=nope', status: 400, cacheControl: null },
     { name: 'invalid limit', url: '/news/archive?limit=51', status: 400, cacheControl: null },
     { name: 'repeated category', url: '/news/archive?category=a&category=b', status: 400, cacheControl: null },
-  ],
-  '/news/categories': [
-    {
-      url: '/news/categories',
-      docs: [{ category: 'Game Updates', count: 1 }],
-      status: 200,
-      cacheControl: CACHE_CONTROL.NEWS_CATEGORIES,
-    },
   ],
   '/news/image': [
     {

@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ItemsController } from './items.controller';
 import { ItemsService } from './items.service';
-import { NewItemsController } from './new-items.controller';
 
 @Module({
-  controllers: [ItemsController, NewItemsController],
+  controllers: [ItemsController],
   providers: [ItemsService],
   exports: [ItemsService],
 })

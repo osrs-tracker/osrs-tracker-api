@@ -106,7 +106,7 @@ export const mongoDBProvider: FactoryProvider = {
       .collection(ITEMS_COLLECTION)
       .createIndex({ addedAt: -1 }, { partialFilterExpression: { addedAt: { $exists: true } } });
 
-    // Ensure news indexes are created: the feed upserts on `link`, `/news/since/:date` reads by `pubDate`
+    // Ensure news indexes are created: the feed upserts on `link`; nothing reads by `pubDate` alone any more (DATA-MODEL.md)
     await db.collection(NEWS_COLLECTION).createIndex({ link: 1 }, { unique: true });
     await db.collection(NEWS_COLLECTION).createIndex({ pubDate: -1 });
 

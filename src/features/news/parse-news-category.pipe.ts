@@ -4,7 +4,7 @@ import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 const MAX_CATEGORY_LENGTH = 64;
 
 /**
- * Parses the optional `category` of `/news/archive`: one name, as `/news/categories` lists it. An unknown name isn't
+ * Parses the optional `category` of `/news/archive`: one name, as Jagex uses it (`Game Updates`). An unknown name isn't
  * rejected, it matches no posts; a repeated param (an array) or an empty or overlong one is a 400.
  */
 @Injectable()

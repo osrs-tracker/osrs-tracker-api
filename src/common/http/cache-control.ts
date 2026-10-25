@@ -9,12 +9,8 @@ export const CACHE_CONTROL = {
   /** Always fresh: items, hiscores, recent lists, unknown player previews and outages. */
   REVALIDATE: 'max-age=0, must-revalidate',
   NEWS: 'public, max-age=300',
-  /** The stored posts since a date: as fresh as `NEWS`, which refreshes them. */
-  NEWS_SINCE: 'public, max-age=300',
   /** A page of the stored posts: the first one is as fresh as `NEWS`, which refreshes it. */
   NEWS_ARCHIVE: 'public, max-age=300',
-  /** The stored posts' categories: a new one appears at most a few times a year. */
-  NEWS_CATEGORIES: 'public, max-age=3600',
   NEWS_IMAGE: 'public, max-age=604800',
   ITEM_SEARCH: 'public, max-age=3600',
   /** Item browse: the items collection changes at most daily. */

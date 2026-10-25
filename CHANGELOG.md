@@ -7,26 +7,36 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 
 ### API
 
-- New `GET /new-items?limit=` (1 to 100, default 25, `public, max-age=3600`): the items the hourly items job added,
-  newest first, `[{ id, icon, name, addedAt }]`, for a "New on the GE" page on the web (#217,
-  osrs-tracker/osrs-tracker-web#444). New items get a large share of the site's search impressions, and ids aren't a
-  reliable added order. Not `/items/new`: `/items/:id` would shadow it. The items job now stores `addedAt` on insert and
-  `updatedAt` on every item it writes, which is only a new or changed one, and the item browse lists carry `updatedAt`,
-  so the web's items sitemap can give each item a `<lastmod>`. Neither is `lastFetch`, which is when a visitor last
-  looked an item up. No backfill: the list is `[]` until a game update adds an item, and older items get `updatedAt`
-  only when the Wiki changes them.
+- **Breaking:** Routes follow one rule now: another view of a collection is a query param on it, not a new top-level
+  route or a value in the path. `/items/:id` and `/players/:username` take any name, so the route conflict policy
+  rejects fixed words beside them, and each view had found its own way around that. `GET /items` takes one of `search=`
+  (item search), `letter=` (item browse) or `sort=` (`lookedUp`, the default and the old `GET /items`, or `added`, the
+  new items), and `GET /players` takes `sort=lookedUp` (the default) or `sort=gain` (the top gainers), each mode with
+  its own `Cache-Control`, and `max-age=0, must-revalidate` on a 400. `/players/:username/hiscores` takes `limit`
+  instead of `size`, and `/players/:username` takes `preview=false` instead of `skipRefresh=true` (which read as if a
+  GET could refresh). `/items/search/:query`, `/items/browse/:letter`, `size` and `skipRefresh` still work until the web
+  app moves over, then go. `/new-items` and `/top-gainers` (below, added today and not called yet) and
+  `/news/since/:date` and `/news/categories` (no calls in a week, the web pages `/news/archive` instead) are removed. No
+  `/v2`: the web app is the only consumer.
 
-- New `GET /top-gainers?limit=` (1 to 50, default 10): the tracked players with the largest Overall XP gain between the
-  previous and the newest day's offset-0 entries, `[{ username, gain, date }]`, for a "Top gainers today" list on the
-  web's `/trackers/xp` (#218, osrs-tracker/osrs-tracker-web#445). Only 5 or 6 of the ~540 tracked players are linked
-  from the site's HTML, so Google finds the rest only through the sitemap; the list links a different set every day. Not
-  `/players/top-gainers`: `top-gainers` is a valid name, so that would shadow `/players/:username`. It reads only stored
-  entries, from players still scraped and without a not-found streak whose newest entry is from the latest 00 UTC slot,
-  leaving out those who gained nothing. Players whose previous entry is older than the slot before are left out too
-  (#229): the web labels the list as one day, and a player resumed after a pause or with a missed scrape would show a
-  gain over several days. Ranking means reading every candidate's two newest entries, so each pod caches the list per
-  slot for an hour (`public, max-age=3600`), and serves the previous slot's list until an hour after 00 UTC, so a scrape
-  still landing (done by 00:15 every day of the last week) never shows a partial list.
+- New `GET /items?sort=added&limit=` (1 to 100, default 25, `public, max-age=3600`): the items the hourly items job
+  added, newest first, `[{ id, icon, name, addedAt }]`, for a "New on the GE" page on the web (#217,
+  osrs-tracker/osrs-tracker-web#444). New items get a large share of the site's search impressions, and ids aren't a
+  reliable added order. The items job now stores `addedAt` on insert and `updatedAt` on every item it writes, which is
+  only a new or changed one, and the item browse lists carry `updatedAt`, so the web's items sitemap can give each item
+  a `<lastmod>`. Neither is `lastFetch`, which is when a visitor last looked an item up. No backfill: the list is `[]`
+  until a game update adds an item, and older items get `updatedAt` only when the Wiki changes them.
+
+- New `GET /players?sort=gain&limit=` (1 to 50, default 10): the tracked players with the largest Overall XP gain
+  between the previous and the newest day's offset-0 entries, `[{ username, gain, date }]`, for a "Top gainers today"
+  list on the web's `/trackers/xp` (#218, osrs-tracker/osrs-tracker-web#445). Only 5 or 6 of the ~540 tracked players
+  are linked from the site's HTML, so Google finds the rest only through the sitemap; the list links a different set
+  every day. It reads only stored entries, from players still scraped and without a not-found streak whose newest entry
+  is from the latest 00 UTC slot, leaving out those who gained nothing. Players whose previous entry is older than the
+  slot before are left out too (#229): the web labels the list as one day, and a player resumed after a pause or with a
+  missed scrape would show a gain over several days. Ranking means reading every candidate's two newest entries, so each
+  pod caches the list per slot for an hour (`public, max-age=3600`), and serves the previous slot's list until an hour
+  after 00 UTC, so a scrape still landing (done by 00:15 every day of the last week) never shows a partial list.
 
 - `CORS_ORIGIN` now takes a comma-separated list of origins, each checked for `https://` or `http://` at startup, and
   the cluster allows `https://osrs-tracker.net` beside `https://osrs-tracker.freekmencke.com` (#219, roadmap

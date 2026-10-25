@@ -1,7 +1,7 @@
 import { Filter } from 'mongodb';
 import { Item } from '@osrs-tracker/models';
 
-/** The letters `GET /items/browse/:letter` takes: `a` to `z`, and `0` for names that don't start with a letter. */
+/** The letters `GET /items?letter=` takes: `a` to `z`, and `0` for names that don't start with a letter. */
 export const BROWSE_LETTERS = [...'abcdefghijklmnopqrstuvwxyz0'];
 
 /**
