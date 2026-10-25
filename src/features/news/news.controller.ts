@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Controller, Get, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ParseIntRangeOptions, ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
@@ -7,7 +7,6 @@ import { NewsService } from './news.service';
 import { ParseNewsCategoryPipe } from './parse-news-category.pipe';
 import { ParseNewsCursorPipe } from './parse-news-cursor.pipe';
 import { ParseNewsImageUrlPipe } from './parse-news-image-url.pipe';
-import { ParseSinceDatePipe } from './parse-since-date.pipe';
 
 const LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 4 };
 const ARCHIVE_LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 20 };
@@ -34,24 +33,9 @@ export class NewsController {
   }
 
   /**
-   * The stored posts published after `date` (see `ParseSinceDatePipe`), newest first, at most 200: every post since the
-   * feed was first stored, plus older ones backfilled from the Wiki without `description` or `enclosure`. Refreshes the
-   * feed first, but answers from the stored posts when Jagex fails. `NEWS_SINCE`; 400 for an invalid date. Errors have
-   * no `Cache-Control`.
-   */
-  @Get('since/:date')
-  async getNewsSince(@Res({ passthrough: true }) res: Response, @Param('date', ParseSinceDatePipe) since: Date) {
-    const news = await this.newsService.getNewsSince(since);
-
-    // Set only on success (not with @Header), so caches don't keep a failed read for 5 minutes
-    res.setHeader('Cache-Control', CACHE_CONTROL.NEWS_SINCE);
-    return news;
-  }
-
-  /**
    * A page of every stored post (feed and backfilled), newest first with ties on `pubDate` broken by `link`, as
    * `{ posts, next }`: `limit` posts (1 to 50, default 20) after the `before` cursor (the previous page's `next`; none
-   * for the first page) in `category` when given (a name from `/news/categories`; an unknown one matches nothing).
+   * for the first page) in `category` when given (Jagex's name, e.g. `Game Updates`; an unknown one matches nothing).
    * `next` is `null` on the last page. The first page refreshes the feed first but answers from the stored posts when
    * Jagex fails. `NEWS_ARCHIVE`; 400 for an invalid `before`, `limit` or `category`. Errors have no `Cache-Control`.
    */
@@ -67,19 +51,6 @@ export class NewsController {
     // Set only on success (not with @Header), so caches don't keep a failed read for 5 minutes
     res.setHeader('Cache-Control', CACHE_CONTROL.NEWS_ARCHIVE);
     return page;
-  }
-
-  /**
-   * The stored posts' categories by name, as `{ category, count }`, for the archive's filter. `NEWS_CATEGORIES`; errors
-   * have no `Cache-Control`.
-   */
-  @Get('categories')
-  async getNewsCategories(@Res({ passthrough: true }) res: Response) {
-    const categories = await this.newsService.getNewsCategories();
-
-    // Set only on success (not with @Header), so caches don't keep a failed read for an hour
-    res.setHeader('Cache-Control', CACHE_CONTROL.NEWS_CATEGORIES);
-    return categories;
   }
 
   /**

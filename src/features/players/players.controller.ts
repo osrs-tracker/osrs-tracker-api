@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Controller,
   DefaultValuePipe,
   Get,
@@ -10,7 +9,6 @@ import {
   NotFoundException,
   Param,
   ParseBoolPipe,
-  ParseEnumPipe,
   Post,
   Query,
   Req,
@@ -25,16 +23,13 @@ import { ParseIntRangeOptions, ParseIntRangePipe } from '../../common/pipes/pars
 import { ParseScrapingOffsetPipe } from './parse-scraping-offset.pipe';
 import { ParseUsernamePipe } from './parse-username.pipe';
 import { needsRefresh, playerMaxAgeSeconds } from './player.policy';
-import { PlayersService, RECENT_PLAYERS_ENTRY, type RecentPlayersEntry } from './players.service';
+import { ParsePlayerListQueryPipe, type PlayerListQuery } from './parse-player-list-query.pipe';
+import { PlayersService } from './players.service';
 
-const LIMIT: ParseIntRangeOptions = { min: 1, max: 50, default: 5 };
-const SIZE: ParseIntRangeOptions = { min: 1, max: 100, default: 7 };
+const PAGE_SIZE: ParseIntRangeOptions = { min: 1, max: 100, optional: true };
+const DEFAULT_PAGE_SIZE = 7;
 // A cap far above a player's entries per offset (clean-hiscores keeps 60 days), and within the 32 bits `$slice` takes
 const SKIP: ParseIntRangeOptions = { min: 0, max: 10_000, default: 0 };
-const ENTRY = new ParseEnumPipe(RECENT_PLAYERS_ENTRY, {
-  optional: true,
-  exceptionFactory: () => new BadRequestException(`Entry must be 'overall'.`),
-});
 
 @Controller('players')
 export class PlayersController {
@@ -43,19 +38,29 @@ export class PlayersController {
   constructor(private readonly playersService: PlayersService) {}
 
   /**
-   * The most recently looked up players, newest first, each with `hiscoreEntries` holding at most its newest entry (for
-   * `scrapingOffset` when given; any offset when absent). `entry=overall` cuts that entry to its `date`,
-   * `scrapingOffset` and `skills.Overall`, with `activities: {}` (the web's recent players rows); without it, the entry
-   * is whole. 400 when a param is out of range or `entry` isn't `overall`. `REVALIDATE` on every response.
+   * The players, by `sort` (`ParsePlayerListQueryPipe`; 400 for any other `sort` or an invalid param):
+   * - `lookedUp` (the default): the `limit` (1 to 50, default 5) most recently looked up players, newest first, each
+   *   with `hiscoreEntries` holding at most its newest entry (for `scrapingOffset` when given; any offset when absent).
+   *   `entry=overall` cuts that entry to its `date`, `scrapingOffset` and `skills.Overall`, with `activities: {}` (the
+   *   web's recent players rows); without it, the entry is whole. 400 when `entry` isn't `overall`. `REVALIDATE`.
+   * - `gain`: the `limit` (1 to `MAX_TOP_GAINERS`, default 10) tracked players with the largest Overall XP gain
+   *   between the previous and the newest day's hiscore entries for offset 0, `[{ username, gain, date }]` by `gain`,
+   *   largest first, with `date` the newer entry's: only players whose newest entry is from the newest offset-0 slot
+   *   (its previous slot until an hour after it starts, `topGainersSlot`) and the one before it from the slot before,
+   *   still scraped and without a not-found streak; none who gained nothing. Read from stored entries only.
+   *   `TOP_GAINERS`.
+   *
+   * Each sort's `Cache-Control` is on every response of that sort; a 400 gets `REVALIDATE`.
    */
   @Get('')
-  @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
-  getRecentPlayers(
-    @Query('limit', new ParseIntRangePipe(LIMIT)) limit: number,
-    @Query('scrapingOffset', new ParseScrapingOffsetPipe({ optional: true })) scrapingOffset?: number,
-    @Query('entry', ENTRY) entry?: RecentPlayersEntry,
-  ) {
-    return this.playersService.getLastFetchedPlayers(limit, scrapingOffset, entry);
+  @Header('Cache-Control', CACHE_CONTROL.REVALIDATE) // Before the pipe runs, so it's also a 400's
+  listPlayers(@Res({ passthrough: true }) res: Response, @Query(ParsePlayerListQueryPipe) query: PlayerListQuery) {
+    if (query.sort === 'gain') {
+      res.setHeader('Cache-Control', CACHE_CONTROL.TOP_GAINERS);
+      return this.playersService.getTopGainers(query.limit, new Date());
+    }
+
+    return this.playersService.getLastFetchedPlayers(query.limit, query.scrapingOffset, query.entry);
   }
 
   /**
@@ -65,8 +70,8 @@ export class PlayersController {
    * A stored player as stored (stale or not), with `trackedSince` (its oldest entry for `scrapingOffset`, or `null`)
    * and a `max-age` of the time left until it may be refreshed (0 to `PLAYER_MAX_AGE_SECONDS`, `playerMaxAgeSeconds`).
    * An unknown player is a live preview from the hiscores, not stored (`scrapingOffsets: []`, `trackedSince: null`);
-   * 404 when not on the hiscores (or with `skipRefresh`, which skips the preview), 503 when they can't be reached; all
-   * three `REVALIDATE`. `includeLatestHiscoreEntry` adds `hiscoreEntries` with the newest entry for `scrapingOffset`
+   * 404 when not on the hiscores (or with `preview=false`, which skips the preview; `skipRefresh=true` is its deprecated
+   * name), 503 when they can't be reached; all three `REVALIDATE`. `includeLatestHiscoreEntry` adds `hiscoreEntries` with the newest entry for `scrapingOffset`
    * (empty when there is none). 400 for an invalid username or param.
    */
   @Get(':username')
@@ -75,6 +80,8 @@ export class PlayersController {
     @Param('username', ParseUsernamePipe) username: string,
     @Query('scrapingOffset', new ParseScrapingOffsetPipe()) scrapingOffset: number,
     @Query('includeLatestHiscoreEntry', new DefaultValuePipe(false), ParseBoolPipe) includeLatestHiscoreEntry: boolean,
+    @Query('preview', new DefaultValuePipe(true), ParseBoolPipe) allowPreview: boolean,
+    /** @deprecated `preview=false`; removed once the web app no longer sends it. */
     @Query('skipRefresh', new DefaultValuePipe(false), ParseBoolPipe) skipRefresh: boolean,
   ) {
     // Read-only: refreshing, starting to track and recording the lookup happen in the browser's POST lookup.
@@ -88,7 +95,7 @@ export class PlayersController {
     // Not stored: preview the player live from the hiscores, without storing it.
     response.setHeader('Cache-Control', CACHE_CONTROL.REVALIDATE);
 
-    if (skipRefresh) throw new NotFoundException(`Player '${username}' not found`);
+    if (!allowPreview || skipRefresh) throw new NotFoundException(`Player '${username}' not found`);
 
     const preview = await this.playersService.previewPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
     if (preview.status === 'notFound') throw new NotFoundException(`Player '${username}' not found`);
@@ -165,17 +172,20 @@ export class PlayersController {
   }
 
   /**
-   * A page (`size`, `skip`) of the player's hiscore entries for `scrapingOffset`, newest first; an empty body for a
-   * player that isn't stored. 400 for an invalid username or param. `REVALIDATE` on every response.
+   * A page (`limit` 1 to 100, default 7; `skip`) of the player's hiscore entries for `scrapingOffset`, newest first; an
+   * empty body for a player that isn't stored. `size` is `limit`'s deprecated name. 400 for an invalid username or
+   * param. `REVALIDATE` on every response.
    */
   @Get(':username/hiscores')
   @Header('Cache-Control', CACHE_CONTROL.REVALIDATE)
   getHiscoresByUsername(
     @Param('username', ParseUsernamePipe) username: string,
     @Query('scrapingOffset', new ParseScrapingOffsetPipe()) scrapingOffset: number,
-    @Query('size', new ParseIntRangePipe(SIZE)) size: number,
+    @Query('limit', new ParseIntRangePipe(PAGE_SIZE)) limit: number | undefined,
     @Query('skip', new ParseIntRangePipe(SKIP)) skip: number,
+    /** @deprecated `limit`; removed once the web app no longer sends it. */
+    @Query('size', new ParseIntRangePipe(PAGE_SIZE)) size: number | undefined,
   ) {
-    return this.playersService.getPlayerHiscores(username, scrapingOffset, size, skip);
+    return this.playersService.getPlayerHiscores(username, scrapingOffset, limit ?? size ?? DEFAULT_PAGE_SIZE, skip);
   }
 }

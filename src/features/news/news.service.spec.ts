@@ -22,7 +22,7 @@ import {
   NEWS_IMAGES,
   NEWS_IMAGES_PRESET,
 } from './news.config';
-import { MAX_NEWS_SINCE, NewsService } from './news.service';
+import { NewsService } from './news.service';
 
 vi.mock('undici', async (importOriginal) => ({ ...(await importOriginal<typeof import('undici')>()), fetch: vi.fn() }));
 
@@ -177,31 +177,6 @@ describe('NewsService caches', () => {
 
       expect((await service.getRecentNews(4))[0].title).toBe('Patch notes');
       expect(warn).toHaveBeenCalledWith('Storing the news feed failed: connection closed');
-    });
-  });
-
-  describe('getNewsSince', () => {
-    const since = new Date('2026-10-01T00:00:00Z');
-
-    it('refreshes the feed, then reads the stored posts after the date, newest first', async () => {
-      answerWith(() => new Response(RSS));
-      storedNews = [{ title: 'Stored' }];
-
-      expect(await service.getNewsSince(since)).toEqual(storedNews);
-      expect(fakeNews.bulkWrite).toHaveBeenCalledBefore(fakeNews.find);
-      expect(fakeNews.find).toHaveBeenCalledWith(
-        { pubDate: { $gt: since } },
-        { sort: { pubDate: -1 }, limit: MAX_NEWS_SINCE, projection: { _id: 0 } },
-      );
-    });
-
-    it('answers from the stored posts when the feed fails', async () => {
-      answerWith(() => new Response('Bad gateway', { status: 502 }));
-      storedNews = [{ title: 'Stored' }];
-
-      expect(await service.getNewsSince(since)).toEqual(storedNews);
-      expect(fakeNews.bulkWrite).not.toHaveBeenCalled();
-      expect(warn).toHaveBeenCalledWith('News feed request failed: HTTP 502');
     });
   });
 

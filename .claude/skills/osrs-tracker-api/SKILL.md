@@ -139,15 +139,17 @@ review rules go in `## Review rules`.
 ## Validating params
 
 Validate query and route params in pipes, not with checks in the handler: `ParseUsernamePipe`,
-`ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (item browse's letter), `ParseSinceDatePipe` (an ISO date for
-`/news/since/:date`), `ParseNewsCursorPipe` and `ParseNewsCategoryPipe` (`/news/archive`'s `before` and `category`),
-`ParsePlayerCountRangePipe` (`/player-counts`' `range`: `24h`, `7d`, `30d`, `1y` or `all`; `24h` when absent),
-`ParseNewsImageUrlPipe` (`/news/image`'s `url`: only plain `https://cdn.runescape.com/` URLs, by parsed origin, never a
-prefix check), `ParseItemSearchQueryPipe` (`/items/search/:query`, at most 64 characters), each next to its feature, and
-from `common/pipes/` `new ParseIntRangePipe({ min, max?, default?, optional?, message? })` for any other integer (its
-message is named after the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` + `ParseIntPipe` + a
-range check, or an `isNaN` check after a parse pipe. Keep existing status codes and messages: the web may show them. A
-new pipe gets a spec.
+`ParseScrapingOffsetPipe`, `ParseBrowseLetterPipe` (item browse's letter), `ParseNewsCursorPipe` and
+`ParseNewsCategoryPipe` (`/news/archive`'s `before` and `category`), `ParsePlayerCountRangePipe` (`/player-counts`'
+`range`: `24h`, `7d`, `30d`, `1y` or `all`; `24h` when absent), `ParseNewsImageUrlPipe` (`/news/image`'s `url`: only
+plain `https://cdn.runescape.com/` URLs, by parsed origin, never a prefix check), `ParseItemSearchQueryPipe` (item
+search, at most 64 characters), `ParseItemListQueryPipe` and `ParsePlayerListQueryPipe` (`GET /items`' and
+`GET /players`' whole query, into a union of modes, reusing the pipes above), each next to its feature,
+`singleQueryValue` (a 400 for a repeated param) in a whole-query pipe, and from `common/pipes/`
+`new ParseIntRangePipe({ min, max?, default?, optional?, message? })` for any other integer (its message is named after
+the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` + `ParseIntPipe` + a range check, or an
+`isNaN` check after a parse pipe. Keep existing status codes and messages: the web may show them. A new pipe gets a
+spec.
 
 Stored usernames are Jagex's matching form: lowercase, `_` and `-` as spaces, trimmed (`PlayerUtils.normalizeUsername`,
 which `ParseUsernamePipe` applies), so one player is one document. Anything that stores, looks up or compares a name
@@ -165,6 +167,11 @@ A route that duplicates or shadows another (`/items/recent` next to `/items/:id`
 e2e spec: `ROUTE_CONFLICT_POLICY` (`config/app-options.ts`, `error` for both kinds) is passed by `main.ts` and
 `app.e2e.spec.ts`. Rename or restructure the route; don't relax the policy to `warn`, and leave
 `routeResolutionStrategy` at its default (with conflicts rejected, declaration order doesn't matter).
+
+So another view of a collection (a filter, a sort, a search) is a query param on that collection, parsed by its
+whole-query pipe (`GET /items?search=`, `?letter=`, `?sort=added`; `GET /players?sort=gain`), never a new top-level
+route or a value in the path. Each mode sets its own `Cache-Control` in the handler, over a `REVALIDATE` `@Header` that
+also covers the pipe's 400s. A route kept only until the web app stops calling it says so in a `@deprecated` line.
 
 ## Service failures
 
@@ -283,17 +290,17 @@ changes `CASES` in the same diff. The spec fails on a new GET route without a ca
 case expects (values only POSTs send go in its `POST_ONLY`); a new branch reusing an existing value it can't see, so
 that one is on the author and the `conventions-reviewer`.
 
-- Read-only, slow-changing: `public, max-age=N` (`/player-counts/live` 60, `/news`, `/news/since/:date`,
-  `/news/archive`, `/player-counts` and `/player-counts/latest` 300, `/news/categories`, `/items/search/:query`,
-  `/sitemap/players`, `/top-gainers` and `/new-items` 3600, `/items/browse/:letter` 86400, `/news/image` 604800).
-- Routes that fetch Jagex live (`/news`, `/news/since/:date`, `/news/archive`, `/news/image`, `/player-counts/live`) and
-  `/news/categories` set it with `res.setHeader` after the read succeeds, not with `@Header` (which also applies to
-  errors), so caches don't keep a 503 (`/player-counts/live` sets `REVALIDATE` first, for its 502).
+- Read-only, slow-changing: `public, max-age=N` (`/player-counts/live` 60, `/news`, `/news/archive`, `/player-counts`
+  and `/player-counts/latest` 300, `/items?search=`, `/items?sort=added`, `/players?sort=gain` and `/sitemap/players`
+  3600, `/items?letter=` 86400, `/news/image` 604800).
+- Routes that fetch Jagex live (`/news`, `/news/archive`, `/news/image`, `/player-counts/live`) set it with
+  `res.setHeader` after the read succeeds, not with `@Header` (which also applies to errors), so caches don't keep a 503
+  (`/player-counts/live` sets `REVALIDATE` first, for its 502).
 - `/player-counts` and `/player-counts/latest` read only stored samples (no Jagex call), so they set `PLAYER_COUNT` with
   `@Header`, on every response.
 - GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR. The one
-  exception: a news feed refresh (`/news`, `/news/since/:date`, the first page of `/news/archive`) upserts the feed's
-  posts into `news` (keyed on `link`), the same whoever asks; the e2e spec allows only that write (`FEED_STORE`).
+  exception: a news feed refresh (`/news`, the first page of `/news/archive`) upserts the feed's posts into `news`
+  (keyed on `link`), the same whoever asks; the e2e spec allows only that write (`FEED_STORE`).
 - `/items/:id`, `/players/:username/hiscores` and the recent-items/players lists: `max-age=0, must-revalidate` so
   they're always fresh.
 - `/players/:username`: stored players get a dynamic `max-age` (`playerMaxAgeSeconds`), clamped to `[0, 900]`

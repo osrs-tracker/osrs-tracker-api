@@ -83,7 +83,7 @@ function matchScore({ queryWord, across, typos }: QueryWord, words: string[]): n
 }
 
 /**
- * Item search for `GET /items/search/:query`, in memory. Every query word of at least `MIN_PREFIX_LENGTH` characters
+ * Item search for `GET /items?search=`, in memory. Every query word of at least `MIN_PREFIX_LENGTH` characters
  * has to match the name, in any order, scoring by how (`SCORE`):
  *
  * - a whole word, or the start of one (`drag scim` finds Dragon scimitar);
