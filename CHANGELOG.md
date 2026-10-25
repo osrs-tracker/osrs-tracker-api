@@ -5,10 +5,10 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 
 ## 2026-10-25
 
-- New `GET /top-gainers?limit=` (1 to 50, default 10): the tracked players with the largest Overall XP gain between
-  their two newest offset-0 entries, `[{ username, gain, date }]`, for a "Top gainers today" list on the web's
-  `/trackers/xp` (#218, osrs-tracker/osrs-tracker-web#445). Only 5 or 6 of the ~540 tracked players are linked from the
-  site's HTML, so Google finds the rest only through the sitemap; the list links a different set every day. Not
+- New `GET /top-gainers?limit=` (1 to 50, default 5, like `GET /players`): the tracked players with the largest Overall
+  XP gain between their two newest offset-0 entries, `[{ username, gain, date }]`, for a "Top gainers today" list on the
+  web's `/trackers/xp` (#218, osrs-tracker/osrs-tracker-web#445). Only 5 or 6 of the ~540 tracked players are linked
+  from the site's HTML, so Google finds the rest only through the sitemap; the list links a different set every day. Not
   `/players/top-gainers`: `top-gainers` is a valid name, so that would shadow `/players/:username`. It reads only stored
   entries, from players still scraped and without a not-found streak whose newest entry is from the latest 00 UTC slot,
   leaving out those who gained nothing. Ranking means reading every candidate's two newest entries, so each pod caches

@@ -18,7 +18,7 @@ export class TopGainersController {
    */
   @Get()
   @Header('Cache-Control', CACHE_CONTROL.TOP_GAINERS)
-  getTopGainers(@Query('limit', new ParseIntRangePipe({ min: 1, max: MAX_TOP_GAINERS, default: 10 })) limit: number) {
+  getTopGainers(@Query('limit', new ParseIntRangePipe({ min: 1, max: MAX_TOP_GAINERS, default: 5 })) limit: number) {
     return this.playersService.getTopGainers(limit, new Date());
   }
 }
