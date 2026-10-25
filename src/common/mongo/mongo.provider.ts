@@ -102,6 +102,9 @@ export const mongoDBProvider: FactoryProvider = {
       .collection(ITEMS_COLLECTION)
       .createIndex({ lastFetch: -1 }, { partialFilterExpression: { lastFetch: { $exists: true } } });
     await db.collection(ITEMS_COLLECTION).createIndex({ name: 1 }, { collation: ITEM_NAME_COLLATION });
+    await db
+      .collection(ITEMS_COLLECTION)
+      .createIndex({ addedAt: -1 }, { partialFilterExpression: { addedAt: { $exists: true } } });
 
     // Ensure news indexes are created: the feed upserts on `link`, `/news/since/:date` reads by `pubDate`
     await db.collection(NEWS_COLLECTION).createIndex({ link: 1 }, { unique: true });

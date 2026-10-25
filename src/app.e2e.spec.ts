@@ -173,6 +173,10 @@ const CASES: Record<string, Case[]> = {
   '/items/browse/:letter': [
     { url: '/items/browse/a', docs: [item], status: 200, cacheControl: CACHE_CONTROL.ITEM_BROWSE },
   ],
+  '/new-items': [
+    { url: '/new-items?limit=25', docs: [item], status: 200, cacheControl: CACHE_CONTROL.NEW_ITEMS },
+    { name: 'invalid limit', url: '/new-items?limit=101', status: 400, cacheControl: CACHE_CONTROL.NEW_ITEMS },
+  ],
   '/player-counts': [
     { url: '/player-counts?range=1y', docs: [playerCount], status: 200, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
     { name: 'invalid range', url: '/player-counts?range=1w', status: 400, cacheControl: CACHE_CONTROL.PLAYER_COUNT },

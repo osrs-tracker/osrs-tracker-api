@@ -47,8 +47,10 @@ export class ItemsRefreshService implements OnApplicationBootstrap {
   /**
    * Upserts by `id` with `$set` of the Wiki's object (a field it omits keeps its stored value) only the items that are
    * new or differ from the stored copy in a field the Wiki sends: the list changes only on game updates, and writing
-   * every item each hour showed as a spike of ~4,700 ops. Then deletes the items missing from the list (taken off the
-   * GE), unless more than `MAX_REMOVED_ITEMS` would go, so a truncated response never wipes the collection.
+   * every item each hour showed as a spike of ~4,700 ops. A new item gets `addedAt` and every written one `updatedAt`
+   * (one time per run), so `updatedAt` moves only when a Wiki field changed: the comparison iterates the Wiki's keys, so
+   * the stored dates never count as a change. Then deletes the items missing from the list (taken off the GE), unless
+   * more than `MAX_REMOVED_ITEMS` would go, so a truncated response never wipes the collection.
    */
   async refresh(signal: AbortSignal): Promise<void> {
     const list = await this.fetchItems(signal);
@@ -64,9 +66,15 @@ export class ItemsRefreshService implements OnApplicationBootstrap {
     });
     // bulkWrite rejects an empty batch
     if (changed.length) {
+      const now = new Date();
       await this.items.bulkWrite(
         changed.map((item) => ({
-          updateOne: { filter: { id: item.id }, hint: { id: 1 }, update: { $set: item }, upsert: true },
+          updateOne: {
+            filter: { id: item.id },
+            hint: { id: 1 },
+            update: { $set: { ...item, updatedAt: now }, $setOnInsert: { addedAt: now } },
+            upsert: true,
+          },
         })),
       );
     }

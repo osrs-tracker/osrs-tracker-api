@@ -47,6 +47,18 @@ export class ItemsService {
       .toArray();
   }
 
+  /** The items with an `addedAt` (added by the ingester), newest first. */
+  getNewItems(limit: number): Promise<Item[]> {
+    return this.collection
+      .find<Item>(
+        { addedAt: { $exists: true } },
+        { hint: { addedAt: -1 }, projection: { _id: 0, id: 1, icon: 1, name: 1, addedAt: 1 } },
+      )
+      .sort({ addedAt: -1 })
+      .limit(limit)
+      .toArray();
+  }
+
   getItem(id: number): Promise<Item | null> {
     return this.collection.findOne<Item>({ id: id }, { hint: { id: 1 }, projection: { _id: 0 } });
   }
@@ -62,7 +74,7 @@ export class ItemsService {
       .find<Item>(buildItemBrowseFilter(letter), {
         collation: ITEM_NAME_COLLATION, // The `{ name: 1 }` index's, or Mongo can't use it
         hint: { name: 1 },
-        projection: { _id: 0, id: 1, icon: 1, name: 1 },
+        projection: { _id: 0, id: 1, icon: 1, name: 1, updatedAt: 1 },
       })
       .sort({ name: 1 })
       .toArray();
