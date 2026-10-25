@@ -47,7 +47,7 @@ export class ItemsService {
       .toArray();
   }
 
-  /** The items with an `addedAt` (added by the ingester), newest first. */
+  /** The items with an `addedAt` (all of them since the 2026-10-25 backfill), newest first. */
   getNewItems(limit: number): Promise<Item[]> {
     return this.collection
       .find<Item>(

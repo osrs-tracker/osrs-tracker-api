@@ -24,8 +24,11 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   osrs-tracker/osrs-tracker-web#444). New items get a large share of the site's search impressions, and ids aren't a
   reliable added order. The items job now stores `addedAt` on insert and `updatedAt` on every item it writes, which is
   only a new or changed one, and the item browse lists carry `updatedAt`, so the web's items sitemap can give each item
-  a `<lastmod>`. Neither is `lastFetch`, which is when a visitor last looked an item up. No backfill: the list is `[]`
-  until a game update adds an item, and older items get `updatedAt` only when the Wiki changes them.
+  a `<lastmod>`. Neither is `lastFetch`, which is when a visitor last looked an item up. Older items got their release
+  day as `addedAt` in a one-off backfill from the OSRS Wiki (the `infobox_item` bucket's `release_date`, a fact, no Wiki
+  text), clamped to Old School's launch on 2013-02-22 for the 2,599 released before it, so the list has the latest game
+  update's items from the start instead of `[]` until the next one. Older items get `updatedAt` only when the Wiki
+  changes them.
 
 - New `GET /players?sort=gain&limit=` (1 to 50, default 5, like `sort=lookedUp`): the tracked players with the largest
   Overall XP gain between the previous and the newest day's offset-0 entries, `[{ username, gain, date }]`, for a "Top

@@ -36,9 +36,9 @@ export class ItemsController {
    *   other `letter`, uppercase included. `ITEM_BROWSE`.
    * - `sort=lookedUp` (the default): the `limit` (1 to 50, default 5) most recently looked up items, newest first.
    *   `REVALIDATE`.
-   * - `sort=added`: the `limit` (1 to 100, default 25) items the ingester added, newest first, with only `id`, `icon`,
-   *   `name` and `addedAt`. Items stored before `addedAt` existed have none and are never listed, so it's `[]` until a
-   *   game update adds one. `NEW_ITEMS`.
+   * - `sort=added`: the `limit` (1 to 100, default 25) newest items by `addedAt` (when the ingester stored the item,
+   *   or its release day from before then; see `DATA-MODEL.md`), with only `id`, `icon`, `name` and `addedAt`.
+   *   `NEW_ITEMS`.
    *
    * Each mode's `Cache-Control` is on every response of that mode; a 400 gets `REVALIDATE`.
    */
