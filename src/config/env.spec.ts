@@ -13,7 +13,7 @@ describe('validateEnv', () => {
   it('applies the defaults and treats empty optional values as unset', () => {
     expect(validateEnv({ ...VALID, CORS_ORIGIN: '', PORT: '' })).toEqual({
       ...VALID,
-      CORS_ORIGIN: undefined,
+      CORS_ORIGIN: [],
       PORT: 3000,
       METRICS_PORT: 9090,
     });
@@ -27,7 +27,19 @@ describe('validateEnv', () => {
         PORT: '8080',
         METRICS_PORT: '9091',
       }),
-    ).toMatchObject({ CORS_ORIGIN: 'https://osrs-tracker.freekmencke.com', PORT: 8080, METRICS_PORT: 9091 });
+    ).toMatchObject({ CORS_ORIGIN: ['https://osrs-tracker.freekmencke.com'], PORT: 8080, METRICS_PORT: 9091 });
+  });
+
+  it('reads CORS_ORIGIN as a comma-separated list, trimming each entry and skipping empty ones', () => {
+    expect(
+      validateEnv({ ...VALID, CORS_ORIGIN: ' https://osrs-tracker.freekmencke.com , https://osrs-tracker.net,' }),
+    ).toMatchObject({ CORS_ORIGIN: ['https://osrs-tracker.freekmencke.com', 'https://osrs-tracker.net'] });
+  });
+
+  it('rejects a CORS_ORIGIN entry without a protocol', () => {
+    expect(() =>
+      validateEnv({ ...VALID, CORS_ORIGIN: 'https://osrs-tracker.freekmencke.com,osrs-tracker.net' }),
+    ).toThrow('CORS_ORIGIN entry "osrs-tracker.net" must start with https:// or http://.');
   });
 
   it.each(Object.keys(VALID))('throws when %s is missing or blank', (name) => {

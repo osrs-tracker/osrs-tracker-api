@@ -5,6 +5,10 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 
 ## 2026-10-25
 
+- `CORS_ORIGIN` now takes a comma-separated list of origins, each checked for `https://` or `http://` at startup, and
+  the cluster allows `https://osrs-tracker.net` beside `https://osrs-tracker.freekmencke.com` (#219, roadmap
+  osrs-tracker/osrs-tracker-web#448). The website moves to the new domain, and its browser requests from there would
+  otherwise fail CORS; the old origin stays until the switch is live.
 - The ingester's hourly items job now writes only the items that are new or changed, instead of all ~4,700 every hour
   (#215). The Wiki's list changes only on game updates, so nearly every write was a no-op, but MongoDB counts each
   statement in a bulk write, and the job showed as a spike of ~4,700 ops at every hour that hid real traffic. It reads
