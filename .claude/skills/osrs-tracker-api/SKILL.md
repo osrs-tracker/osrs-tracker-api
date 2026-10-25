@@ -171,7 +171,8 @@ e2e spec: `ROUTE_CONFLICT_POLICY` (`config/app-options.ts`, `error` for both kin
 So another view of a collection (a filter, a sort, a search) is a query param on that collection, parsed by its
 whole-query pipe (`GET /items?search=`, `?letter=`, `?sort=added`; `GET /players?sort=gain`), never a new top-level
 route or a value in the path. Each mode sets its own `Cache-Control` in the handler, over a `REVALIDATE` `@Header` that
-also covers the pipe's 400s. A route kept only until the web app stops calling it says so in a `@deprecated` line.
+also covers the pipe's 400s. A route kept only until the web app stops calling it says so in a `@deprecated` line, and
+an issue removes it.
 
 ## Service failures
 
@@ -275,8 +276,7 @@ usernames) is in [`DATA-MODEL.md`](../../../DATA-MODEL.md). The API's side, in `
   the proxy is shared with process-players.
 - GETs never write: `GET /players/:username` returns a stored player as stored (stale or not, never refreshed), and an
   unknown player as a live preview from `determinePlayerStatusAndType` that isn't stored (`scrapingOffsets: []`,
-  `trackedSince: null`), 404 only for not found and 503 when the hiscores fail. `preview=false` (deprecated:
-  `skipRefresh=true`) skips the preview (404).
+  `trackedSince: null`), 404 only for not found and 503 when the hiscores fail. `preview=false` skips the preview (404).
 
 ## Cache-Control (important)
 
@@ -293,8 +293,7 @@ that one is on the author and the `conventions-reviewer`.
 
 - Read-only, slow-changing: `public, max-age=N` (`/player-counts/live` 60, `/news`, `/news/archive`, `/player-counts`
   and `/player-counts/latest` 300, `/items?search=`, `/items?sort=added`, `/players?sort=gain` and `/sitemap/players`
-  3600, `/items?letter=` 86400, `/news/image` 604800; the deprecated aliases `/items/search/:query` 3600 and
-  `/items/browse/:letter` 86400 until #231).
+  3600, `/items?letter=` 86400, `/news/image` 604800).
 - Routes that fetch Jagex live (`/news`, `/news/archive`, `/news/image`, `/player-counts/live`) set it with
   `res.setHeader` after the read succeeds, not with `@Header` (which also applies to errors), so caches don't keep a 503
   (`/player-counts/live` sets `REVALIDATE` first, for its 502).

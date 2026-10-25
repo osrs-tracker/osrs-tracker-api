@@ -16,9 +16,7 @@ import { isBotRequest } from '../../common/bot/is-bot-request';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
 import { ItemsService } from './items.service';
-import { ParseBrowseLetterPipe } from './parse-browse-letter.pipe';
 import { type ItemListQuery, ParseItemListQueryPipe } from './parse-item-list-query.pipe';
-import { ParseItemSearchQueryPipe } from './parse-item-search-query.pipe';
 
 const ITEM_ID_PIPE = new ParseIntRangePipe({ min: 1, message: (id) => `Invalid item ID "${id}"` });
 
@@ -81,27 +79,5 @@ export class ItemsController {
     if (isBotRequest(request)) return;
 
     await this.itemsService.recordLookup(id);
-  }
-
-  /**
-   * `GET /items?search=`, as before that existed. `ITEM_SEARCH` on every response.
-   *
-   * @deprecated Use `GET /items?search=`; removed once the web app no longer calls it.
-   */
-  @Get('search/:query')
-  @Header('Cache-Control', CACHE_CONTROL.ITEM_SEARCH)
-  async searchItems(@Param('query', ParseItemSearchQueryPipe) query: string) {
-    return this.itemsService.searchItems(query);
-  }
-
-  /**
-   * `GET /items?letter=`, as before that existed. `ITEM_BROWSE` on every response.
-   *
-   * @deprecated Use `GET /items?letter=`; removed once the web app no longer calls it.
-   */
-  @Get('browse/:letter')
-  @Header('Cache-Control', CACHE_CONTROL.ITEM_BROWSE)
-  browseItems(@Param('letter', ParseBrowseLetterPipe) letter: string) {
-    return this.itemsService.browseItems(letter);
   }
 }
