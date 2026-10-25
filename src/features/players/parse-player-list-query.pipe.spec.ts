@@ -16,7 +16,7 @@ describe('ParsePlayerListQueryPipe', () => {
   });
 
   it('reads gain with its own limit range, ignoring the lookedUp params', async () => {
-    expect(await pipe.transform({ sort: 'gain', entry: 'all' })).toEqual({ sort: 'gain', limit: 10 });
+    expect(await pipe.transform({ sort: 'gain', entry: 'all' })).toEqual({ sort: 'gain', limit: 5 });
     await expect(pipe.transform({ sort: 'gain', limit: '51' })).rejects.toThrow('Limit must be between 1 and 50.');
   });
 
