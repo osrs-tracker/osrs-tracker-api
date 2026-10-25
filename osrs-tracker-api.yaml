@@ -33,8 +33,9 @@ spec:
             - secretRef:
                 name: aws-mongodb-credentials
           env:
+            # Comma-separated. The old origin goes once the web app has moved to osrs-tracker.net (osrs-tracker/osrs-tracker-web#453).
             - name: CORS_ORIGIN
-              value: https://osrs-tracker.freekmencke.com
+              value: https://osrs-tracker.freekmencke.com,https://osrs-tracker.net
             - name: OSRS_API_BASE_URL
               value: https://runescape-api.freekmencke.com/rs
           ports:

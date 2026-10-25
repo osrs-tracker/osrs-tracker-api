@@ -10,8 +10,8 @@ export interface MongoEnv {
 export interface Env extends MongoEnv {
   /** Prefix of every Jagex URL (hiscores, news feed), e.g. the API Gateway proxy in front of secure.runescape.com. */
   OSRS_API_BASE_URL: string;
-  /** Allowed besides `http://localhost:4200`. */
-  CORS_ORIGIN?: string;
+  /** Origins allowed besides `http://localhost:4200`, from a comma-separated list; empty when unset. */
+  CORS_ORIGIN: string[];
   PORT: number;
   METRICS_PORT: number;
 }
@@ -41,7 +41,7 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   return read.done({
     ...mongoEnv(read),
     OSRS_API_BASE_URL: read.url('OSRS_API_BASE_URL', read.required('OSRS_API_BASE_URL'), ['https://', 'http://']),
-    CORS_ORIGIN: read.url('CORS_ORIGIN', read.optional('CORS_ORIGIN'), ['https://', 'http://']),
+    CORS_ORIGIN: read.urlList('CORS_ORIGIN', read.optional('CORS_ORIGIN'), ['https://', 'http://']),
     PORT: read.port('PORT', 3000),
     METRICS_PORT: read.port('METRICS_PORT', 9090),
   });
@@ -92,6 +92,13 @@ function envReader(raw: Record<string, unknown>) {
       errors.push(`${name} must start with ${protocols.join(' or ')}.`);
     return value;
   };
+  /** A comma-separated list of URLs, each trimmed and checked like `url`; empty entries are skipped. */
+  const urlList = (name: string, value: string | undefined, protocols: string[]): string[] =>
+    (value ?? '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== '')
+      .map((entry) => url(`${name} entry "${entry}"`, entry, protocols));
   const port = (name: string, fallback: number): number => {
     const value = optional(name);
     if (value === undefined) return fallback;
@@ -104,5 +111,5 @@ function envReader(raw: Record<string, unknown>) {
     return env;
   };
 
-  return { optional, required, url, port, done };
+  return { optional, required, url, urlList, port, done };
 }
