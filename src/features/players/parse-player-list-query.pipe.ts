@@ -15,7 +15,7 @@ export type PlayerListQuery =
 
 const LIMIT_PIPES: Record<PlayerSort, ParseIntRangePipe> = {
   lookedUp: new ParseIntRangePipe({ min: 1, max: 50, default: 5 }),
-  gain: new ParseIntRangePipe({ min: 1, max: MAX_TOP_GAINERS, default: 10 }),
+  gain: new ParseIntRangePipe({ min: 1, max: MAX_TOP_GAINERS, default: 5 }),
 };
 const SCRAPING_OFFSET = new ParseScrapingOffsetPipe({ optional: true });
 const ENTRY = new ParseEnumPipe(RECENT_PLAYERS_ENTRY, {
