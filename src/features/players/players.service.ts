@@ -24,6 +24,13 @@ import { entriesForOffset, HISCORE_ENTRIES, PLAYER_PROJECTION } from './player-q
 import { buildSitemapPlayersPipeline, SitemapPlayer } from './player-sitemap';
 import { buildLookupUpdate, buildRefreshUpdate } from './player.policy';
 import { PlayerUtils } from './player.utils';
+import {
+  buildTopGainersPipeline,
+  rankTopGainers,
+  TOP_GAINERS_CACHE_TTL_MS,
+  TopGainer,
+  topGainersSlot,
+} from './top-gainers';
 
 type PartialHiscoreEntry = Pick<HiscoreEntry, 'skills' | 'activities'>;
 
@@ -67,6 +74,15 @@ export class PlayersService {
   private readonly notFoundNames = new LRUCache<string, true>({
     max: NOT_FOUND_CACHE_MAX,
     ttl: NOT_FOUND_CACHE_TTL_MS,
+  });
+  /**
+   * The ranked top gainers by slot start (`topGainersSlot`), so a new slot misses at once; the ttl picks up entries
+   * stored late (a requeued scrape). Reading them means every candidate's two newest entries, so not per request.
+   */
+  private readonly topGainersCache = new LRUCache<number, TopGainer[]>({
+    max: 1,
+    ttl: TOP_GAINERS_CACHE_TTL_MS,
+    fetchMethod: (slot) => this.fetchTopGainers(new Date(slot)),
   });
 
   private readonly collection: Collection<StoredPlayer>;
@@ -165,6 +181,25 @@ export class PlayersService {
   /** The tracked players for the web app's sitemap (`buildSitemapPlayersPipeline`). */
   getSitemapPlayers(now: Date): Promise<SitemapPlayer[]> {
     return this.collection.aggregate<SitemapPlayer>(buildSitemapPlayersPipeline(now)).toArray();
+  }
+
+  /** The `limit` largest Overall XP gains in the newest settled offset-0 slot (`rankTopGainers`), from the cache. */
+  async getTopGainers(limit: number, now: Date): Promise<TopGainer[]> {
+    const topGainers = await this.topGainersCache.forceFetch(topGainersSlot(now).getTime());
+    return topGainers.slice(0, limit);
+  }
+
+  private async fetchTopGainers(slot: Date): Promise<TopGainer[]> {
+    const players = await this.collection
+      .aggregate<Pick<StoredPlayer, 'username' | 'hiscoreEntries'>>(buildTopGainersPipeline(slot))
+      .toArray();
+    const decoded = await Promise.all(
+      players.map(async ({ username, hiscoreEntries }) => ({
+        username,
+        entries: await this.layouts.decode(hiscoreEntries ?? []),
+      })),
+    );
+    return rankTopGainers(decoded, slot);
   }
 
   /**

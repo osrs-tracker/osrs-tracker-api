@@ -42,7 +42,8 @@ osrs-tracker/osrs-tracker-aws#52). Both writers prepend with `hiscoreEntriesWrit
 `buildRefreshUpdate` in `src/features/players/player.policy.ts`), and readers decode with `decodeHiscoreEntries`. Bare
 values only point to newer entries, so readers must decode from the newest entry, and the order matters: the API takes
 the first matching entry as the latest and the last as `trackedSince`, and its player sitemap (`GET /sitemap/players`,
-`src/features/players/player-sitemap.ts`) lists players whose first entry is at most 30 days old.
+`src/features/players/player-sitemap.ts`) lists players whose first entry is at most 30 days old. The top gainers
+(`GET /top-gainers`, `src/features/players/top-gainers.ts`) diff each player's first two offset-0 entries.
 
 A change to this format that existing entries can't be decoded with (in `encodeHiscoreEntry`, `decodeHiscoreEntries`,
 `hiscoreEntriesWriteExpression` or `layoutId`) isn't a normal release: it needs a migration and every writer and reader

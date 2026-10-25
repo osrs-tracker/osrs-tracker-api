@@ -284,8 +284,8 @@ case expects (values only POSTs send go in its `POST_ONLY`); a new branch reusin
 that one is on the author and the `conventions-reviewer`.
 
 - Read-only, slow-changing: `public, max-age=N` (`/player-counts/live` 60, `/news`, `/news/since/:date`,
-  `/news/archive`, `/player-counts` and `/player-counts/latest` 300, `/news/categories`, `/items/search/:query` and
-  `/sitemap/players` 3600, `/items/browse/:letter` 86400, `/news/image` 604800).
+  `/news/archive`, `/player-counts` and `/player-counts/latest` 300, `/news/categories`, `/items/search/:query`,
+  `/sitemap/players` and `/top-gainers` 3600, `/items/browse/:letter` 86400, `/news/image` 604800).
 - Routes that fetch Jagex live (`/news`, `/news/since/:date`, `/news/archive`, `/news/image`, `/player-counts/live`) and
   `/news/categories` set it with `res.setHeader` after the read succeeds, not with `@Header` (which also applies to
   errors), so caches don't keep a 503 (`/player-counts/live` sets `REVALIDATE` first, for its 502).
