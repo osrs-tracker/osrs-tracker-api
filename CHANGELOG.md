@@ -3,6 +3,14 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-10-25
+
+- The ingester's hourly items job now writes only the items that are new or changed, instead of all ~4,700 every hour
+  (#215). The Wiki's list changes only on game updates, so nearly every write was a no-op, but MongoDB counts each
+  statement in a bulk write, and the job showed as a spike of ~4,700 ops at every hour that hid real traffic. It reads
+  the stored items in one `find` first, which also gives the count for the delete guard. Its log line now reads
+  `Items refreshed: <n> changed, <n> removed`.
+
 ## 2026-10-22
 
 ### Ingester

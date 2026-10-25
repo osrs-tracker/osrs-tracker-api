@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/comm
 import { Cron } from '@nestjs/schedule';
 import { Item } from '@osrs-tracker/models';
 import { Collection, Db } from 'mongodb';
+import { isDeepStrictEqual } from 'node:util';
 import { Agent, fetch } from 'undici';
 import { AGENT, USER_AGENT } from '../common/agent/agent.provider';
 import { ITEMS_COLLECTION } from '../common/mongo/collections';
@@ -18,8 +19,8 @@ import { JobRunsService } from './job-runs.service';
 export const ITEM_MAPPING_URL = 'https://prices.runescape.wiki/api/v2/osrs/mapping';
 
 /**
- * Keeps `items` a copy of the OSRS Wiki's item list, every hour: upserts every item, then deletes the ones the list no
- * longer has. Ported from osrs-tracker-aws's refresh-items Lambda.
+ * Keeps `items` a copy of the OSRS Wiki's item list, every hour: upserts the items that are new or changed, then deletes
+ * the ones the list no longer has. Ported from osrs-tracker-aws's refresh-items Lambda.
  */
 @Injectable()
 export class ItemsRefreshService implements OnApplicationBootstrap {
@@ -44,23 +45,40 @@ export class ItemsRefreshService implements OnApplicationBootstrap {
   }
 
   /**
-   * Upserts each item by `id` with `$set` of the Wiki's object (a field it omits keeps its stored value), then deletes
-   * the items missing from the list (taken off the GE), unless more than `MAX_REMOVED_ITEMS` would go, so a truncated
-   * response never wipes the collection.
+   * Upserts by `id` with `$set` of the Wiki's object (a field it omits keeps its stored value) only the items that are
+   * new or differ from the stored copy in a field the Wiki sends: the list changes only on game updates, and writing
+   * every item each hour showed as a spike of ~4,700 ops. Then deletes the items missing from the list (taken off the
+   * GE), unless more than `MAX_REMOVED_ITEMS` would go, so a truncated response never wipes the collection.
    */
   async refresh(signal: AbortSignal): Promise<void> {
     const list = await this.fetchItems(signal);
-
-    const { matchedCount, upsertedCount } = await this.items.bulkWrite(
-      list.map((item) => ({
-        updateOne: { filter: { id: item.id }, hint: { id: 1 }, update: { $set: item }, upsert: true },
-      })),
+    const stored = new Map(
+      (await this.items.find({}, { projection: { _id: 0, lastFetch: 0 } }).toArray()).map((item) => [item.id, item]),
     );
-    const upserted = matchedCount + upsertedCount;
+
+    const changed = list.filter((item) => {
+      const current = stored.get(item.id);
+      return (
+        !current || (Object.keys(item) as (keyof Item)[]).some((key) => !isDeepStrictEqual(current[key], item[key]))
+      );
+    });
+    // bulkWrite rejects an empty batch
+    if (changed.length) {
+      await this.items.bulkWrite(
+        changed.map((item) => ({
+          updateOne: { filter: { id: item.id }, hint: { id: 1 }, update: { $set: item }, upsert: true },
+        })),
+      );
+    }
     signal.throwIfAborted();
 
-    const removed = await this.removeItemsNotIn(list.map(({ id }) => id));
-    this.logger.log(`Items refreshed: ${upserted} upserted, ${removed} removed`, { fetched: list.length, upserted });
+    const listed = new Set(list.map(({ id }) => id));
+    const removable = [...stored.keys()].filter((id) => !listed.has(id)).length;
+    const removed = await this.removeItemsNotIn([...listed], removable);
+    this.logger.log(`Items refreshed: ${changed.length} changed, ${removed} removed`, {
+      fetched: list.length,
+      changed: changed.length,
+    });
   }
 
   private async fetchItems(signal: AbortSignal): Promise<Item[]> {
@@ -77,11 +95,11 @@ export class ItemsRefreshService implements OnApplicationBootstrap {
     return list;
   }
 
-  /** Deletes the items whose `id` isn't in `ids` and returns how many, or 0 with a warning when over the limit. */
-  private async removeItemsNotIn(ids: number[]): Promise<number> {
-    const filter = { id: { $nin: ids } };
-    const removable = await this.items.countDocuments(filter, { hint: { id: 1 } });
-
+  /**
+   * Deletes the items whose `id` isn't in `ids` (`removable` of the stored ones) and returns how many, or 0 with a
+   * warning when over the limit.
+   */
+  private async removeItemsNotIn(ids: number[], removable: number): Promise<number> {
     if (removable > MAX_REMOVED_ITEMS) {
       this.logger.warn(
         `Skipped removing ${removable} items missing from the Wiki's list: more than ${MAX_REMOVED_ITEMS}`,
@@ -90,7 +108,7 @@ export class ItemsRefreshService implements OnApplicationBootstrap {
     }
     if (removable === 0) return 0;
 
-    const { deletedCount } = await this.items.deleteMany(filter, { hint: { id: 1 } });
+    const { deletedCount } = await this.items.deleteMany({ id: { $nin: ids } }, { hint: { id: 1 } });
     return deletedCount;
   }
 }
