@@ -8,8 +8,8 @@
 
 # OSRS Tracker API
 
-The API behind [OSRS Tracker](https://osrs-tracker.freekmencke.com). It looks up Old School RuneScape players, items and
-news, and stores player progress so the website can show how players gain XP over time.
+The API behind [OSRS Tracker](https://osrs-tracker.net). It looks up Old School RuneScape players, items and news, and
+stores player progress so the website can show how players gain XP over time.
 
 ## What it provides
 
@@ -26,7 +26,7 @@ Each route's statuses, `Cache-Control` and parameters are described in a short c
 
 ## How it fits together
 
-The [OSRS Tracker website](https://osrs-tracker.freekmencke.com)
+The [OSRS Tracker website](https://osrs-tracker.net)
 ([osrs-tracker-web](https://github.com/osrs-tracker/osrs-tracker-web)) gets its data from this API. Scraping Lambdas in
 [osrs-tracker-aws](https://github.com/osrs-tracker/osrs-tracker-aws) fetch the hiscores and player counts, and the
 ingester below stores them in MongoDB and keeps the item list and old hiscores tidy. Which process writes each field and
