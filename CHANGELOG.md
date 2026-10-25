@@ -5,6 +5,15 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 
 ## 2026-10-25
 
+- New `GET /new-items?limit=` (1 to 100, default 25, `public, max-age=3600`): the items the hourly items job added,
+  newest first, `[{ id, icon, name, addedAt }]`, for a "New on the GE" page on the web (#217,
+  osrs-tracker/osrs-tracker-web#444). New items get a large share of the site's search impressions, and ids aren't a
+  reliable added order. Not `/items/new`: `/items/:id` would shadow it. The items job now stores `addedAt` on insert and
+  `updatedAt` on every item it writes, which is only a new or changed one, and the item browse lists carry `updatedAt`,
+  so the web's items sitemap can give each item a `<lastmod>`. Neither is `lastFetch`, which is when a visitor last
+  looked an item up. No backfill: the list is `[]` until a game update adds an item, and older items get `updatedAt`
+  only when the Wiki changes them.
+
 - New `GET /top-gainers?limit=` (1 to 50, default 10): the tracked players with the largest Overall XP gain between
   their two newest offset-0 entries, `[{ username, gain, date }]`, for a "Top gainers today" list on the web's
   `/trackers/xp` (#218, osrs-tracker/osrs-tracker-web#445). Only 5 or 6 of the ~540 tracked players are linked from the

@@ -67,9 +67,10 @@ export class ItemsController {
 
   /**
    * Every item whose name starts with `letter` (`a` to `z`, case-insensitive, accents ignored; `0` for names starting
-   * with a digit or other character), sorted by name case-insensitively, with only `id`, `icon` and `name`; `[]` when
-   * none match. The largest letter is about 600 items (40 KB). 400 for any other `letter`, uppercase included.
-   * `ITEM_BROWSE` on every response.
+   * with a digit or other character), sorted by name case-insensitively, with only `id`, `icon`, `name` and `updatedAt`
+   * (when the ingester last changed it; absent on items it hasn't written since storing dates); `[]` when none match.
+   * The largest letter is about 600 items (40 KB, up to 60 KB once most carry `updatedAt`). 400 for any other `letter`,
+   * uppercase included. `ITEM_BROWSE` on every response.
    */
   @Get('browse/:letter')
   @Header('Cache-Control', CACHE_CONTROL.ITEM_BROWSE)

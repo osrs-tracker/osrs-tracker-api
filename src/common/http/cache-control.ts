@@ -19,6 +19,8 @@ export const CACHE_CONTROL = {
   ITEM_SEARCH: 'public, max-age=3600',
   /** Item browse: the items collection changes at most daily. */
   ITEM_BROWSE: 'public, max-age=86400',
+  /** The newest items: the hourly items refresh adds them at most once an hour. */
+  NEW_ITEMS: 'public, max-age=3600',
   /** The player sitemap, read by the web app's build. */
   PLAYER_SITEMAP: 'public, max-age=3600',
   /** The top gainers: kept by the API until new entries may have landed, at most an hour (`TOP_GAINERS_CACHE_TTL_MS`). */
