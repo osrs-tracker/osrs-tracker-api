@@ -155,6 +155,15 @@ const CASES: Record<string, Case[]> = {
       cacheControl: CACHE_CONTROL.PLAYER_SITEMAP,
     },
   ],
+  '/top-gainers': [
+    {
+      url: '/top-gainers?limit=10',
+      docs: [{ username: 'toxsick', hiscoreEntries: [storedEntry] }],
+      status: 200,
+      cacheControl: CACHE_CONTROL.TOP_GAINERS,
+    },
+    { name: 'invalid limit', url: '/top-gainers?limit=51', status: 400, cacheControl: CACHE_CONTROL.TOP_GAINERS },
+  ],
   '/items': [{ url: '/items', status: 200, cacheControl: CACHE_CONTROL.REVALIDATE }],
   '/items/:id': [{ url: '/items/4151', docs: [item], status: 200, cacheControl: CACHE_CONTROL.REVALIDATE }],
   '/items/search/:query': [

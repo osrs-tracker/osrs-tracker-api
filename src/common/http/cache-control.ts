@@ -21,6 +21,8 @@ export const CACHE_CONTROL = {
   ITEM_BROWSE: 'public, max-age=86400',
   /** The player sitemap, read by the web app's build. */
   PLAYER_SITEMAP: 'public, max-age=3600',
+  /** The top gainers: kept by the API until new entries may have landed, at most an hour (`TOP_GAINERS_CACHE_TTL_MS`). */
+  TOP_GAINERS: 'public, max-age=3600',
   /** The player count, latest and history: sampled every 10 minutes. */
   PLAYER_COUNT: 'public, max-age=300',
   /** The live player count: kept for a minute, Jagex asks for at most one world list poll a minute. */
