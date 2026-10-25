@@ -5,7 +5,7 @@ import { Document } from 'mongodb';
 import { slotStart } from '../../ingester/scrape-results';
 import { entriesForOffset } from './player-queries';
 
-/** A player in the top gainers: `gain` is the Overall XP between its two newest entries, `date` the newer one's. */
+/** A player in the top gainers: `gain` is the Overall XP over its newest day of entries, `date` the newer entry's. */
 export interface TopGainer {
   username: string;
   gain: number;
@@ -58,16 +58,19 @@ export function buildTopGainersPipeline(slot: Date): Document[] {
 }
 
 /**
- * The players with the largest Overall XP gain between their two newest entries (decoded, newest first), largest
- * first, at most `MAX_TOP_GAINERS`. Leaves out a player whose newest entry isn't from `slot`'s day, who has only one
- * entry, or who gained nothing.
+ * The players with the largest Overall XP gain between the previous and the newest day's entries (their two newest,
+ * decoded, newest first), largest first, at most `MAX_TOP_GAINERS`. Leaves out a player whose newest entry isn't from
+ * `slot`'s day, whose previous one is older than the previous slot (a paused or missed scrape: a gain over more than a
+ * day), who has only one entry, or who gained nothing.
  */
 export function rankTopGainers(players: { username: string; entries: HiscoreEntry[] }[], slot: Date): TopGainer[] {
+  const previousSlot = slot.getTime() - DAY;
   const slotEnd = slot.getTime() + DAY;
   return players
     .flatMap(({ username, entries: [newest, previous] }) => {
       if (!newest || !previous) return [];
       if (newest.date.getTime() < slot.getTime() || newest.date.getTime() >= slotEnd) return [];
+      if (previous.date.getTime() < previousSlot) return [];
       const gain = getOverallXpDiff(newest, previous);
       return gain > 0 ? [{ username, gain, date: newest.date }] : [];
     })

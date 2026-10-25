@@ -48,6 +48,18 @@ describe('rankTopGainers', () => {
     expect(rankTopGainers([stale, nextDay, player('fresh', 10)], SLOT).map((g) => g.username)).toEqual(['fresh']);
   });
 
+  it('leaves out a player whose previous entry is older than the previous slot', () => {
+    const resumed = {
+      username: 'resumed',
+      entries: [entry(TODAY, 1_005_000), entry(new Date('2026-10-23T00:05:00Z'), 1_000_000)],
+    };
+    const firstLookup = {
+      username: 'looked-up',
+      entries: [entry(TODAY, 1_000_010), entry(new Date('2026-10-24T00:00:00Z'), 1_000_000)],
+    };
+    expect(rankTopGainers([resumed, firstLookup], SLOT).map((g) => g.username)).toEqual(['looked-up']);
+  });
+
   it('leaves out a player with only one entry', () => {
     expect(rankTopGainers([{ username: 'new', entries: [entry(TODAY, 1_000_000)] }], SLOT)).toEqual([]);
   });

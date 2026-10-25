@@ -16,15 +16,17 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   looked an item up. No backfill: the list is `[]` until a game update adds an item, and older items get `updatedAt`
   only when the Wiki changes them.
 
-- New `GET /top-gainers?limit=` (1 to 50, default 10): the tracked players with the largest Overall XP gain between
-  their two newest offset-0 entries, `[{ username, gain, date }]`, for a "Top gainers today" list on the web's
-  `/trackers/xp` (#218, osrs-tracker/osrs-tracker-web#445). Only 5 or 6 of the ~540 tracked players are linked from the
-  site's HTML, so Google finds the rest only through the sitemap; the list links a different set every day. Not
+- New `GET /top-gainers?limit=` (1 to 50, default 10): the tracked players with the largest Overall XP gain between the
+  previous and the newest day's offset-0 entries, `[{ username, gain, date }]`, for a "Top gainers today" list on the
+  web's `/trackers/xp` (#218, osrs-tracker/osrs-tracker-web#445). Only 5 or 6 of the ~540 tracked players are linked
+  from the site's HTML, so Google finds the rest only through the sitemap; the list links a different set every day. Not
   `/players/top-gainers`: `top-gainers` is a valid name, so that would shadow `/players/:username`. It reads only stored
   entries, from players still scraped and without a not-found streak whose newest entry is from the latest 00 UTC slot,
-  leaving out those who gained nothing. Ranking means reading every candidate's two newest entries, so each pod caches
-  the list per slot for an hour (`public, max-age=3600`), and serves the previous slot's list until an hour after 00
-  UTC, so a scrape still landing (done by 00:15 every day of the last week) never shows a partial list.
+  leaving out those who gained nothing. Players whose previous entry is older than the slot before are left out too
+  (#229): the web labels the list as one day, and a player resumed after a pause or with a missed scrape would show a
+  gain over several days. Ranking means reading every candidate's two newest entries, so each pod caches the list per
+  slot for an hour (`public, max-age=3600`), and serves the previous slot's list until an hour after 00 UTC, so a scrape
+  still landing (done by 00:15 every day of the last week) never shows a partial list.
 
 - `CORS_ORIGIN` now takes a comma-separated list of origins, each checked for `https://` or `http://` at startup, and
   the cluster allows `https://osrs-tracker.net` beside `https://osrs-tracker.freekmencke.com` (#219, roadmap
