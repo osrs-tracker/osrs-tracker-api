@@ -172,7 +172,8 @@ So another view of a collection (a filter, a sort, a search) is a query param on
 whole-query pipe (`GET /items?search=`, `?letter=`, `?sort=added`; `GET /players?sort=gain`), never a new top-level
 route or a value in the path. Each mode sets its own `Cache-Control` in the handler, over a `REVALIDATE` `@Header` that
 also covers the pipe's 400s. A route kept only until the web app stops calling it says so in a `@deprecated` line, and
-an issue removes it.
+an issue removes it as soon as the web's deploy that stops calling it is live (its `CD` run done, and Loki showing the
+web's new pods on the new form), without waiting days for stale browser tabs.
 
 ## Service failures
 
