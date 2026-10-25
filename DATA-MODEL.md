@@ -103,10 +103,10 @@ protects a layout whose first entry is still being written.
 
 One document per OSRS item, keyed by `id`.
 
-| Field                                                                               | Written by                                                                                                                                                                     | Read by                |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- |
-| `id`, `name`, `examine`, `icon`, `members`, `value`, `limit`, `lowalch`, `highalch` | The items job, every hour: upserts each item from the OSRS Wiki `mapping` endpoint with `$set` of the whole object. A field the Wiki omits for an item keeps its stored value. | API, web.              |
-| `lastFetch`                                                                         | API `recordLookup` (`POST /items/:id/lookup`): when a visitor last looked the item up. Only on existing items.                                                                 | API recent items list. |
+| Field                                                                               | Written by                                                                                                                                                                                                                                           | Read by                |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `id`, `name`, `examine`, `icon`, `members`, `value`, `limit`, `lowalch`, `highalch` | The items job, every hour: upserts each item from the OSRS Wiki `mapping` endpoint that is new or differs from the stored one in a field the Wiki sends, with `$set` of the whole object. A field the Wiki omits for an item keeps its stored value. | API, web.              |
+| `lastFetch`                                                                         | API `recordLookup` (`POST /items/:id/lookup`): when a visitor last looked the item up. Only on existing items.                                                                                                                                       | API recent items list. |
 
 The items job deletes the items missing from the Wiki's list after its upsert (items Jagex took off the GE), but skips
 that run's delete when more than 50 would go (`MAX_REMOVED_ITEMS`), so a truncated response never wipes the collection.
