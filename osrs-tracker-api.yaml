@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: osrs-tracker-api
-          image: freekmencke/osrs-tracker-api@sha256:4e292597f17b3767e32304f0ba7b013478e1b4e4a1ddbc0054712582b5b18309
+          image: freekmencke/osrs-tracker-api@sha256:e18e911cd523b54670c532c2e4b7262a1ce1783e6bbad6a089316a9726361ea1
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:
@@ -115,7 +115,7 @@ spec:
       containers:
         - name: osrs-tracker-ingester
           # The same digest as osrs-tracker-api's: CD's deploy commit updates both
-          image: freekmencke/osrs-tracker-api@sha256:4e292597f17b3767e32304f0ba7b013478e1b4e4a1ddbc0054712582b5b18309
+          image: freekmencke/osrs-tracker-api@sha256:e18e911cd523b54670c532c2e4b7262a1ce1783e6bbad6a089316a9726361ea1
           imagePullPolicy: IfNotPresent
           command: [node, ingest]
           envFrom:
