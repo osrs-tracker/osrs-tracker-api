@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 import { BROWSE_LETTERS } from './item-browse';
 
-/** Parses the `letter` route param of item browse: one of `BROWSE_LETTERS`, lowercase only (one URL per page). */
+/** Parses the `letter` of item browse (`ParseItemListQueryPipe`): one of `BROWSE_LETTERS`, lowercase only (one URL per page). */
 @Injectable()
 export class ParseBrowseLetterPipe implements PipeTransform<string, string> {
   transform(value: string): string {

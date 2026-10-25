@@ -26,8 +26,7 @@ import { needsRefresh, playerMaxAgeSeconds } from './player.policy';
 import { ParsePlayerListQueryPipe, type PlayerListQuery } from './parse-player-list-query.pipe';
 import { PlayersService } from './players.service';
 
-const PAGE_SIZE: ParseIntRangeOptions = { min: 1, max: 100, optional: true };
-const DEFAULT_PAGE_SIZE = 7;
+const LIMIT: ParseIntRangeOptions = { min: 1, max: 100, default: 7 };
 // A cap far above a player's entries per offset (clean-hiscores keeps 60 days), and within the 32 bits `$slice` takes
 const SKIP: ParseIntRangeOptions = { min: 0, max: 10_000, default: 0 };
 
@@ -70,8 +69,8 @@ export class PlayersController {
    * A stored player as stored (stale or not), with `trackedSince` (its oldest entry for `scrapingOffset`, or `null`)
    * and a `max-age` of the time left until it may be refreshed (0 to `PLAYER_MAX_AGE_SECONDS`, `playerMaxAgeSeconds`).
    * An unknown player is a live preview from the hiscores, not stored (`scrapingOffsets: []`, `trackedSince: null`);
-   * 404 when not on the hiscores (or with `preview=false`, which skips the preview; `skipRefresh=true` is its deprecated
-   * name), 503 when they can't be reached; all three `REVALIDATE`. `includeLatestHiscoreEntry` adds `hiscoreEntries` with the newest entry for `scrapingOffset`
+   * 404 when not on the hiscores (or with `preview=false`, which skips the preview), 503 when they can't be reached;
+   * all three `REVALIDATE`. `includeLatestHiscoreEntry` adds `hiscoreEntries` with the newest entry for `scrapingOffset`
    * (empty when there is none). 400 for an invalid username or param.
    */
   @Get(':username')
@@ -81,8 +80,6 @@ export class PlayersController {
     @Query('scrapingOffset', new ParseScrapingOffsetPipe()) scrapingOffset: number,
     @Query('includeLatestHiscoreEntry', new DefaultValuePipe(false), ParseBoolPipe) includeLatestHiscoreEntry: boolean,
     @Query('preview', new DefaultValuePipe(true), ParseBoolPipe) allowPreview: boolean,
-    /** @deprecated `preview=false`; removed once the web app no longer sends it. */
-    @Query('skipRefresh', new DefaultValuePipe(false), ParseBoolPipe) skipRefresh: boolean,
   ) {
     // Read-only: refreshing, starting to track and recording the lookup happen in the browser's POST lookup.
     const player = await this.playersService.getPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
@@ -95,7 +92,7 @@ export class PlayersController {
     // Not stored: preview the player live from the hiscores, without storing it.
     response.setHeader('Cache-Control', CACHE_CONTROL.REVALIDATE);
 
-    if (!allowPreview || skipRefresh) throw new NotFoundException(`Player '${username}' not found`);
+    if (!allowPreview) throw new NotFoundException(`Player '${username}' not found`);
 
     const preview = await this.playersService.previewPlayer(username, scrapingOffset, includeLatestHiscoreEntry);
     if (preview.status === 'notFound') throw new NotFoundException(`Player '${username}' not found`);
@@ -173,7 +170,7 @@ export class PlayersController {
 
   /**
    * A page (`limit` 1 to 100, default 7; `skip`) of the player's hiscore entries for `scrapingOffset`, newest first; an
-   * empty body for a player that isn't stored. `size` is `limit`'s deprecated name. 400 for an invalid username or
+   * empty body for a player that isn't stored. 400 for an invalid username or
    * param. `REVALIDATE` on every response.
    */
   @Get(':username/hiscores')
@@ -181,11 +178,9 @@ export class PlayersController {
   getHiscoresByUsername(
     @Param('username', ParseUsernamePipe) username: string,
     @Query('scrapingOffset', new ParseScrapingOffsetPipe()) scrapingOffset: number,
-    @Query('limit', new ParseIntRangePipe(PAGE_SIZE)) limit: number | undefined,
+    @Query('limit', new ParseIntRangePipe(LIMIT)) limit: number,
     @Query('skip', new ParseIntRangePipe(SKIP)) skip: number,
-    /** @deprecated `limit`; removed once the web app no longer sends it. */
-    @Query('size', new ParseIntRangePipe(PAGE_SIZE)) size: number | undefined,
   ) {
-    return this.playersService.getPlayerHiscores(username, scrapingOffset, limit ?? size ?? DEFAULT_PAGE_SIZE, skip);
+    return this.playersService.getPlayerHiscores(username, scrapingOffset, limit, skip);
   }
 }

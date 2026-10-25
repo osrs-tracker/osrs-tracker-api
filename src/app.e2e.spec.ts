@@ -195,13 +195,6 @@ const CASES: Record<string, Case[]> = {
     { name: 'two modes', url: '/items?search=whip&letter=a', status: 400, cacheControl: CACHE_CONTROL.REVALIDATE },
   ],
   '/items/:id': [{ url: '/items/4151', docs: [item], status: 200, cacheControl: CACHE_CONTROL.REVALIDATE }],
-  '/items/search/:query': [
-    { name: 'found', url: '/items/search/whip', docs: [item], status: 200, cacheControl: CACHE_CONTROL.ITEM_SEARCH },
-    { name: 'none found', url: '/items/search/nothing', status: 200, cacheControl: CACHE_CONTROL.ITEM_SEARCH },
-  ],
-  '/items/browse/:letter': [
-    { url: '/items/browse/a', docs: [item], status: 200, cacheControl: CACHE_CONTROL.ITEM_BROWSE },
-  ],
   '/player-counts': [
     { url: '/player-counts?range=1y', docs: [playerCount], status: 200, cacheControl: CACHE_CONTROL.PLAYER_COUNT },
     { name: 'invalid range', url: '/player-counts?range=1w', status: 400, cacheControl: CACHE_CONTROL.PLAYER_COUNT },

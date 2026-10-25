@@ -14,10 +14,10 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   new items), and `GET /players` takes `sort=lookedUp` (the default) or `sort=gain` (the top gainers), each mode with
   its own `Cache-Control`, and `max-age=0, must-revalidate` on a 400. `/players/:username/hiscores` takes `limit`
   instead of `size`, and `/players/:username` takes `preview=false` instead of `skipRefresh=true` (which read as if a
-  GET could refresh). `/items/search/:query`, `/items/browse/:letter`, `size` and `skipRefresh` still work until the web
-  app moves over, then go. `/new-items` and `/top-gainers` (below, added today and not called yet) and
-  `/news/since/:date` and `/news/categories` (no calls in a week, the web pages `/news/archive` instead) are removed. No
-  `/v2`: the web app is the only consumer.
+  GET could refresh). `/items/search/:query`, `/items/browse/:letter`, `size` and `skipRefresh` were kept until the web
+  app moved over (osrs-tracker/osrs-tracker-web#458), then removed the same day (#231). `/new-items` and `/top-gainers`
+  (below, added today and not called yet) and `/news/since/:date` and `/news/categories` (no calls in a week, the web
+  pages `/news/archive` instead) are removed. No `/v2`: the web app is the only consumer.
 
 - New `GET /items?sort=added&limit=` (1 to 100, default 25, `public, max-age=3600`): the items the hourly items job
   added, newest first, `[{ id, icon, name, addedAt }]`, for a "New on the GE" page on the web (#217,

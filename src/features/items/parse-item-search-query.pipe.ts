@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 
 const MAX_QUERY_LENGTH = 64;
 
-/** Parses the `query` route param of item search: present, and at most 64 characters. */
+/** Parses the `search` of item search (`ParseItemListQueryPipe`): present, and at most 64 characters. */
 @Injectable()
 export class ParseItemSearchQueryPipe implements PipeTransform<string, string> {
   transform(value: string): string {
