@@ -275,7 +275,8 @@ usernames) is in [`DATA-MODEL.md`](../../../DATA-MODEL.md). The API's side, in `
   the proxy is shared with process-players.
 - GETs never write: `GET /players/:username` returns a stored player as stored (stale or not, never refreshed), and an
   unknown player as a live preview from `determinePlayerStatusAndType` that isn't stored (`scrapingOffsets: []`,
-  `trackedSince: null`), 404 only for not found and 503 when the hiscores fail. `skipRefresh` skips the preview (404).
+  `trackedSince: null`), 404 only for not found and 503 when the hiscores fail. `preview=false` (deprecated:
+  `skipRefresh=true`) skips the preview (404).
 
 ## Cache-Control (important)
 
@@ -292,7 +293,8 @@ that one is on the author and the `conventions-reviewer`.
 
 - Read-only, slow-changing: `public, max-age=N` (`/player-counts/live` 60, `/news`, `/news/archive`, `/player-counts`
   and `/player-counts/latest` 300, `/items?search=`, `/items?sort=added`, `/players?sort=gain` and `/sitemap/players`
-  3600, `/items?letter=` 86400, `/news/image` 604800).
+  3600, `/items?letter=` 86400, `/news/image` 604800; the deprecated aliases `/items/search/:query` 3600 and
+  `/items/browse/:letter` 86400 until #231).
 - Routes that fetch Jagex live (`/news`, `/news/archive`, `/news/image`, `/player-counts/live`) set it with
   `res.setHeader` after the read succeeds, not with `@Header` (which also applies to errors), so caches don't keep a 503
   (`/player-counts/live` sets `REVALIDATE` first, for its 502).
