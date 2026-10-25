@@ -62,6 +62,11 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   `@nestjs/platform-express` pins 2.4.0 exactly, up to its latest 12.2.0. No route takes uploads, so it wasn't
   reachable; drop the override once platform-express ships 2.5.0 or later.
 
+- The `news` index is now `{ pubDate: -1, link: -1 }`, the archive's sort, instead of `{ pubDate: -1 }`: a two-key sort
+  can't use a one-key index, so every archive page scanned and sorted the whole collection, and the old index's only
+  reader (`/news/since/:date`) went today. The API creates the new one at startup; the old one was dropped by hand after
+  the deploy.
+
 ## 2026-10-22
 
 ### Ingester
