@@ -10,11 +10,12 @@ export class TopGainersController {
   constructor(private readonly playersService: PlayersService) {}
 
   /**
-   * The tracked players with the largest Overall XP gain between their two newest hiscore entries for offset 0,
-   * `[{ username, gain, date }]` by `gain`, largest first, with `date` the newer entry's: only players whose newest
-   * entry is from the newest offset-0 slot (its previous slot until an hour after it starts, `topGainersSlot`), still
-   * scraped and without a not-found streak; none who gained nothing. Read from stored entries only. 400 when `limit`
-   * is out of range. `TOP_GAINERS` on every response.
+   * The tracked players with the largest Overall XP gain between the previous and the newest day's hiscore entries
+   * for offset 0, `[{ username, gain, date }]` by `gain`, largest first, with `date` the newer entry's: only players
+   * whose newest entry is from the newest offset-0 slot (its previous slot until an hour after it starts,
+   * `topGainersSlot`) and the one before it from the slot before, still scraped and without a not-found streak; none
+   * who gained nothing. Read from stored entries only. 400 when `limit` is out of range. `TOP_GAINERS` on every
+   * response.
    */
   @Get()
   @Header('Cache-Control', CACHE_CONTROL.TOP_GAINERS)
