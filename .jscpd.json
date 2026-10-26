@@ -1,0 +1,7 @@
+{
+  "path": ["src"],
+  "format": ["typescript"],
+  "ignore": ["**/*.spec.ts", "**/*.fixture.ts"],
+  "threshold": 1,
+  "reporters": ["console"]
+}

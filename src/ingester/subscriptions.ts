@@ -4,7 +4,7 @@ import { PlayerSubscription, StoredPlayer } from '@osrs-tracker/models';
 export const SUBSCRIPTIONS_TABLE = 'osrs-tracker_subscriptions';
 
 /** Deletes are skipped when more than this share of the table's items would go (`deleteGuard`). */
-export const MAX_DELETED_SHARE = 0.1;
+const MAX_DELETED_SHARE = 0.1;
 
 /**
  * Not written: queue-players queues it together with -12 (the same hour), and nothing writes it to `players` either

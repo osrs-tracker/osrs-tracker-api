@@ -3,6 +3,13 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-10-26
+
+- CI checks for unused, copied and circular code, in the `lint` job and the verify skill: knip (unused files, exports
+  and dependencies of the API and the ingester, `knip.jsonc`), jscpd (copy-pasted code in `src/`, failing over 1%
+  duplicated lines, `.jscpd.json`) and ESLint's `import-x/no-cycle` (circular imports). knip's first run took the
+  `export` off eleven constants and types only their own file uses.
+
 ## 2026-10-25
 
 ### API

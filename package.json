@@ -28,7 +28,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint \"src/**/*.ts\" --fix",
-    "lint:ci": "eslint \"src/**/*.ts\""
+    "lint:ci": "eslint \"src/**/*.ts\"",
+    "knip": "knip",
+    "jscpd": "jscpd"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1154.0",
@@ -67,8 +69,12 @@
     "@types/node": "^24.19.2",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.17.1",
     "fork-ts-checker-webpack-plugin": "^9.1.0",
     "globals": "^17.8.0",
+    "jscpd": "^5.4.2",
+    "knip": "^6.43.0",
     "prettier": "^3.9.10",
     "tsconfig-paths-webpack-plugin": "^4.2.0",
     "typescript": "~6.0.3",
@@ -78,5 +84,8 @@
   },
   "overrides": {
     "multer": "^2.5.0"
+  },
+  "allowScripts": {
+    "unrs-resolver": false
   }
 }

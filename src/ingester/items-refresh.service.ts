@@ -16,7 +16,7 @@ import {
 import { JobRunsService } from './job-runs.service';
 
 /** The OSRS Wiki's list of every GE item, with its static fields (no prices). */
-export const ITEM_MAPPING_URL = 'https://prices.runescape.wiki/api/v2/osrs/mapping';
+const ITEM_MAPPING_URL = 'https://prices.runescape.wiki/api/v2/osrs/mapping';
 
 /**
  * Unobtainable copies of real items that Jagex leaves listed on the GE, examined as just "placeholder" (`Placeholder`,

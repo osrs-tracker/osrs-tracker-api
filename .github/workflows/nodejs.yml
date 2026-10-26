@@ -90,6 +90,11 @@ jobs:
       - uses: ./.github/actions/setup-deps # zizmor: ignore[self-repository]
       - run: npm run lint:ci
       - run: npm run prettier:ci
+      # Unused files, exports and dependencies (knip.jsonc), for both entrypoints: the API and the ingester
+      - run: npm run knip
+      # Copy-pasted code in src/ (.jscpd.json): fails when more than 1% of the lines are duplicated, the specs and
+      # fixtures left out
+      - run: npm run jscpd
       # Local links and #anchors in the Markdown, here because lint also runs for docs-only pushes. --hidden includes
       # .claude/; a glob input doesn't skip .gitignore'd paths, so node_modules is excluded by hand. --offline skips
       # external URLs, which would make CI flaky.
