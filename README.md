@@ -13,11 +13,11 @@ stores player progress so the website can show how players gain XP over time.
 
 ## What it provides
 
-- **Players**: player details and their saved hiscore history, used for XP tracking, plus a sitemap list of tracked
-  players for the website.
-- **Items**: item details, search by name and browsing by first letter.
-- **News**: the latest OSRS news posts, with their images converted to WebP, and every post since a date (stored from
-  the feed, and back to 2013 from the OSRS Wiki).
+- **Players**: player details and their saved hiscore history, used for XP tracking, the day's top Overall XP gainers
+  (`GET /players?sort=gain`), plus a sitemap list of tracked players for the website.
+- **Items**: item details, search by name, browsing by first letter and the newest items (`GET /items?sort=added`).
+- **News**: the latest OSRS news posts, with their images converted to WebP, and an archive of every post, paged and
+  filterable by category (stored from the feed, and back to 2013 from the OSRS Wiki).
 - **Player counts**: the players online now (live from Jagex's world list) and over time (sampled every 10 minutes by
   [osrs-tracker-aws](https://github.com/osrs-tracker/osrs-tracker-aws)).
 
