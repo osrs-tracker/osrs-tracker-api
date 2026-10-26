@@ -13,9 +13,10 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 
 ## Commands
 
-- Verify: `.claude/skills/verify/verify.sh` runs `npm run prettier:ci`, `npm run lint:ci`,
-  `npx tsc --noEmit -p tsconfig.json`, `npm run build` and `npm test` at once and reports every failure. The `verify`
-  skill (`.claude/skills/verify/`) runs it, and Claude Code runs that skill before each commit of a code change.
+- Verify: `.claude/skills/verify/verify.sh` runs `npm run prettier:ci`, `npm run lint:ci`, `npm run knip` (unused code),
+  `npm run jscpd` (copy-pasted code), `npx tsc --noEmit -p tsconfig.json`, `npm run build` and `npm test` at once and
+  reports every failure. The `verify` skill (`.claude/skills/verify/`) runs it, and Claude Code runs that skill before
+  each commit of a code change.
 - Dev server: `npm run start:dev` on port 3000. `.env` points at production data, through a port-forward to the
   cluster's MongoDB that the user runs with the admin kubeconfig (README, Running it locally): the `claude-agent`
   ServiceAccount can't port-forward, so when the connect fails, ask the user to start it.

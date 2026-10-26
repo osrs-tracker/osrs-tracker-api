@@ -4,8 +4,8 @@ import { singleQueryValue } from '../../common/pipes/single-query-value';
 import { ParseBrowseLetterPipe } from './parse-browse-letter.pipe';
 import { ParseItemSearchQueryPipe } from './parse-item-search-query.pipe';
 
-export const ITEM_SORTS = ['lookedUp', 'added'] as const;
-export type ItemSort = (typeof ITEM_SORTS)[number];
+const ITEM_SORTS = ['lookedUp', 'added'] as const;
+type ItemSort = (typeof ITEM_SORTS)[number];
 
 /** `GET /items`' query: one of item search, item browse, or a list in `sort` order. */
 export type ItemListQuery = { search: string } | { letter: string } | { sort: ItemSort; limit: number };

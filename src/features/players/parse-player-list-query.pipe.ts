@@ -5,8 +5,8 @@ import { ParseScrapingOffsetPipe } from './parse-scraping-offset.pipe';
 import { RECENT_PLAYERS_ENTRY, type RecentPlayersEntry } from './players.service';
 import { MAX_TOP_GAINERS } from './top-gainers';
 
-export const PLAYER_SORTS = ['lookedUp', 'gain'] as const;
-export type PlayerSort = (typeof PLAYER_SORTS)[number];
+const PLAYER_SORTS = ['lookedUp', 'gain'] as const;
+type PlayerSort = (typeof PLAYER_SORTS)[number];
 
 /** `GET /players`' query: the recently looked up players, or the top gainers. */
 export type PlayerListQuery =

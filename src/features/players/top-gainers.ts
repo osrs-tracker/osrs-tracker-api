@@ -13,7 +13,7 @@ export interface TopGainer {
 }
 
 /** The scraping offset the top gainers are ranked for: the default one, the offset most players are scraped at. */
-export const TOP_GAINERS_OFFSET = 0;
+const TOP_GAINERS_OFFSET = 0;
 
 /** Most players returned; the cached list holds this many. */
 export const MAX_TOP_GAINERS = 50;

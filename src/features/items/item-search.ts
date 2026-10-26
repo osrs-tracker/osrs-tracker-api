@@ -2,13 +2,13 @@ import { Item } from '@osrs-tracker/models';
 import leven from 'leven';
 
 /** The shortest query word that matches the start of a word; shorter ones only match whole words. */
-export const MIN_PREFIX_LENGTH = 2;
+const MIN_PREFIX_LENGTH = 2;
 /** The shortest query word that matches inside a word (`axe` in Battleaxe) or across words (`tbow`). */
-export const MIN_INNER_LENGTH = 3;
+const MIN_INNER_LENGTH = 3;
 /** The shortest query word matched with a typo; from `MIN_TWO_TYPOS_LENGTH` with two. */
-export const MIN_TYPO_LENGTH = 4;
+const MIN_TYPO_LENGTH = 4;
 const MIN_TWO_TYPOS_LENGTH = 8;
-export const MAX_SEARCH_RESULTS = 20;
+const MAX_SEARCH_RESULTS = 20;
 
 /** Points per query word by how it matches a name, best first; an item scores the sum. */
 const SCORE = { whole: 4, prefix: 3, across: 2, inner: 1, typo: 1 } as const;

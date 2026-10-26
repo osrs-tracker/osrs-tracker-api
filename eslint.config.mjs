@@ -2,6 +2,8 @@
 import eslint from '@eslint/js';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import { defineConfig } from 'eslint/config';
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
+import { importX } from 'eslint-plugin-import-x';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -42,6 +44,19 @@ export default defineConfig(
           message: 'Never `no-store`, `no-cache` or `private` in Cache-Control: use a value from `CACHE_CONTROL`.',
         })),
       ],
+    },
+  },
+  {
+    // No circular imports: Nest resolves a provider cycle only through `forwardRef`, and a module that imports itself
+    // through another reads it half-initialised. Resolved paths, so relative imports count too.
+    files: ['src/**/*.ts'],
+    plugins: { 'import-x': importX },
+    settings: {
+      'import-x/resolver-next': [createTypeScriptImportResolver({ project: 'tsconfig.json' })],
+      'import-x/extensions': ['.ts'],
+    },
+    rules: {
+      'import-x/no-cycle': 'error',
     },
   },
   eslintConfigPrettier,

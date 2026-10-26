@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // Unused files, exports and dependencies. The two entrypoints of the image: the API (nest-cli.json's main.ts) and the
+  // ingester (`node ingest`), plus rspack.config.js, which `nest build -b rspack` loads
+  "entry": ["src/main.ts", "src/ingest.ts", "rspack.config.js"],
+  // Its rspack plugin loads rspack.config.js to find the entries, and fails: the file is a function of Nest CLI's
+  // options, so it's read as a plain entry instead
+  "rspack": false,
+}

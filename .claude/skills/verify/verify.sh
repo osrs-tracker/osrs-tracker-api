@@ -5,10 +5,14 @@ set -u
 # Plain output: the logs are read by Claude, not a terminal
 export NO_COLOR=1 FORCE_COLOR=0
 
-names=(prettier lint types build test)
+names=(prettier lint knip jscpd types build test)
 commands=(
   'npm run prettier:ci'
   'npm run lint:ci'
+  # Unused files, exports and dependencies (knip.jsonc)
+  'npm run knip'
+  # Copy-pasted code in src/ (.jscpd.json): fails over 1% duplicated lines
+  'npm run jscpd'
   # The build's type check (fork-ts-checker) reads tsconfig.build.json, which skips the specs: this is their only one
   'npx tsc --noEmit -p tsconfig.json'
   'npm run build'
