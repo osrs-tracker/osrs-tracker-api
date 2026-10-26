@@ -53,6 +53,7 @@ export default defineConfig(
     plugins: { 'import-x': importX },
     settings: {
       'import-x/resolver-next': [createTypeScriptImportResolver({ project: 'tsconfig.json' })],
+      // The files no-cycle parses to follow their imports; it skips the others, and the default is only .js
       'import-x/extensions': ['.ts'],
     },
     rules: {
