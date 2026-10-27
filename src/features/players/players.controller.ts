@@ -43,8 +43,9 @@ export class PlayersController {
    *   `entry=overall` cuts that entry to its `date`, `scrapingOffset` and `skills.Overall`, with `activities: {}` (the
    *   web's recent players rows); without it, the entry is whole. 400 when `entry` isn't `overall`. `REVALIDATE`.
    * - `gain`: the `limit` (1 to `MAX_TOP_GAINERS`, default 5) tracked players with the largest Overall XP gain
-   *   between the previous and the newest day's hiscore entries for offset 0, `[{ username, gain, date }]` by `gain`,
-   *   largest first, with `date` the newer entry's: only players whose newest entry is from the newest offset-0 slot
+   *   between the previous and the newest day's hiscore entries for offset 0,
+   *   `[{ username, type, status, diedAsHardcore, gain, date }]` by `gain`, largest first, with `date` the newer
+   *   entry's and the player fields as stored (the web's account avatar): only players whose newest entry is from the newest offset-0 slot
    *   (its previous slot until an hour after it starts, `topGainersSlot`) and the one before it from the slot before,
    *   still scraped and without a not-found streak; none who gained nothing. Read from stored entries only.
    *   `TOP_GAINERS`.

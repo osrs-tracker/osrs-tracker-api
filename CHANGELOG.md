@@ -3,6 +3,13 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-10-27
+
+- `GET /players?sort=gain` now answers `[{ username, type, status, diedAsHardcore, gain, date }]`: the web shows each
+  top gainer's account avatar (the type icon with the de-ironed and died-as-hardcore badges), like its other player
+  lists (#239, osrs-tracker/osrs-tracker-web#445). The values are as stored, like the recent lookups list's; nothing
+  else of the player is added, since the list is cached and served to every visitor.
+
 ## 2026-10-26
 
 - CI checks for unused, copied and circular code, in the `lint` job and the verify skill: knip (unused files, exports
