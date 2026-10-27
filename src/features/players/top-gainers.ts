@@ -1,16 +1,15 @@
 import { getOverallXpDiff } from '@osrs-tracker/hiscores';
-import { HiscoreEntry } from '@osrs-tracker/models';
+import { HiscoreEntry, Player } from '@osrs-tracker/models';
 import { millisecondsInDay as DAY, millisecondsInHour as HOUR } from 'date-fns/constants';
 import { Document } from 'mongodb';
 import { slotStart } from '../../ingester/scrape-results';
 import { entriesForOffset } from './player-queries';
 
+/** The stored fields a top gainer is served with: the web draws its account avatar from them. */
+export type TopGainerPlayer = Pick<Player, 'username' | 'type' | 'status' | 'diedAsHardcore'>;
+
 /** A player in the top gainers: `gain` is the Overall XP over its newest day of entries, `date` the newer entry's. */
-export interface TopGainer {
-  username: string;
-  gain: number;
-  date: Date;
-}
+export type TopGainer = TopGainerPlayer & { gain: number; date: Date };
 
 /** The scraping offset the top gainers are ranked for: the default one, the offset most players are scraped at. */
 const TOP_GAINERS_OFFSET = 0;
@@ -50,6 +49,9 @@ export function buildTopGainersPipeline(slot: Date): Document[] {
       $project: {
         _id: 0,
         username: 1,
+        type: 1,
+        status: 1,
+        diedAsHardcore: 1,
         // From the newest: an unchanged value is stored as a bare rank, resolved from a newer entry
         hiscoreEntries: { $slice: [entriesForOffset('$hiscoreEntries', TOP_GAINERS_OFFSET), 2] },
       },
@@ -63,16 +65,16 @@ export function buildTopGainersPipeline(slot: Date): Document[] {
  * `slot`'s day, whose previous one is older than the previous slot (a paused or missed scrape: a gain over more than a
  * day), who has only one entry, or who gained nothing.
  */
-export function rankTopGainers(players: { username: string; entries: HiscoreEntry[] }[], slot: Date): TopGainer[] {
+export function rankTopGainers(players: (TopGainerPlayer & { entries: HiscoreEntry[] })[], slot: Date): TopGainer[] {
   const previousSlot = slot.getTime() - DAY;
   const slotEnd = slot.getTime() + DAY;
   return players
-    .flatMap(({ username, entries: [newest, previous] }) => {
+    .flatMap(({ entries: [newest, previous], ...player }) => {
       if (!newest || !previous) return [];
       if (newest.date.getTime() < slot.getTime() || newest.date.getTime() >= slotEnd) return [];
       if (previous.date.getTime() < previousSlot) return [];
       const gain = getOverallXpDiff(newest, previous);
-      return gain > 0 ? [{ username, gain, date: newest.date }] : [];
+      return gain > 0 ? [{ ...player, gain, date: newest.date }] : [];
     })
     .sort((a, b) => b.gain - a.gain || a.username.localeCompare(b.username))
     .slice(0, MAX_TOP_GAINERS);

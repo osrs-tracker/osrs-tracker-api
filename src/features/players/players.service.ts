@@ -29,6 +29,7 @@ import {
   rankTopGainers,
   TOP_GAINERS_CACHE_TTL_MS,
   TopGainer,
+  TopGainerPlayer,
   topGainersSlot,
 } from './top-gainers';
 
@@ -191,11 +192,11 @@ export class PlayersService {
 
   private async fetchTopGainers(slot: Date): Promise<TopGainer[]> {
     const players = await this.collection
-      .aggregate<Pick<StoredPlayer, 'username' | 'hiscoreEntries'>>(buildTopGainersPipeline(slot))
+      .aggregate<TopGainerPlayer & Pick<StoredPlayer, 'hiscoreEntries'>>(buildTopGainersPipeline(slot))
       .toArray();
     const decoded = await Promise.all(
-      players.map(async ({ username, hiscoreEntries }) => ({
-        username,
+      players.map(async ({ hiscoreEntries, ...player }) => ({
+        ...player,
         entries: await this.layouts.decode(hiscoreEntries ?? []),
       })),
     );
