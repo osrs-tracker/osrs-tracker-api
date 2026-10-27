@@ -58,7 +58,7 @@ export class PlayerCountsService {
 
   /**
    * The players online now, from Jagex's world list, at most `LIVE_PLAYER_COUNT_TTL_MS` old; never stored (the
-   * record-player-count Lambda owns `playerCounts`). A 502 when Jagex fails, answered for `LIVE_PLAYER_COUNT_TTL_MS`
+   * ingester owns `playerCounts`). A 502 when Jagex fails, answered for `LIVE_PLAYER_COUNT_TTL_MS`
    * without asking again.
    */
   async getLive(): Promise<PlayerCount> {

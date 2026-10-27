@@ -268,7 +268,7 @@ usernames) is in [`DATA-MODEL.md`](../../../DATA-MODEL.md). The API's side, in `
 - Success: resume in the same update — merge `pausedScrapingOffsets` into `scrapingOffsets`, unset it,
   `hiscoreNotFoundSince` and `hiscoreNotFoundCount`.
 - Not found (404/400 on the normal table) or failed (any other status, network error, timeout, or any of the four tables
-  failing): write nothing and leave them alone. **Never** count 404s here; the Lambda owns that bookkeeping.
+  failing): write nothing and leave them alone. **Never** count 404s here; the ingester owns that bookkeeping.
 - `POST /players/:username/lookup` answers 404 only for not found. Failed returns the stored player with
   `refreshFailed: true`, or 503 when the player isn't stored.
 - Hiscore lookups go through `determinePlayerStatusAndType`, which asks the normal table first, shares lookups in flight
@@ -303,8 +303,8 @@ that one is on the author and the `conventions-reviewer`.
 - GETs never write; lookups are recorded by browser-only POSTs, since crawlers hit the GETs during SSR. The one
   exception: a news feed refresh (`/news`, the first page of `/news/archive`) upserts the feed's posts into `news`
   (keyed on `link`), the same whoever asks; the e2e spec allows only that write (`FEED_STORE`).
-- `/items/:id`, `/players/:username/hiscores` and the recent-items/players lists: `max-age=0, must-revalidate` so
-  they're always fresh.
+- `/items/:id`, `/players/:username/hiscores`, and `/items` and `/players` without a query (the recent lists):
+  `max-age=0, must-revalidate` so they're always fresh.
 - `/players/:username`: stored players get a dynamic `max-age` (`playerMaxAgeSeconds`), clamped to `[0, 900]`
   (`PLAYER_MAX_AGE_SECONDS` in `cache-control.ts`, which `PLAYER_REFRESHED` uses too) and capped at the time until the
   refresh window; the preview of an unknown player and the 503 get `max-age=0, must-revalidate`.

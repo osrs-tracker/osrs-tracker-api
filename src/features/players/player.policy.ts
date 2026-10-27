@@ -27,7 +27,7 @@ const SCRAPING_OFFSET_LOOKUPS = 'scrapingOffsetLookups' satisfies keyof StoredPl
 /**
  * The update `recordLookup` runs for a visitor's lookup: `lastHiscoreFetch` (the recent players list) and the lookup
  * date for `scrapingOffset` in models' `Player.scrapingOffsetLookups`, keyed by the offset as a string (`"-12"` to
- * `"11"`). The clean-hiscores Lambda drops an offset nobody looked up for 180 days; a dotted `$set` leaves the other
+ * `"11"`). The ingester's clean job drops an offset nobody looked up for 180 days; a dotted `$set` leaves the other
  * offsets' dates alone. The field name comes from the model (`SCRAPING_OFFSET_LOOKUPS`), since TypeScript doesn't
  * check a dotted key: a rename in models fails the build instead of writing a field clean-hiscores doesn't read.
  */

@@ -112,8 +112,8 @@ export class PlayersService {
           ...PLAYER_PROJECTION,
           pausedScrapingOffsets: 1, // Still tracked (they have a history), resumed by the next successful refresh
           ...(includeLatestHiscoreEntry ? { hiscoreEntries: { $elemMatch: { o: scrapingOffset } } } : {}),
-          // Date of the oldest stored entry for this offset (entries are stored newest first). The clean-hiscores
-          // Lambda removes entries older than MAX_AGE_IN_DAYS, so this is where the history starts, not when tracking
+          // Date of the oldest stored entry for this offset (entries are stored newest first). The ingester's
+          // clean job removes entries older than MAX_AGE_IN_DAYS, so this is where the history starts, not when tracking
           // started.
           trackedSince: {
             $ifNull: [
@@ -280,11 +280,11 @@ export class PlayersService {
   /**
    * Refreshes the player info for the given `username`.
    *
-   * Pause/resume contract with the `process-players` Lambda (osrs-tracker-aws): the Lambda owns the not-found
-   * bookkeeping (`hiscoreNotFoundCount`, `hiscoreNotFoundSince`) and, after 7 days of 404s, moves `scrapingOffsets`
-   * into `pausedScrapingOffsets` so the player is no longer queued. A successful refresh here resumes tracking by
-   * merging the paused offsets back and removing the pause fields. A refresh that isn't `refreshed` writes nothing and
-   * leaves them untouched: the Lambda does the 404 counting.
+   * Pause/resume contract with the ingester (from process-players' `notFound` usernames; DATA-MODEL.md): the ingester
+   * owns the not-found bookkeeping (`hiscoreNotFoundCount`, `hiscoreNotFoundSince`) and, after 7 days of 404s, moves
+   * `scrapingOffsets` into `pausedScrapingOffsets` so the player is no longer queued. A successful refresh here resumes
+   * tracking by merging the paused offsets back and removing the pause fields. A refresh that isn't `refreshed` writes
+   * nothing and leaves them untouched: the ingester does the 404 counting.
    *
    * @param scrapingOffset Added to the player's `scrapingOffsets` if not already present, with an initial
    *   `hiscoreEntry`.

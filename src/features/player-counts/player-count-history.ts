@@ -15,8 +15,8 @@ const RANGES: Record<PlayerCountRange, { span?: number; points: 'samples' | 'hou
 };
 
 /**
- * Whether `range` reads `playerCountsDaily` (one document per UTC day, recomputed by the record-player-count Lambda after
- * every sample, so today's is partial) instead of `playerCounts`: averaging every sample per day on each request grew
+ * Whether `range` reads `playerCountsDaily` (one document per UTC day, recomputed by the ingester after every
+ * sample, so today's is partial) instead of `playerCounts`: averaging every sample per day on each request grew
  * with the stored samples (6.5 s for 10 years, #159).
  */
 export const readsDailyAverages = (range: PlayerCountRange): boolean => RANGES[range].points === 'days';
