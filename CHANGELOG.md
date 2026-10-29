@@ -3,6 +3,12 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-10-29
+
+### Behind the scenes
+
+- Node 26 LTS replaces Node 24 as the runtime (Docker image, CI, `engines.node`) and for `@types/node` (#242).
+
 ## 2026-10-27
 
 - `GET /players?sort=gain` now answers `[{ username, type, status, diedAsHardcore, gain, date }]`: the web shows each
