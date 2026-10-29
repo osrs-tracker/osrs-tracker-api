@@ -64,7 +64,7 @@ elsewhere.
 
 ## Running it locally
 
-You need Node 24 or newer, and `kubectl` with the cluster's admin kubeconfig (`~/.kube/admin.yaml`). MongoDB runs in the
+You need Node 26 or newer, and `kubectl` with the cluster's admin kubeconfig (`~/.kube/admin.yaml`). MongoDB runs in the
 cluster (the `mongodb` namespace, a single-member replica set) with no public port, so reach it through a port-forward,
 and keep it running while the API runs:
 
@@ -114,7 +114,7 @@ production data. This runs them all at once and reports every failure:
 
 ## Built with
 
-NestJS 12, TypeScript 6, MongoDB and Node 24, bundled with rspack and tested with Vitest, deployed with Docker on
+NestJS 12, TypeScript 6, MongoDB and Node 26, bundled with rspack and tested with Vitest, deployed with Docker on
 Kubernetes. Merging to `main` deploys it: GitHub Actions builds the image and commits its digest to
 `osrs-tracker-api.yaml`, and Flux applies it to the cluster.
 
