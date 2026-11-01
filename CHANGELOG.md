@@ -3,6 +3,13 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-11-01
+
+### Behind the scenes
+
+- `zizmorcore/zizmor-action` to v0.8.0 in the `zizmor` workflow, matching osrs-tracker/osrs-tracker-packages#25; the
+  zizmor version it runs stays pinned.
+
 ## 2026-10-29
 
 ### Behind the scenes
