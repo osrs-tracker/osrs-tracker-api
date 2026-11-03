@@ -41,6 +41,9 @@ rules, plus deploy and release steps. Keep detail there, not in this file.
 - Deploying is merging to `main` (GitHub Actions → Flux). Never build, push or `kubectl apply` by hand.
 - Never `--no-gpg-sign`. Never `no-store`, `no-cache` or `private` in `Cache-Control` (ESLint and `src/app.e2e.spec.ts`
   enforce it).
+- Adding, removing or renaming a workload, changing its replicas, or changing how traffic or deploys flow makes the map
+  on freekmencke.com stale: open an issue in `FreekMencke/freek-mencke-web`
+  (`src/app/home/fremen-server/cluster-parts.ts`). That repo is public, so no IDs.
 
 ## Where things live
 
