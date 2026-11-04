@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ResilienceModule, ResilienceService } from '@nestjs/resilience';
 import { Test } from '@nestjs/testing';
+import { HiscoreTable } from '@osrs-tracker/hiscores';
 import {
   createHiscoreLayout,
   encodeHiscoreEntry,
@@ -153,30 +154,28 @@ describe('PlayersService hiscore lookups', () => {
     expect(mockFetch).toHaveBeenCalledTimes(5);
   });
 
+  /** Answers each table in `tables` with its hiscore, and 404s the others. */
+  function answerByTable(tables: Partial<Record<HiscoreTable, unknown>>) {
+    mockFetch.mockImplementation(async (url) => {
+      const table = new URL(String(url)).pathname.split('/')[1].replace(/^m=/, '') as HiscoreTable;
+      return table in tables ? response('found', tables[table]) : response('notFound');
+    });
+  }
+
+  async function preview(username: string) {
+    const result = await service.previewPlayer(username, 0, true);
+    if (result.status !== 'found') throw new Error(`Expected found, got ${result.status}`);
+    return result.player;
+  }
+
   describe('Hardcore Worlds', () => {
     // A main entry frozen before Hardcore Worlds opened, and the character's progress on its own table
     const stub = jagexHiscore(-1, 1, 1_154);
     const progress = jagexHiscore(5, 50, 101_333);
     const dead = jagexHiscore(5, 50, 101_333, { timeStamp: Date.parse('2026-11-04T18:00:00Z') });
 
-    /** Answers the main table and Hardcore Worlds' table (a 404 when absent), and 404s the ironman tables. */
-    function answerByTable(main: unknown, hardcoreMain?: unknown) {
-      mockFetch.mockImplementation(async (url) => {
-        const table = new URL(String(url)).pathname.split('/')[1];
-        if (table === 'm=hiscore_oldschool') return response('found', main);
-        if (table === 'm=hiscore_oldschool_hardcore_mains' && hardcoreMain) return response('found', hardcoreMain);
-        return response('notFound');
-      });
-    }
-
-    async function preview(username: string) {
-      const result = await service.previewPlayer(username, 0, true);
-      if (result.status !== 'found') throw new Error(`Expected found, got ${result.status}`);
-      return result.player;
-    }
-
     it("takes a Hardcore main's combat level and entry from its own table, not the main table's stub", async () => {
-      answerByTable(stub, progress);
+      answerByTable({ hiscore_oldschool: stub, hiscore_oldschool_hardcore_mains: progress });
 
       const player = await preview('hcmain');
       expect(player).toMatchObject({ type: PlayerType.HardcoreMain, combatLevel: 63, diedAsHardcore: false });
@@ -184,16 +183,16 @@ describe('PlayersService hiscore lookups', () => {
     });
 
     it('keeps a dead Hardcore main on its own table, died as hardcore, while its main entry is the stub or equal to the dead row', async () => {
-      answerByTable(stub, dead);
+      answerByTable({ hiscore_oldschool: stub, hiscore_oldschool_hardcore_mains: dead });
       expect(await preview('dead hcmain')).toMatchObject({ type: PlayerType.HardcoreMain, diedAsHardcore: true });
 
       // As FailedHcMain at 17:59 UTC on 2026-11-04: main unranked at the dead row's xp, a Transfer or not yet
-      answerByTable(jagexHiscore(-1, 50, 101_333), dead);
+      answerByTable({ hiscore_oldschool: jagexHiscore(-1, 50, 101_333), hiscore_oldschool_hardcore_mains: dead });
       expect(await preview('failedhcmain')).toMatchObject({ type: PlayerType.HardcoreMain, diedAsHardcore: true });
     });
 
     it('makes a dead row whose main entry grew past it a Transfer: a main account that died as hardcore, from main', async () => {
-      answerByTable(jagexHiscore(4_000, 50, 101_400), dead);
+      answerByTable({ hiscore_oldschool: jagexHiscore(4_000, 50, 101_400), hiscore_oldschool_hardcore_mains: dead });
 
       const player = await preview('transferred');
       expect(player).toMatchObject({ type: PlayerType.Normal, combatLevel: 63, diedAsHardcore: true });
@@ -201,9 +200,43 @@ describe('PlayersService hiscore lookups', () => {
     });
 
     it('sees a main account once the row is gone (404): the stored type marks that Transfer (buildRefreshUpdate)', async () => {
-      answerByTable(jagexHiscore(4_000, 50, 101_333));
+      answerByTable({ hiscore_oldschool: jagexHiscore(4_000, 50, 101_333) });
 
       expect(await preview('gone')).toMatchObject({ type: PlayerType.Normal, diedAsHardcore: false });
+    });
+  });
+
+  describe('hardcore ironmen', () => {
+    // On the main, ironman and hardcore tables with the same xp
+    const alive = jagexHiscore(5, 99, 26_207_134);
+    // A dead row keeps its xp from the death, and Overall gets Jagex's death record (8 of 8 dead ones, 2017-2026)
+    const dead = jagexHiscore(5, 99, 26_116_135, { timeStamp: Date.parse('2017-12-07T09:29:00Z') });
+
+    it("reads a death from the hardcore table's death record, even with no xp gained since", async () => {
+      answerByTable({
+        hiscore_oldschool: dead,
+        hiscore_oldschool_ironman: dead,
+        hiscore_oldschool_hardcore_ironman: dead,
+      });
+
+      expect(await preview('itti')).toMatchObject({ type: PlayerType.Hardcore, diedAsHardcore: true });
+    });
+
+    it('is alive without a death record, even with the hardcore row behind the ironman one (no xp inference)', async () => {
+      answerByTable({
+        hiscore_oldschool: alive,
+        hiscore_oldschool_ironman: alive,
+        hiscore_oldschool_hardcore_ironman: alive,
+      });
+      expect(await preview('anypurps')).toMatchObject({ type: PlayerType.Hardcore, diedAsHardcore: false });
+
+      const behind = jagexHiscore(5, 99, 26_000_000);
+      answerByTable({
+        hiscore_oldschool: alive,
+        hiscore_oldschool_ironman: alive,
+        hiscore_oldschool_hardcore_ironman: behind,
+      });
+      expect(await preview('no record')).toMatchObject({ type: PlayerType.Hardcore, diedAsHardcore: false });
     });
   });
 

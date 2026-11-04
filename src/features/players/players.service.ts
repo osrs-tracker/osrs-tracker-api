@@ -377,10 +377,10 @@ export class PlayersService {
         combatLevel: PlayerUtils.getCombatLevel(tracked.hiscore.skills),
         type,
         status: PlayerUtils.determineStatus(normal, ironman, ultimate),
-        // A Hardcore Worlds death is Jagex's death record, dead before a Reset or a Transfer and after a Transfer; not
-        // the ironman rule, since that table runs ahead of the main stub, and resets
-        diedAsHardcore:
-          !!hardcoreMainResult?.diedAt || PlayerUtils.getTotalXp(hardcore) < PlayerUtils.getTotalXp(ironman),
+        // Jagex's death record on either hardcore table, which every dead hardcore ironman checked had (deaths from 2017
+        // to 2026, osrs-tracker/osrs-tracker-api#251); a Hardcore Worlds row keeps it before a Reset or a Transfer and
+        // after a Transfer
+        diedAsHardcore: !!hardcoreResult?.diedAt || !!hardcoreMainResult?.diedAt,
         lastModified: new Date(),
       } satisfies Player,
       partialHiscoreEntry: { skills: tracked.hiscore.skills, activities: tracked.hiscore.activities },

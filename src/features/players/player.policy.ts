@@ -90,7 +90,8 @@ export function buildRefreshUpdate(
  * `diedAsHardcore` for `buildRefreshUpdate`. A transferred Hardcore Worlds character is a main account to a lookup, and
  * only the stored player still shows what it was. So for a main account it's also true when the stored player is a
  * Hardcore main (its row on Hardcore Worlds' table is gone: a Transfer), or a main account that already died as one (it
- * sticks). Any other type takes the lookup's value: a Hardcore main seen alive, or a hardcore ironman's ironman rule.
+ * sticks). Any other type takes the lookup's value, Jagex's death record: a Reset brings a Hardcore main back alive, and
+ * a wrong `true` stored by the old XP rule for a hardcore ironman goes on its next refresh.
  */
 function diedAsHardcoreExpression({ type, diedAsHardcore }: Player): Document {
   if (type !== PlayerType.Normal) return { $literal: diedAsHardcore };
