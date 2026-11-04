@@ -183,19 +183,21 @@ describe('PlayersService hiscore lookups', () => {
       expect(player.hiscoreEntries?.[0].skills[SkillEnum.Attack]).toEqual({ rank: 5, level: 50, xp: 101_333 });
     });
 
-    it('keeps a dead Hardcore main on its own table while its main entry is still the stub', async () => {
+    it('keeps a dead Hardcore main on its own table while its main entry is the stub, or equal to the dead row', async () => {
       answerByTable(stub, dead);
-
       expect(await preview('dead hcmain')).toMatchObject({ type: PlayerType.HardcoreMain, diedAsHardcore: false });
+
+      // As FailedHcMain at 17:59 UTC on 2026-11-04: main unranked at the dead row's xp, a Transfer or not yet
+      answerByTable(jagexHiscore(-1, 50, 101_333), dead);
+      expect(await preview('failedhcmain')).toMatchObject({ type: PlayerType.HardcoreMain, diedAsHardcore: false });
     });
 
-    it('makes a dead row whose main entry caught up a Transfer: a main account that died as hardcore, from main', async () => {
-      // As FailedHcMain at 17:59 UTC on 2026-11-04: main unranked but at the dead row's xp, no longer the stub
-      answerByTable(jagexHiscore(-1, 50, 101_333), dead);
+    it('makes a dead row whose main entry grew past it a Transfer: a main account that died as hardcore, from main', async () => {
+      answerByTable(jagexHiscore(4_000, 50, 101_400), dead);
 
       const player = await preview('transferred');
       expect(player).toMatchObject({ type: PlayerType.Normal, combatLevel: 63, diedAsHardcore: true });
-      expect(player.hiscoreEntries?.[0].skills[SkillEnum.Attack]).toEqual({ rank: null, level: 50, xp: 101_333 });
+      expect(player.hiscoreEntries?.[0].skills[SkillEnum.Attack]).toEqual({ rank: 4_000, level: 50, xp: 101_400 });
     });
 
     it('sees a main account once the row is gone (404): the stored type marks that Transfer (buildRefreshUpdate)', async () => {

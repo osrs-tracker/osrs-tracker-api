@@ -91,13 +91,13 @@ describe('PlayerUtils.transferredFromHardcoreWorlds', () => {
   const diedAt = new Date('2026-11-04T18:00:00Z');
   const dead = (xp: number) => ({ hiscore: entry(xp), diedAt });
 
-  it('is a Transfer once the main entry has caught up with the dead row', () => {
-    expect(PlayerUtils.transferredFromHardcoreWorlds(entry(96_453), dead(96_453))).toBe(true);
-    expect(PlayerUtils.transferredFromHardcoreWorlds(entry(100_000), dead(96_453))).toBe(true);
+  it('is a Transfer once the main entry has grown past the dead row', () => {
+    expect(PlayerUtils.transferredFromHardcoreWorlds(entry(96_454), dead(96_453))).toBe(true);
   });
 
-  it("isn't while the main entry is still the stub behind the dead row", () => {
+  it("isn't while the main entry is the stub behind the dead row, or equal to it (a death before the choice)", () => {
     expect(PlayerUtils.transferredFromHardcoreWorlds(entry(3_292), dead(96_453))).toBe(false);
+    expect(PlayerUtils.transferredFromHardcoreWorlds(entry(96_453), dead(96_453))).toBe(false);
   });
 
   it("isn't without a death on the row, or without a row", () => {

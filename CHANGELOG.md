@@ -15,11 +15,12 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
 - **Breaking:** for the web, a lookup now turns a Hardcore Worlds character that died and transferred to the main game
   into `type: 'normal'` with `diedAsHardcore: true`, a combination the web labelled as a former hardcore ironman until
   osrs-tracker/osrs-tracker-web#500 (#249). It's a Transfer when its row on Hardcore Worlds' table is dead (hiscores
-  6.1.0's `diedAt`) and its main entry has caught up with that row, or when a player stored as `hardcore_mains` is off
-  that table. From then on it's tracked on the main table, which now holds its progress (the sync drops its `table`),
-  and `diedAsHardcore` stays true on later lookups, decided in the update since only the stored player shows what it
-  was. Not the hardcore ironman rule's XP comparison: Hardcore Worlds' table runs ahead of the main stub, and resets.
-  Only a lookup switches it, by the owner's choice: until then process-players keeps scraping the dead row.
+  6.1.0's `diedAt`) and its main entry has grown past that row (not just reached it: the first death seen had main at
+  the dead row's XP, which may come before the choice), or when a player stored as `hardcore_mains` is off that table.
+  From then on it's tracked on the main table, which now holds its progress (the sync drops its `table`), and
+  `diedAsHardcore` stays true on later lookups, decided in the update since only the stored player shows what it was.
+  Not the hardcore ironman rule's XP comparison: Hardcore Worlds' table runs ahead of the main stub, and resets. Only a
+  lookup switches it, by the owner's choice: until then process-players keeps scraping the dead row.
 
 ## 2026-11-01
 
