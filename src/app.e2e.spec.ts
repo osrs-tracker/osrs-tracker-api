@@ -59,7 +59,7 @@ interface Fakes {
    * answers `LAYOUT`).
    */
   docs?: object[];
-  /** The four hiscore tables: all found, all not found (404), or all failing. */
+  /** The five hiscore tables: all found, all not found (404), or all failing. */
   hiscores?: 'found' | 'notFound' | 'failed';
   /** Jagex's world list: answered, or failing. */
   worldList?: 'found' | 'failed';

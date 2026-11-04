@@ -1,4 +1,7 @@
-import { PlayerSubscription, StoredPlayer } from '@osrs-tracker/models';
+import { PlayerSubscription, PlayerType, StoredPlayer } from '@osrs-tracker/models';
+
+/** The fields of a stored player that make its item: the sync projects only these. */
+type SubscribedPlayer = Pick<StoredPlayer, 'username' | 'scrapingOffsets' | 'type'>;
 
 /** The DynamoDB table queue-players reads who to scrape from (osrs-tracker/osrs-tracker-aws#164). Only the sync writes it. */
 export const SUBSCRIPTIONS_TABLE = 'osrs-tracker_subscriptions';
@@ -21,22 +24,26 @@ export interface SubscriptionsDiff {
 
 /**
  * A player's item, or none when it has no offsets to scrape (a Number Set can't be empty). `pausedScrapingOffsets`
- * don't count: a paused player isn't scraped.
+ * don't count: a paused player isn't scraped. A Hardcore main is scraped from its own table; any other player has no
+ * `table` (the main one), never `table: undefined`, which the document client refuses to write.
  */
-export function subscriptionOf({
-  username,
-  scrapingOffsets,
-}: Pick<StoredPlayer, 'username' | 'scrapingOffsets'>): PlayerSubscription | undefined {
+export function subscriptionOf({ username, scrapingOffsets, type }: SubscribedPlayer): PlayerSubscription | undefined {
   const offsets = new Set(scrapingOffsets?.filter((offset) => offset !== QUEUED_WITH_MINUS_12));
-  return offsets.size ? { username, scrapingOffsets: offsets } : undefined;
+  if (!offsets.size) return undefined;
+  return type === PlayerType.HardcoreMain
+    ? { username, scrapingOffsets: offsets, table: 'hiscore_oldschool_hardcore_mains' }
+    : { username, scrapingOffsets: offsets };
 }
 
-/** A put for each player whose item is missing or has other offsets, a delete for each item without a player to scrape. */
+/**
+ * A put for each player whose item is missing or has other offsets or another table, a delete for each item without a
+ * player to scrape.
+ */
 export function diffSubscriptions(
-  players: readonly Pick<StoredPlayer, 'username' | 'scrapingOffsets'>[],
+  players: readonly SubscribedPlayer[],
   items: readonly PlayerSubscription[],
 ): SubscriptionsDiff {
-  const stored = new Map(items.map((item) => [item.username, item.scrapingOffsets]));
+  const stored = new Map(items.map((item) => [item.username, item]));
   const wanted = new Set<string>();
   const puts: PlayerSubscription[] = [];
 
@@ -44,8 +51,8 @@ export function diffSubscriptions(
     const subscription = subscriptionOf(player);
     if (!subscription) continue;
     wanted.add(subscription.username);
-    const offsets = stored.get(subscription.username);
-    if (!offsets || !sameOffsets(offsets, subscription.scrapingOffsets)) puts.push(subscription);
+    const item = stored.get(subscription.username);
+    if (!item || !sameItem(item, subscription)) puts.push(subscription);
   }
 
   return { puts, deletes: items.map(({ username }) => username).filter((username) => !wanted.has(username)) };
@@ -64,6 +71,10 @@ export function deleteGuard(players: number, items: number, deletes: number): st
   return undefined;
 }
 
-function sameOffsets(a: ReadonlySet<number>, b: ReadonlySet<number>): boolean {
-  return a.size === b.size && [...a].every((offset) => b.has(offset));
+function sameItem(a: PlayerSubscription, b: PlayerSubscription): boolean {
+  return (
+    a.table === b.table &&
+    a.scrapingOffsets.size === b.scrapingOffsets.size &&
+    [...a.scrapingOffsets].every((offset) => b.scrapingOffsets.has(offset))
+  );
 }

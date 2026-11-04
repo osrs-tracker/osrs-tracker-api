@@ -3,6 +3,16 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-11-04
+
+- **Breaking:** for the web, a player's `type` can now be `hardcore_mains`: a Hardcore Worlds character, which a lookup
+  detects on Jagex's new `hiscore_oldschool_hardcore_mains` table when it's on no ironman table (#247, roadmap
+  osrs-tracker/osrs-tracker-web#496). Its main-table entry is a stub frozen at Tutorial Island, so its combat level and
+  initial entry (and a preview's) now come from its own table, and the ingester's subscriptions sync writes
+  `table: 'hiscore_oldschool_hardcore_mains'` into its item, so process-players scrapes that table
+  (osrs-tracker/osrs-tracker-aws#186). A lookup asks five tables instead of four, about 24% more requests to Jagex; the
+  bulkhead limits stay. `@osrs-tracker/models` 3.4.0 and `@osrs-tracker/hiscores` 6.1.0 add the type and the table.
+
 ## 2026-11-01
 
 ### Behind the scenes

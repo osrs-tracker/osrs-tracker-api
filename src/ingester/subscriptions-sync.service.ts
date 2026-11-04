@@ -67,7 +67,10 @@ export class SubscriptionsSyncService implements OnApplicationBootstrap, OnAppli
    */
   private async sync(signal: AbortSignal): Promise<void> {
     const players = await this.players
-      .find({ 'scrapingOffsets.0': { $exists: true } }, { projection: { _id: 0, username: 1, scrapingOffsets: 1 } })
+      .find(
+        { 'scrapingOffsets.0': { $exists: true } },
+        { projection: { _id: 0, username: 1, scrapingOffsets: 1, type: 1 } },
+      )
       .toArray();
     const items: PlayerSubscription[] = [];
     for await (const page of paginateScan({ client: this.dynamo }, { TableName: SUBSCRIPTIONS_TABLE }))

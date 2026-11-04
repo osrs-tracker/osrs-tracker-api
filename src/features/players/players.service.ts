@@ -334,9 +334,10 @@ export class PlayersService {
   }
 
   /**
-   * Determines the player's type and status from the four hiscore tables: the normal table first, which settles
-   * `notFound` and `failed` in one request, then the three ironman tables. Fails when any table couldn't be reached,
-   * since a missing table would otherwise look like the player not being on it and change their type.
+   * Determines the player's type and status from the five hiscore tables: the normal table first, which settles
+   * `notFound` and `failed` in one request, then the three ironman tables and Hardcore Worlds'. Fails when any table
+   * couldn't be reached, since a missing table would otherwise look like the player not being on it and change their
+   * type.
    */
   private async fetchPlayerStatusAndType(username: string): Promise<PlayerStatusAndType> {
     const normalResult = await this.getHiscore(username, PlayerType.Normal);
@@ -346,25 +347,39 @@ export class PlayersService {
       this.getHiscore(username, PlayerType.Ironman),
       this.getHiscore(username, PlayerType.Ultimate),
       this.getHiscore(username, PlayerType.Hardcore),
+      this.getHiscore(username, PlayerType.HardcoreMain),
     ]);
 
     if (results.some((result) => result.status === 'failed')) return { status: 'failed' };
 
     const normal = normalResult.hiscore;
-    const [ironman, ultimate, hardcore] = results.map((result) => (result.status === 'found' ? result.hiscore : null));
+    const [ironmanResult, ultimateResult, hardcoreResult, hardcoreMainResult] = results.map((result) =>
+      result.status === 'found' ? result : null,
+    );
+    const ironman = ironmanResult?.hiscore ?? null;
+    const ultimate = ultimateResult?.hiscore ?? null;
+    const hardcore = hardcoreResult?.hiscore ?? null;
+    const type = PlayerUtils.determineType({
+      ironman,
+      ultimate,
+      hardcore,
+      hardcoreMain: hardcoreMainResult?.hiscore ?? null,
+    });
+    // A Hardcore main's normal entry is a frozen stub from before Hardcore Worlds opened: its progress is on its own table
+    const tracked = type === PlayerType.HardcoreMain && hardcoreMainResult ? hardcoreMainResult : normalResult;
 
     return {
       status: 'found',
       player: {
         username,
-        combatLevel: PlayerUtils.getCombatLevel(normal.skills),
-        type: PlayerUtils.determineType(ironman, ultimate, hardcore),
+        combatLevel: PlayerUtils.getCombatLevel(tracked.hiscore.skills),
+        type,
         status: PlayerUtils.determineStatus(normal, ironman, ultimate),
         diedAsHardcore: PlayerUtils.getTotalXp(hardcore) < PlayerUtils.getTotalXp(ironman),
         lastModified: new Date(),
       } satisfies Player,
-      partialHiscoreEntry: { skills: normal.skills, activities: normal.activities },
-      layout: normalResult.layout,
+      partialHiscoreEntry: { skills: tracked.hiscore.skills, activities: tracked.hiscore.activities },
+      layout: tracked.layout,
     };
   }
 

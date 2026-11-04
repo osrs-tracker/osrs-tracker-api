@@ -6,6 +6,7 @@ import {
   createHiscoreLayout,
   encodeHiscoreEntry,
   HiscoreEntry,
+  PlayerType,
   SkillEnum,
   StoredHiscoreEntry,
   stripUnchangedValues,
@@ -132,10 +133,27 @@ describe('PlayersService hiscore lookups', () => {
     expect(await service.refreshPlayerInfo('truncated', 0)).toBe('failed');
   });
 
-  it('asks all four tables for a player that is on the hiscores', async () => {
+  it('asks all five tables for a player that is on the hiscores', async () => {
     answerWith('found');
     expect((await service.previewPlayer('toxsick', 0, false)).status).toBe('found');
-    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockFetch).toHaveBeenCalledTimes(5);
+  });
+
+  it("takes a Hardcore main's combat level and entry from its own table, not the main table's stub", async () => {
+    const stub = COMBAT_SKILLS.map((name, id) => ({ id, name, rank: -1, level: 1, xp: 0 }));
+    const real = COMBAT_SKILLS.map((name, id) => ({ id, name, rank: 5, level: 50, xp: 101_333 }));
+    mockFetch.mockImplementation(async (url) => {
+      const table = new URL(String(url)).pathname.split('/')[1];
+      if (table === 'm=hiscore_oldschool') return response('found', { name: 'hcmain', skills: stub, activities: [] });
+      if (table === 'm=hiscore_oldschool_hardcore_mains')
+        return response('found', { name: 'hcmain', skills: real, activities: [] });
+      return response('notFound');
+    });
+
+    const result = await service.previewPlayer('hcmain', 0, true);
+    if (result.status !== 'found') throw new Error(`Expected found, got ${result.status}`);
+    expect(result.player).toMatchObject({ type: PlayerType.HardcoreMain, combatLevel: 63, diedAsHardcore: false });
+    expect(result.player.hiscoreEntries?.[0].skills[SkillEnum.Attack]).toEqual({ rank: 5, level: 50, xp: 101_333 });
   });
 
   it('shares one lookup between concurrent requests for a name', async () => {
@@ -146,10 +164,10 @@ describe('PlayersService hiscore lookups', () => {
       service.previewPlayer('toxsick', 0, false),
     ]);
     expect(results.map((result) => result.status)).toEqual(['found', 'found', 'found']);
-    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockFetch).toHaveBeenCalledTimes(5);
 
     await service.previewPlayer('toxsick', 0, false); // Not cached once settled
-    expect(mockFetch).toHaveBeenCalledTimes(8);
+    expect(mockFetch).toHaveBeenCalledTimes(10);
   });
 
   it('remembers names that are not on the hiscores for previews, but not failures', async () => {
