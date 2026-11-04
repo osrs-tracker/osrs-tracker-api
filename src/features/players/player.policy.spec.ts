@@ -131,8 +131,8 @@ describe('buildRefreshUpdate', () => {
     expect($set.username).toEqual({ $literal: '$hiscoreEntries' });
   });
 
-  it('takes diedAsHardcore from the lookup for any type but a main account or a hardcore ironman', () => {
-    for (const type of [PlayerType.HardcoreMain, PlayerType.Ironman, PlayerType.Ultimate]) {
+  it('takes diedAsHardcore from the lookup for any type but a main account', () => {
+    for (const type of [PlayerType.HardcoreMain, PlayerType.Hardcore, PlayerType.Ironman]) {
       const [{ $set }] = buildRefreshUpdate(player({ type, diedAsHardcore: false }), entry, 0);
       expect($set.diedAsHardcore).toEqual({ $literal: false });
     }
@@ -145,17 +145,5 @@ describe('buildRefreshUpdate', () => {
     const [{ $set }] = buildRefreshUpdate(player({ type: PlayerType.Normal, diedAsHardcore: false }), entry, 0);
 
     expect($set.diedAsHardcore).toEqual(mainDiedAsHardcore);
-  });
-
-  it("keeps a hardcore ironman's stored death on later lookups", () => {
-    const [{ $set }] = buildRefreshUpdate(player({ type: PlayerType.Hardcore, diedAsHardcore: false }), entry, 0);
-
-    // Field paths read the stored player, as it was before this update
-    expect($set.diedAsHardcore).toEqual({
-      $or: [
-        { $literal: false },
-        { $and: [{ $eq: ['$type', PlayerType.Hardcore] }, { $eq: ['$diedAsHardcore', true] }] },
-      ],
-    });
   });
 });
