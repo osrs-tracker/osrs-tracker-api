@@ -8,7 +8,7 @@ export const MAX_CONCURRENT_HISCORE_REQUESTS = 8;
 
 /**
  * Hiscore requests waiting for a slot; beyond that they fail at once (503 or `refreshFailed`) instead of holding a
- * visitor's request open. 4x the concurrency: a lookup asks one table, then three at once, so this holds about eight
+ * visitor's request open. 4x the concurrency: a lookup asks one table, then four at once, so this holds about six
  * lookups' worth, roughly one hiscores timeout of waiting when Jagex is slow.
  */
 export const MAX_QUEUED_HISCORE_REQUESTS = 4 * MAX_CONCURRENT_HISCORE_REQUESTS;

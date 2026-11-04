@@ -70,11 +70,28 @@ describe('PlayerUtils.hasCombatSkills', () => {
 });
 
 describe('PlayerUtils.determineType', () => {
+  const none = { ironman: null, ultimate: null, hardcore: null, hardcoreMain: null };
+
   it('picks the most restrictive table the player is on', () => {
-    expect(PlayerUtils.determineType(entry(10), entry(10), null)).toBe(PlayerType.Ultimate);
-    expect(PlayerUtils.determineType(entry(10), null, entry(10))).toBe(PlayerType.Hardcore);
-    expect(PlayerUtils.determineType(entry(10), null, null)).toBe(PlayerType.Ironman);
-    expect(PlayerUtils.determineType(null, null, null)).toBe(PlayerType.Normal);
+    expect(PlayerUtils.determineType({ ...none, ironman: entry(10), ultimate: entry(10) })).toBe(PlayerType.Ultimate);
+    expect(PlayerUtils.determineType({ ...none, ironman: entry(10), hardcore: entry(10) })).toBe(PlayerType.Hardcore);
+    expect(PlayerUtils.determineType({ ...none, ironman: entry(10) })).toBe(PlayerType.Ironman);
+    expect(PlayerUtils.determineType(none)).toBe(PlayerType.Normal);
+  });
+
+  it('picks Hardcore main only for a player on its table and on no ironman table', () => {
+    expect(PlayerUtils.determineType({ ...none, hardcoreMain: entry(10) })).toBe(PlayerType.HardcoreMain);
+    expect(PlayerUtils.determineType({ ...none, ironman: entry(10), hardcoreMain: entry(10) })).toBe(
+      PlayerType.Ironman,
+    );
+  });
+});
+
+describe('PlayerUtils.getHiscoreTable', () => {
+  it("maps each type to its table, Hardcore main to Hardcore Worlds'", () => {
+    expect(PlayerUtils.getHiscoreTable(PlayerType.Normal)).toBe('hiscore_oldschool');
+    expect(PlayerUtils.getHiscoreTable(PlayerType.Hardcore)).toBe('hiscore_oldschool_hardcore_ironman');
+    expect(PlayerUtils.getHiscoreTable(PlayerType.HardcoreMain)).toBe('hiscore_oldschool_hardcore_mains');
   });
 });
 

@@ -1,5 +1,5 @@
 import { marshall } from '@aws-sdk/util-dynamodb';
-import { PlayerSubscription } from '@osrs-tracker/models';
+import { PlayerSubscription, PlayerType } from '@osrs-tracker/models';
 import { describe, expect, it } from 'vitest';
 import { deleteGuard, diffSubscriptions, subscriptionOf } from './subscriptions';
 
@@ -8,44 +8,71 @@ const item = (username: string, ...offsets: number[]): PlayerSubscription => ({
   scrapingOffsets: new Set(offsets),
 });
 
+const hardcoreMainItem = (username: string, ...offsets: number[]): PlayerSubscription => ({
+  ...item(username, ...offsets),
+  table: 'hiscore_oldschool_hardcore_mains',
+});
+
+const player = (username: string, scrapingOffsets: number[], type = PlayerType.Normal) => ({
+  username,
+  scrapingOffsets,
+  type,
+});
+
 describe('subscriptionOf', () => {
   it('stores the offsets as a Set, which the document client writes as a Number Set', () => {
-    const subscription = subscriptionOf({ username: 'toxsick', scrapingOffsets: [0, -3] })!;
+    const subscription = subscriptionOf(player('toxsick', [0, -3]))!;
     expect(subscription).toEqual(item('toxsick', 0, -3));
     expect(marshall(subscription).scrapingOffsets).toEqual({ NS: ['0', '-3'] });
   });
 
   it('gives no item without offsets: a Number Set cannot be empty', () => {
-    expect(subscriptionOf({ username: 'toxsick', scrapingOffsets: [] })).toBeUndefined();
-    expect(subscriptionOf({ username: 'toxsick', scrapingOffsets: undefined! })).toBeUndefined();
+    expect(subscriptionOf(player('toxsick', []))).toBeUndefined();
+    expect(subscriptionOf(player('toxsick', undefined!))).toBeUndefined();
   });
 
   it('leaves out offset 12, which queue-players queues with -12', () => {
-    expect(subscriptionOf({ username: 'toxsick', scrapingOffsets: [12, 0] })).toEqual(item('toxsick', 0));
-    expect(subscriptionOf({ username: 'toxsick', scrapingOffsets: [12] })).toBeUndefined();
+    expect(subscriptionOf(player('toxsick', [12, 0]))).toEqual(item('toxsick', 0));
+    expect(subscriptionOf(player('toxsick', [12]))).toBeUndefined();
+  });
+
+  it("names Hardcore Worlds' table for a Hardcore main, and no table (the main one) for anyone else", () => {
+    const subscription = subscriptionOf(player('hcmain', [0], PlayerType.HardcoreMain))!;
+    expect(subscription).toEqual(hardcoreMainItem('hcmain', 0));
+    expect(marshall(subscription).table).toEqual({ S: 'hiscore_oldschool_hardcore_mains' });
+
+    const ironman = subscriptionOf(player('iron', [0], PlayerType.Ironman))!;
+    expect(ironman).not.toHaveProperty('table');
+    expect(() => marshall(ironman)).not.toThrow();
   });
 });
 
 describe('diffSubscriptions', () => {
   it('puts the missing items and the ones whose offsets differ, not the ones that match in any order', () => {
     const { puts, deletes } = diffSubscriptions(
-      [
-        { username: 'new', scrapingOffsets: [0] },
-        { username: 'changed', scrapingOffsets: [0, 1] },
-        { username: 'same', scrapingOffsets: [1, 0, 0] },
-      ],
+      [player('new', [0]), player('changed', [0, 1]), player('same', [1, 0, 0])],
       [item('changed', 0), item('same', 0, 1)],
     );
     expect(puts).toEqual([item('new', 0), item('changed', 0, 1)]);
     expect(deletes).toEqual([]);
   });
 
-  it('deletes the items of players gone or without offsets (a paused one has none)', () => {
+  it('puts the items whose table differs, either way', () => {
     const { puts, deletes } = diffSubscriptions(
       [
-        { username: 'kept', scrapingOffsets: [0] },
-        { username: 'paused', scrapingOffsets: [] },
+        player('became', [0], PlayerType.HardcoreMain),
+        player('left', [0]),
+        player('same', [0], PlayerType.HardcoreMain),
       ],
+      [item('became', 0), hardcoreMainItem('left', 0), hardcoreMainItem('same', 0)],
+    );
+    expect(puts).toEqual([hardcoreMainItem('became', 0), item('left', 0)]);
+    expect(deletes).toEqual([]);
+  });
+
+  it('deletes the items of players gone or without offsets (a paused one has none)', () => {
+    const { puts, deletes } = diffSubscriptions(
+      [player('kept', [0]), player('paused', [])],
       [item('kept', 0), item('paused', 0), item('gone', 3)],
     );
     expect(puts).toEqual([]);

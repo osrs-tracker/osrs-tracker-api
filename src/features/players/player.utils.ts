@@ -46,6 +46,8 @@ export class PlayerUtils {
         return 'hiscore_oldschool_ultimate';
       case PlayerType.Hardcore:
         return 'hiscore_oldschool_hardcore_ironman';
+      case PlayerType.HardcoreMain:
+        return 'hiscore_oldschool_hardcore_mains';
     }
   }
 
@@ -82,15 +84,20 @@ export class PlayerUtils {
     );
   }
 
-  /** Determines the original playerType from the tables the player is on. Only works when the player has enough xp to appear in the hiscores. */
-  static determineType(
-    ironman: Pick<HiscoreEntry, 'skills'> | null,
-    ultimate: Pick<HiscoreEntry, 'skills'> | null,
-    hardcore: Pick<HiscoreEntry, 'skills'> | null,
-  ): PlayerType {
-    if (ultimate) return PlayerType.Ultimate;
-    if (hardcore) return PlayerType.Hardcore;
-    if (ironman) return PlayerType.Ironman;
+  /**
+   * Determines the original playerType from the tables the player is on (`null`: not on it). Only works when the player
+   * has enough xp to appear in the hiscores. Named, not positional: a swap of these same-typed tables would compile.
+   */
+  static determineType(tables: {
+    ironman: Pick<HiscoreEntry, 'skills'> | null;
+    ultimate: Pick<HiscoreEntry, 'skills'> | null;
+    hardcore: Pick<HiscoreEntry, 'skills'> | null;
+    hardcoreMain: Pick<HiscoreEntry, 'skills'> | null;
+  }): PlayerType {
+    if (tables.ultimate) return PlayerType.Ultimate;
+    if (tables.hardcore) return PlayerType.Hardcore;
+    if (tables.ironman) return PlayerType.Ironman;
+    if (tables.hardcoreMain) return PlayerType.HardcoreMain;
     return PlayerType.Normal;
   }
 

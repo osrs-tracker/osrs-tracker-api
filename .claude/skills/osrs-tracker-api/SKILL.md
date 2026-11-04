@@ -267,7 +267,7 @@ usernames) is in [`DATA-MODEL.md`](../../../DATA-MODEL.md). The API's side, in `
 
 - Success: resume in the same update — merge `pausedScrapingOffsets` into `scrapingOffsets`, unset it,
   `hiscoreNotFoundSince` and `hiscoreNotFoundCount`.
-- Not found (404/400 on the normal table) or failed (any other status, network error, timeout, or any of the four tables
+- Not found (404/400 on the normal table) or failed (any other status, network error, timeout, or any of the five tables
   failing): write nothing and leave them alone. **Never** count 404s here; the ingester owns that bookkeeping.
 - `POST /players/:username/lookup` answers 404 only for not found. Failed returns the stored player with
   `refreshFailed: true`, or 503 when the player isn't stored.
