@@ -183,13 +183,13 @@ describe('PlayersService hiscore lookups', () => {
       expect(player.hiscoreEntries?.[0].skills[SkillEnum.Attack]).toEqual({ rank: 5, level: 50, xp: 101_333 });
     });
 
-    it('keeps a dead Hardcore main on its own table while its main entry is the stub, or equal to the dead row', async () => {
+    it('keeps a dead Hardcore main on its own table, died as hardcore, while its main entry is the stub or equal to the dead row', async () => {
       answerByTable(stub, dead);
-      expect(await preview('dead hcmain')).toMatchObject({ type: PlayerType.HardcoreMain, diedAsHardcore: false });
+      expect(await preview('dead hcmain')).toMatchObject({ type: PlayerType.HardcoreMain, diedAsHardcore: true });
 
       // As FailedHcMain at 17:59 UTC on 2026-11-04: main unranked at the dead row's xp, a Transfer or not yet
       answerByTable(jagexHiscore(-1, 50, 101_333), dead);
-      expect(await preview('failedhcmain')).toMatchObject({ type: PlayerType.HardcoreMain, diedAsHardcore: false });
+      expect(await preview('failedhcmain')).toMatchObject({ type: PlayerType.HardcoreMain, diedAsHardcore: true });
     });
 
     it('makes a dead row whose main entry grew past it a Transfer: a main account that died as hardcore, from main', async () => {

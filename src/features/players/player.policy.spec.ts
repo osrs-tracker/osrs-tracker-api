@@ -136,6 +136,9 @@ describe('buildRefreshUpdate', () => {
       const [{ $set }] = buildRefreshUpdate(player({ type, diedAsHardcore: false }), entry, 0);
       expect($set.diedAsHardcore).toEqual({ $literal: false });
     }
+    // A Hardcore main dead before its choice: true for now, false again once a Reset brings it back alive
+    const [{ $set }] = buildRefreshUpdate(player({ type: PlayerType.HardcoreMain, diedAsHardcore: true }), entry, 0);
+    expect($set.diedAsHardcore).toEqual({ $literal: true });
   });
 
   it('marks a main account that was stored as a Hardcore main (a Transfer), and keeps it marked on later lookups', () => {
