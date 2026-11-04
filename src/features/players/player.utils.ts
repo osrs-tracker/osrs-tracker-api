@@ -3,7 +3,7 @@ import { HiscoreEntry, overallOf, PlayerStatus, PlayerType, SkillEnum, skillLeve
 
 /**
  * Total xp of a player who isn't on a table: higher than any real total, so a missing table never compares as less.
- * `determineStatus` (de-ironed, de-ultimated) and `diedAsHardcore` rely on that to only compare tables the player is on.
+ * `determineStatus` (de-ironed, de-ultimated) relies on that to only compare tables the player is on.
  */
 export const NOT_ON_TABLE_XP = Number.MAX_SAFE_INTEGER;
 

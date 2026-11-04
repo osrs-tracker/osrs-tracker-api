@@ -12,6 +12,11 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   `table: 'hiscore_oldschool_hardcore_mains'` into its item, so process-players scrapes that table
   (osrs-tracker/osrs-tracker-aws#186). A lookup asks five tables instead of four, about 24% more requests to Jagex; the
   bulkhead limits stay. `@osrs-tracker/models` 3.4.0 and `@osrs-tracker/hiscores` 6.1.0 add the type and the table.
+- A hardcore ironman's `diedAsHardcore` now comes from Jagex's death record on the hardcore table (hiscores 6.1.0's
+  `diedAt`), not from its XP falling behind the ironman table's (#251). The XP rule only fired once the player gained XP
+  after dying, so one who died and stopped playing showed as alive. All 8 dead hardcore ironmen checked on 2026-11-04
+  (deaths from 2017 to 2026) carried the record and the living one didn't, so the XP rule is gone. A stored `true` stays
+  on later lookups, which also keeps the ones the XP rule found.
 - **Breaking:** for the web, `diedAsHardcore` now also covers Hardcore Worlds deaths (#249), in two new combinations:
   `hardcore_mains` with `true`, a character that died there and hasn't picked a Reset or a Transfer yet (its row carries
   hiscores 6.1.0's `diedAt`; false again once a Reset brings it back alive), and `normal` with `true`, one that

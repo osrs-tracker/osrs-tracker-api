@@ -87,18 +87,26 @@ export function buildRefreshUpdate(
 }
 
 /**
- * `diedAsHardcore` for `buildRefreshUpdate`. A transferred Hardcore Worlds character is a main account to a lookup, and
- * only the stored player still shows what it was. So for a main account it's also true when the stored player is a
- * Hardcore main (its row on Hardcore Worlds' table is gone: a Transfer), or a main account that already died as one (it
- * sticks). Any other type takes the lookup's value: a Hardcore main seen alive, or a hardcore ironman's ironman rule.
+ * `diedAsHardcore` for `buildRefreshUpdate`: the lookup's value, kept true once stored for a hardcore ironman and a
+ * main account. A transferred Hardcore Worlds character is a main account to a lookup, and only the stored player still
+ * shows what it was, so for a main account it's also true when the stored player is a Hardcore main (its row on Hardcore
+ * Worlds' table is gone: a Transfer). A Hardcore main's own `true` (dead before its choice) doesn't stick: a Reset
+ * brings it back alive.
  */
 function diedAsHardcoreExpression({ type, diedAsHardcore }: Player): Document {
-  if (type !== PlayerType.Normal) return { $literal: diedAsHardcore };
-  return {
-    $or: [
-      { $literal: diedAsHardcore },
-      { $eq: ['$type', PlayerType.HardcoreMain] },
-      { $and: [{ $eq: ['$type', PlayerType.Normal] }, { $eq: ['$diedAsHardcore', true] }] },
-    ],
-  };
+  switch (type) {
+    case PlayerType.Normal:
+      return {
+        $or: [{ $literal: diedAsHardcore }, { $eq: ['$type', PlayerType.HardcoreMain] }, storedTrueFor(type)],
+      };
+    case PlayerType.Hardcore:
+      return { $or: [{ $literal: diedAsHardcore }, storedTrueFor(type)] };
+    default:
+      return { $literal: diedAsHardcore };
+  }
+}
+
+/** Whether the stored player is of `type` with `diedAsHardcore` true. */
+function storedTrueFor(type: PlayerType): Document {
+  return { $and: [{ $eq: ['$type', type] }, { $eq: ['$diedAsHardcore', true] }] };
 }
