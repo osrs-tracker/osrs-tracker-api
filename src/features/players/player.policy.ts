@@ -1,4 +1,10 @@
-import { hiscoreEntriesWriteExpression, Player, StoredHiscoreEntry, StoredPlayer } from '@osrs-tracker/models';
+import {
+  hiscoreEntriesWriteExpression,
+  Player,
+  PlayerType,
+  StoredHiscoreEntry,
+  StoredPlayer,
+} from '@osrs-tracker/models';
 import { addHours, differenceInHours, differenceInSeconds } from 'date-fns';
 import { Document, UpdateFilter } from 'mongodb';
 import { PLAYER_MAX_AGE_SECONDS } from '../../common/http/cache-control';
@@ -43,7 +49,8 @@ export function buildLookupUpdate(scrapingOffset: number, now: Date): UpdateFilt
  * previous newest entry with the same `o` and `l` (offset and layout), wherever it sits, reduces the values that didn't
  * change to their bare rank. That matters even for this "initial" entry: an offset in `pausedScrapingOffsets` isn't in
  * `scrapingOffsets`, so a lookup that resumes it prepends while older entries for that offset exist. Deciding all that
- * in the update rather than from an earlier read means concurrent lookups prepend it once.
+ * in the update rather than from an earlier read means concurrent lookups prepend it once. `diedAsHardcore` reads the
+ * stored player too, for a Hardcore Worlds Transfer (`diedAsHardcoreExpression`).
  *
  * `storedEntry` is already encoded (`encodeHiscoreEntry`) and its layout upserted by the caller before `updateOne`.
  * Values are wrapped in `$literal`, so strings starting with '$' aren't read as field paths.
@@ -58,6 +65,7 @@ export function buildRefreshUpdate(
       // Field paths in one `$set` read the document as it was before it, so `$scrapingOffsets` is the stored value
       $set: {
         ...Object.fromEntries(Object.entries(player).map(([key, value]) => [key, { $literal: value }])),
+        diedAsHardcore: diedAsHardcoreExpression(player),
         scrapingOffsets: {
           $setUnion: [
             { $ifNull: ['$scrapingOffsets', []] },
@@ -76,4 +84,21 @@ export function buildRefreshUpdate(
     },
     { $unset: ['pausedScrapingOffsets', 'hiscoreNotFoundSince', 'hiscoreNotFoundCount'] },
   ];
+}
+
+/**
+ * `diedAsHardcore` for `buildRefreshUpdate`. A transferred Hardcore Worlds character is a main account to a lookup, and
+ * only the stored player still shows what it was. So for a main account it's also true when the stored player is a
+ * Hardcore main (its row on Hardcore Worlds' table is gone: a Transfer), or a main account that already died as one (it
+ * sticks). Any other type takes the lookup's value: a Hardcore main seen alive, or a hardcore ironman's ironman rule.
+ */
+function diedAsHardcoreExpression({ type, diedAsHardcore }: Player): Document {
+  if (type !== PlayerType.Normal) return { $literal: diedAsHardcore };
+  return {
+    $or: [
+      { $literal: diedAsHardcore },
+      { $eq: ['$type', PlayerType.HardcoreMain] },
+      { $and: [{ $eq: ['$type', PlayerType.Normal] }, { $eq: ['$diedAsHardcore', true] }] },
+    ],
+  };
 }

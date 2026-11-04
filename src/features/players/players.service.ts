@@ -359,11 +359,13 @@ export class PlayersService {
     const ironman = ironmanResult?.hiscore ?? null;
     const ultimate = ultimateResult?.hiscore ?? null;
     const hardcore = hardcoreResult?.hiscore ?? null;
+    // A transferred character is a main account again: its dead row on Hardcore Worlds' table no longer counts
+    const transferred = PlayerUtils.transferredFromHardcoreWorlds(normal, hardcoreMainResult);
     const type = PlayerUtils.determineType({
       ironman,
       ultimate,
       hardcore,
-      hardcoreMain: hardcoreMainResult?.hiscore ?? null,
+      hardcoreMain: transferred ? null : (hardcoreMainResult?.hiscore ?? null),
     });
     // A Hardcore main's normal entry is a frozen stub from before Hardcore Worlds opened: its progress is on its own table
     const tracked = type === PlayerType.HardcoreMain && hardcoreMainResult ? hardcoreMainResult : normalResult;
@@ -375,7 +377,10 @@ export class PlayersService {
         combatLevel: PlayerUtils.getCombatLevel(tracked.hiscore.skills),
         type,
         status: PlayerUtils.determineStatus(normal, ironman, ultimate),
-        diedAsHardcore: PlayerUtils.getTotalXp(hardcore) < PlayerUtils.getTotalXp(ironman),
+        // A Hardcore Worlds death is Jagex's death record, dead before a Reset or a Transfer and after a Transfer; not
+        // the ironman rule, since that table runs ahead of the main stub, and resets
+        diedAsHardcore:
+          !!hardcoreMainResult?.diedAt || PlayerUtils.getTotalXp(hardcore) < PlayerUtils.getTotalXp(ironman),
         lastModified: new Date(),
       } satisfies Player,
       partialHiscoreEntry: { skills: tracked.hiscore.skills, activities: tracked.hiscore.activities },

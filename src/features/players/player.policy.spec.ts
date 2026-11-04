@@ -81,6 +81,14 @@ describe('buildLookupUpdate', () => {
 
 describe('buildRefreshUpdate', () => {
   const entry: StoredHiscoreEntry = { d: NOW, o: 0, l: 1, s: [], a: [] };
+  // A lookup's main account with `diedAsHardcore: false`; the field paths read the stored player, as it was before
+  const mainDiedAsHardcore = {
+    $or: [
+      { $literal: false },
+      { $eq: ['$type', PlayerType.HardcoreMain] },
+      { $and: [{ $eq: ['$type', PlayerType.Normal] }, { $eq: ['$diedAsHardcore', true] }] },
+    ],
+  };
 
   it('resumes a paused player, adds the offset and writes the compact initial entry when the offset is new', () => {
     const refreshed = player({ username: 'toxsick', lastModified: NOW });
@@ -92,7 +100,7 @@ describe('buildRefreshUpdate', () => {
           combatLevel: { $literal: 3 },
           type: { $literal: PlayerType.Normal },
           status: { $literal: PlayerStatus.Default },
-          diedAsHardcore: { $literal: false },
+          diedAsHardcore: mainDiedAsHardcore,
           lastModified: { $literal: NOW },
           scrapingOffsets: {
             $setUnion: [{ $ifNull: ['$scrapingOffsets', []] }, { $ifNull: ['$pausedScrapingOffsets', []] }, [3]],
@@ -121,5 +129,21 @@ describe('buildRefreshUpdate', () => {
     const [{ $set }] = buildRefreshUpdate(player({ username: '$hiscoreEntries' }), entry, 0);
 
     expect($set.username).toEqual({ $literal: '$hiscoreEntries' });
+  });
+
+  it('takes diedAsHardcore from the lookup for any type but a main account', () => {
+    for (const type of [PlayerType.HardcoreMain, PlayerType.Hardcore, PlayerType.Ironman]) {
+      const [{ $set }] = buildRefreshUpdate(player({ type, diedAsHardcore: false }), entry, 0);
+      expect($set.diedAsHardcore).toEqual({ $literal: false });
+    }
+    // A Hardcore main dead before its choice: true for now, false again once a Reset brings it back alive
+    const [{ $set }] = buildRefreshUpdate(player({ type: PlayerType.HardcoreMain, diedAsHardcore: true }), entry, 0);
+    expect($set.diedAsHardcore).toEqual({ $literal: true });
+  });
+
+  it('marks a main account that was stored as a Hardcore main (a Transfer), and keeps it marked on later lookups', () => {
+    const [{ $set }] = buildRefreshUpdate(player({ type: PlayerType.Normal, diedAsHardcore: false }), entry, 0);
+
+    expect($set.diedAsHardcore).toEqual(mainDiedAsHardcore);
   });
 });
