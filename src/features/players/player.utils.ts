@@ -101,6 +101,18 @@ export class PlayerUtils {
     return PlayerType.Normal;
   }
 
+  /**
+   * Whether a Hardcore Worlds character died and transferred to the main game: its row on Hardcore Worlds' table is dead
+   * (`diedAt`) and its main entry has caught up with it. Until a Transfer, the main entry is a stub from before Hardcore
+   * Worlds opened, behind that row. A dead row with the main entry still behind it hasn't transferred (yet).
+   */
+  static transferredFromHardcoreWorlds(
+    normal: Pick<HiscoreEntry, 'skills'>,
+    hardcoreMain: { hiscore: Pick<HiscoreEntry, 'skills'>; diedAt?: Date } | null,
+  ): boolean {
+    return !!hardcoreMain?.diedAt && PlayerUtils.getTotalXp(normal) >= PlayerUtils.getTotalXp(hardcoreMain.hiscore);
+  }
+
   /** Determines the current playerStatus by comparing total xp across tables. Only works when the player has enough xp to appear in the hiscores. */
   static determineStatus(
     normal: Pick<HiscoreEntry, 'skills'> | null,

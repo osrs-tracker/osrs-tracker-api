@@ -41,6 +41,20 @@ type Answer = 'found' | 'notFound' | 'failed';
 /** Jagex's JSON for Overall and the seven combat skills, enough for the combat level. */
 const skills = COMBAT_SKILLS.map((name, id) => ({ id, name, rank: 1, level: 10, xp: 1000 }));
 
+/** Jagex's JSON with every combat skill (and Overall) at `rank`, `level` and `xp`, plus Overall's `death` if given. */
+const jagexHiscore = (rank: number, level: number, xp: number, death?: { timeStamp: number }) => ({
+  name: 'player',
+  skills: COMBAT_SKILLS.map((name, id) => ({
+    id,
+    name,
+    rank,
+    level,
+    xp,
+    ...(name === SkillEnum.Overall && death && { death }),
+  })),
+  activities: [],
+});
+
 function response(answer: Answer, body: unknown = { name: 'player', skills, activities: [] }) {
   const status = { found: 200, notFound: 404, failed: 503 }[answer];
   return { status, ok: status === 200, json: async () => body } as unknown as Awaited<ReturnType<typeof fetch>>;
@@ -139,21 +153,56 @@ describe('PlayersService hiscore lookups', () => {
     expect(mockFetch).toHaveBeenCalledTimes(5);
   });
 
-  it("takes a Hardcore main's combat level and entry from its own table, not the main table's stub", async () => {
-    const stub = COMBAT_SKILLS.map((name, id) => ({ id, name, rank: -1, level: 1, xp: 0 }));
-    const real = COMBAT_SKILLS.map((name, id) => ({ id, name, rank: 5, level: 50, xp: 101_333 }));
-    mockFetch.mockImplementation(async (url) => {
-      const table = new URL(String(url)).pathname.split('/')[1];
-      if (table === 'm=hiscore_oldschool') return response('found', { name: 'hcmain', skills: stub, activities: [] });
-      if (table === 'm=hiscore_oldschool_hardcore_mains')
-        return response('found', { name: 'hcmain', skills: real, activities: [] });
-      return response('notFound');
+  describe('Hardcore Worlds', () => {
+    // A main entry frozen before Hardcore Worlds opened, and the character's progress on its own table
+    const stub = jagexHiscore(-1, 1, 1_154);
+    const progress = jagexHiscore(5, 50, 101_333);
+    const dead = jagexHiscore(5, 50, 101_333, { timeStamp: Date.parse('2026-11-04T18:00:00Z') });
+
+    /** Answers the main table and Hardcore Worlds' table (a 404 when absent), and 404s the ironman tables. */
+    function answerByTable(main: unknown, hardcoreMain?: unknown) {
+      mockFetch.mockImplementation(async (url) => {
+        const table = new URL(String(url)).pathname.split('/')[1];
+        if (table === 'm=hiscore_oldschool') return response('found', main);
+        if (table === 'm=hiscore_oldschool_hardcore_mains' && hardcoreMain) return response('found', hardcoreMain);
+        return response('notFound');
+      });
+    }
+
+    async function preview(username: string) {
+      const result = await service.previewPlayer(username, 0, true);
+      if (result.status !== 'found') throw new Error(`Expected found, got ${result.status}`);
+      return result.player;
+    }
+
+    it("takes a Hardcore main's combat level and entry from its own table, not the main table's stub", async () => {
+      answerByTable(stub, progress);
+
+      const player = await preview('hcmain');
+      expect(player).toMatchObject({ type: PlayerType.HardcoreMain, combatLevel: 63, diedAsHardcore: false });
+      expect(player.hiscoreEntries?.[0].skills[SkillEnum.Attack]).toEqual({ rank: 5, level: 50, xp: 101_333 });
     });
 
-    const result = await service.previewPlayer('hcmain', 0, true);
-    if (result.status !== 'found') throw new Error(`Expected found, got ${result.status}`);
-    expect(result.player).toMatchObject({ type: PlayerType.HardcoreMain, combatLevel: 63, diedAsHardcore: false });
-    expect(result.player.hiscoreEntries?.[0].skills[SkillEnum.Attack]).toEqual({ rank: 5, level: 50, xp: 101_333 });
+    it('keeps a dead Hardcore main on its own table while its main entry is still the stub', async () => {
+      answerByTable(stub, dead);
+
+      expect(await preview('dead hcmain')).toMatchObject({ type: PlayerType.HardcoreMain, diedAsHardcore: false });
+    });
+
+    it('makes a dead row whose main entry caught up a Transfer: a main account that died as hardcore, from main', async () => {
+      // As FailedHcMain at 17:59 UTC on 2026-11-04: main unranked but at the dead row's xp, no longer the stub
+      answerByTable(jagexHiscore(-1, 50, 101_333), dead);
+
+      const player = await preview('transferred');
+      expect(player).toMatchObject({ type: PlayerType.Normal, combatLevel: 63, diedAsHardcore: true });
+      expect(player.hiscoreEntries?.[0].skills[SkillEnum.Attack]).toEqual({ rank: null, level: 50, xp: 101_333 });
+    });
+
+    it('sees a main account once the row is gone (404): the stored type marks that Transfer (buildRefreshUpdate)', async () => {
+      answerByTable(jagexHiscore(4_000, 50, 101_333));
+
+      expect(await preview('gone')).toMatchObject({ type: PlayerType.Normal, diedAsHardcore: false });
+    });
   });
 
   it('shares one lookup between concurrent requests for a name', async () => {
