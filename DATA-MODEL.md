@@ -277,5 +277,6 @@ What the live database holds beyond what the code above writes. Recheck (read-on
   `chat smells`, with one stub entry (2,297 XP). It was refreshed to `hardcore_mains`, and its entries dated before the
   cut-off, 2026-11-04T19:00:00Z, were pulled, so its history starts at its first real entry on 2026-11-05. The
   `hardcore_mains` players first stored after #247 (`dinobear6000`, `failedhcmain`) kept their entries from before the
-  cut-off, since they came from their own table. The backup is the collection `players_backup_20261105_hardcore_stubs`.
+  cut-off, since they came from their own table. The backup collection `players_backup_20261105_hardcore_stubs` was
+  dropped the same day, after the check.
 - **`items`**: `limit`, `lowalch`, `highalch` and `value` are missing on some items (the Wiki omits them).
