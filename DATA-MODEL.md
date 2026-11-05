@@ -271,4 +271,11 @@ What the live database holds beyond what the code above writes. Recheck (read-on
   entries of 514 players, was 223.9 MB); 90 days of entries for the players tracked on 2026-10-10 settles near 37 MB (60
   days, until 2026-10-13: near 25 MB). The migration also put the few out-of-order entries in date order and dropped the
   extra `name` some older API entries carried.
+- **Hardcore mains' main-table stubs**: removed on 2026-11-05 (osrs-tracker/osrs-tracker-api#248). Before
+  osrs-tracker/osrs-tracker-api#247, a Hardcore Worlds character was stored as `normal` and scraped from the main table,
+  where its entry is a frozen stub. Its first entry from its own table then showed as a huge gain. One player had stubs:
+  `chat smells`, with one stub entry (2,297 XP). It was refreshed to `hardcore_mains`, and its entries dated before the
+  cut-off, 2026-11-04T19:00:00Z, were pulled, so its history starts at its first real entry on 2026-11-05. The
+  `hardcore_mains` players first stored after #247 (`dinobear6000`, `failedhcmain`) kept their entries from before the
+  cut-off, since they came from their own table. The backup is the collection `players_backup_20261105_hardcore_stubs`.
 - **`items`**: `limit`, `lowalch`, `highalch` and `value` are missing on some items (the Wiki omits them).
