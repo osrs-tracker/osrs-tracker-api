@@ -8,6 +8,7 @@ import {
 import { subDays } from 'date-fns';
 import { millisecondsInHour as HOUR } from 'date-fns/constants';
 import { Document, Filter, UpdateFilter } from 'mongodb';
+import { SAMPLE_AVERAGES, sampleGroupingStages } from '../features/player-counts/player-count-history';
 
 /** Scraping is paused when a player hasn't been on the hiscores for this many days in a row. */
 export const HISCORE_NOT_FOUND_PAUSE_DAYS = 7;
@@ -125,8 +126,8 @@ export function pausedByNotFound(
 }
 
 /**
- * Inserts the sample unless one with its `date` is stored, so a repeated sample changes nothing: `{ date: 1 }` isn't
- * unique yet (osrs-tracker/osrs-tracker-api#205).
+ * Inserts the sample unless one with its `date` is stored, so a repeated sample changes nothing, rather than failing on
+ * the unique `{ date: 1 }` index (`ScrapeResultsService.ensureIndexes`) as an insert would.
  */
 export function playerCountUpsert({ date, ...counts }: PlayerCount): {
   filter: Filter<PlayerCount>;
@@ -144,58 +145,16 @@ export function startOfUTCDay(date: Date): Date {
 
 /**
  * The `playerCounts` pipeline that averages the samples from `from` on per UTC day, into one `PlayerCountDay` per day
- * that has samples. The grouping and rounding are the API's daily history (`buildPlayerCountHistoryPipeline`), so its
- * `1y` and `all` answer the same when it reads these days instead. Ported from record-player-count (osrs-tracker-aws
- * `playerCountDaysPipeline`).
+ * that has samples. The grouping and averages are the API's 30d hourly history's (`sampleGroupingStages`), per day.
+ * Ported from record-player-count (osrs-tracker-aws `playerCountDaysPipeline`).
  */
 export function playerCountDaysPipeline(from: Date): Document[] {
-  // Each sample is one document per location code after the `$unwind`: its own fields count once, on its first code.
-  const first = { $eq: ['$i', 0] };
-  const once = (value: string | number) => ({ $sum: { $cond: [first, value, 0] } });
-  const average = (sum: string) => ({ $round: [{ $divide: [sum, '$samples'] }, 0] });
-
   return [
     { $match: { date: { $gte: from } } },
+    ...sampleGroupingStages('day'),
     {
       $project: {
-        date: { $dateTrunc: { date: '$date', unit: 'day' } },
-        total: 1,
-        members: 1,
-        f2p: 1,
-        location: { $objectToArray: '$byLocation' },
-      },
-    },
-    { $unwind: { path: '$location', includeArrayIndex: 'i' } },
-    {
-      $group: {
-        _id: { date: '$date', code: '$location.k' },
-        players: { $avg: '$location.v' },
-        samples: once(1),
-        total: once('$total'),
-        members: once('$members'),
-        f2p: once('$f2p'),
-        peak: { $max: '$total' },
-      },
-    },
-    {
-      $group: {
-        _id: '$_id.date',
-        samples: { $sum: '$samples' },
-        total: { $sum: '$total' },
-        members: { $sum: '$members' },
-        f2p: { $sum: '$f2p' },
-        peak: { $max: '$peak' },
-        byLocation: { $push: { k: '$_id.code', v: { $round: ['$players', 0] } } },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        date: '$_id',
-        total: average('$total'),
-        members: average('$members'),
-        f2p: average('$f2p'),
-        byLocation: { $arrayToObject: '$byLocation' },
+        ...SAMPLE_AVERAGES,
         // computed, not included (`1`), so the stored fields keep this order
         peak: '$peak',
         samples: '$samples',

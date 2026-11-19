@@ -11,7 +11,8 @@ export class PlayerCountsController {
 
   /**
    * The players online over `range` (`24h` when absent; see `buildPlayerCountHistoryPipeline`), oldest first; `[]`
-   * before the first sample. 400 for any other `range`. `PLAYER_COUNT` on every response.
+   * before the first sample. A point has `hardcore` (players on Hardcore Worlds, inside `members` and `f2p`) only when
+   * its samples do: absent means unknown, never 0. 400 for any other `range`. `PLAYER_COUNT` on every response.
    */
   @Get()
   @Header('Cache-Control', CACHE_CONTROL.PLAYER_COUNT)
@@ -19,7 +20,10 @@ export class PlayerCountsController {
     return this.playerCountsService.getHistory(range);
   }
 
-  /** The newest sample of the players online (sampled every 10 minutes); 404 before the first one. `PLAYER_COUNT` on every response. */
+  /**
+   * The newest sample of the players online (sampled every 10 minutes), as stored, so without `hardcore` when it was
+   * taken before that was recorded; 404 before the first one. `PLAYER_COUNT` on every response.
+   */
   @Get('latest')
   @Header('Cache-Control', CACHE_CONTROL.PLAYER_COUNT)
   async getLatest() {
@@ -32,7 +36,7 @@ export class PlayerCountsController {
 
   /**
    * The players online now, from Jagex's world list (fetched at most once a minute per pod; `date` is when), not a
-   * stored sample. `PLAYER_COUNT_LIVE`; 502 with `REVALIDATE` when the world list can't be fetched or parsed.
+   * stored sample, so `hardcore` is always there. `PLAYER_COUNT_LIVE`; 502 with `REVALIDATE` when the world list can't be fetched or parsed.
    */
   @Get('live')
   async getLive(@Res({ passthrough: true }) res: Response) {

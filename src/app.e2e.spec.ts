@@ -86,7 +86,15 @@ const storedPlayer = {
 };
 const item = { id: 4151, name: 'Abyssal whip', icon: 'whip.png' };
 const post = { title: 'Game update', pubDate: new Date(), category: 'Game Updates', link: 'https://example.com' };
-const playerCount = { date: new Date(), total: 84441, members: 60000, f2p: 24441, worlds: 321, byLocation: {} };
+const playerCount = {
+  date: new Date(),
+  total: 84441,
+  members: 60000,
+  f2p: 24441,
+  hardcore: 6149,
+  worlds: 321,
+  byLocation: {},
+};
 const LAYOUT = createHiscoreLayout({ skills: [...COMBAT_SKILLS], activities: [] }, new Date(0));
 /** A stored hiscore entry, so reading it also loads its layout. */
 const storedEntry = encodeHiscoreEntry(

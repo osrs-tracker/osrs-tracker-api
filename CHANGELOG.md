@@ -11,6 +11,13 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   new `lastFetchHardcore` on the item, with its own partial index, and the list sorts by it and returns it instead of
   `lastFetch`. Without `world`, requests and responses are as before. `@osrs-tracker/models` 3.5.0 types the field
   (#264), so the service's local `StoredItem` type is gone.
+- The player counts carry `hardcore`, the players on Hardcore Worlds (a subset of `total`, already inside `members` and
+  `f2p`), so the web can show them apart (#266, roadmap osrs-tracker/osrs-tracker-web#540). `/player-counts/live` always
+  has it (`@osrs-tracker/hiscores` 6.2.0 counts it; models 3.6.0 types it); stored samples have it from the release of
+  osrs-tracker/osrs-tracker-aws#189 on, and `/player-counts` returns it on every sample and stored day that has it. The
+  30d hourly and the ingester's daily averages divide it by the samples that have it, not by all of them, since `$sum`
+  counts a missing field as 0: older hours and days get no `hardcore` instead of 0. Both averages now share one grouping
+  (`sampleGroupingStages`), so they can't drift apart.
 
 ## 2026-11-04
 
