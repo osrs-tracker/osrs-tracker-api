@@ -15,6 +15,7 @@ import { Request, Response } from 'express';
 import { isBotRequest } from '../../common/bot/is-bot-request';
 import { CACHE_CONTROL } from '../../common/http/cache-control';
 import { ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
+import { ParseItemWorldPipe, type ItemWorld } from './parse-item-world.pipe';
 import { ItemsService } from './items.service';
 import { type ItemListQuery, ParseItemListQueryPipe } from './parse-item-list-query.pipe';
 
@@ -34,8 +35,9 @@ export class ItemsController {
    *   `updatedAt` (when the ingester last changed it; absent on items it hasn't written since storing dates); `[]` when
    *   none match. The largest letter is about 600 items (40 KB, up to 60 KB once most carry `updatedAt`). 400 for any
    *   other `letter`, uppercase included. `ITEM_BROWSE`.
-   * - `sort=lookedUp` (the default): the `limit` (1 to 50, default 5) most recently looked up items, newest first.
-   *   `REVALIDATE`.
+   * - `sort=lookedUp` (the default): the `limit` (1 to 50, default 5) most recently looked up items, newest first, with
+   *   `lastFetch`. `world=hardcore` (`main` by default, 400 for any other) lists the Hardcore Worlds lookups instead,
+   *   with `lastFetchHardcore`. `REVALIDATE`.
    * - `sort=added`: the `limit` (1 to 100, default 25) newest items by `addedAt` (when the ingester stored the item,
    *   or its release day from before then; see `DATA-MODEL.md`), with only `id`, `icon`, `name` and `addedAt`.
    *   `NEW_ITEMS`.
@@ -58,7 +60,7 @@ export class ItemsController {
       return this.itemsService.getNewItems(query.limit);
     }
 
-    return this.itemsService.getLastFetchedItems(query.limit);
+    return this.itemsService.getLastFetchedItems(query.limit, query.world);
   }
 
   /** The item; 400 for an invalid ID, 404 when there's no such item. `REVALIDATE` on every response. */
@@ -72,12 +74,19 @@ export class ItemsController {
     return item;
   }
 
-  /** Records a visitor's lookup (ignored for bots); 204 either way, 400 for an invalid ID. */
+  /**
+   * Records a visitor's lookup (ignored for bots), on the `world` (`main` by default, or `hardcore`) it was made on; 204
+   * either way, 400 for an invalid ID or any other `world`.
+   */
   @Post(':id/lookup')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async recordLookup(@Req() request: Request, @Param('id', ITEM_ID_PIPE) id: number) {
+  async recordLookup(
+    @Req() request: Request,
+    @Param('id', ITEM_ID_PIPE) id: number,
+    @Query('world', ParseItemWorldPipe) world: ItemWorld,
+  ) {
     if (isBotRequest(request)) return;
 
-    await this.itemsService.recordLookup(id);
+    await this.itemsService.recordLookup(id, world);
   }
 }

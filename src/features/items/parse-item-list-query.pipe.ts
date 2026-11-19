@@ -3,12 +3,14 @@ import { ParseIntRangePipe } from '../../common/pipes/parse-int-range.pipe';
 import { singleQueryValue } from '../../common/pipes/single-query-value';
 import { ParseBrowseLetterPipe } from './parse-browse-letter.pipe';
 import { ParseItemSearchQueryPipe } from './parse-item-search-query.pipe';
+import { type ItemWorld, ParseItemWorldPipe } from './parse-item-world.pipe';
 
 const ITEM_SORTS = ['lookedUp', 'added'] as const;
 type ItemSort = (typeof ITEM_SORTS)[number];
 
 /** `GET /items`' query: one of item search, item browse, or a list in `sort` order. */
-export type ItemListQuery = { search: string } | { letter: string } | { sort: ItemSort; limit: number };
+export type ItemListQuery =
+  { search: string } | { letter: string } | { sort: ItemSort; limit: number; world: ItemWorld };
 
 const LIMIT_PIPES: Record<ItemSort, ParseIntRangePipe> = {
   lookedUp: new ParseIntRangePipe({ min: 1, max: 50, default: 5 }),
@@ -18,7 +20,8 @@ const LIMIT_PIPES: Record<ItemSort, ParseIntRangePipe> = {
 /**
  * Parses `GET /items`' query into one mode: `search` (`ParseItemSearchQueryPipe`), `letter` (`ParseBrowseLetterPipe`),
  * or `sort` (`lookedUp`, the default, or `added`) with its `limit`. 400 for more than one of the three, an unknown
- * `sort` or a repeated param; `limit` is ignored with `search` or `letter`.
+ * `sort`, an unknown `world` (`ParseItemWorldPipe`) or a repeated param; `limit` and `world` are ignored with `search`
+ * or `letter`, and `world` by `sort=added`.
  */
 @Injectable()
 export class ParseItemListQueryPipe implements PipeTransform<Record<string, unknown>, ItemListQuery> {
@@ -43,6 +46,6 @@ export class ParseItemListQueryPipe implements PipeTransform<Record<string, unkn
       data: 'limit',
     });
 
-    return { sort: itemSort, limit: limit! };
+    return { sort: itemSort, limit: limit!, world: new ParseItemWorldPipe().transform(query.world) };
   }
 }

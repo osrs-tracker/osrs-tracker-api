@@ -16,10 +16,20 @@ describe('ParseItemListQueryPipe', () => {
   });
 
   it('sorts by lookedUp by default, with each sort its own limit range', () => {
-    expect(pipe.transform({})).toEqual({ sort: 'lookedUp', limit: 5 });
-    expect(pipe.transform({ sort: 'added' })).toEqual({ sort: 'added', limit: 25 });
-    expect(pipe.transform({ sort: 'added', limit: '100' })).toEqual({ sort: 'added', limit: 100 });
+    expect(pipe.transform({})).toEqual({ sort: 'lookedUp', limit: 5, world: 'main' });
+    expect(pipe.transform({ sort: 'added' })).toEqual({ sort: 'added', limit: 25, world: 'main' });
+    expect(pipe.transform({ sort: 'added', limit: '100' })).toEqual({ sort: 'added', limit: 100, world: 'main' });
     expect(() => pipe.transform({ limit: '51' })).toThrow('Limit must be between 1 and 50.');
+  });
+
+  it('reads the world of a sort, main by default', () => {
+    expect(pipe.transform({ world: 'hardcore' })).toEqual({ sort: 'lookedUp', limit: 5, world: 'hardcore' });
+    expect(pipe.transform({ sort: 'lookedUp', world: 'main' })).toEqual({ sort: 'lookedUp', limit: 5, world: 'main' });
+    expect(() => pipe.transform({ world: 'ultimate' })).toThrow('World must be one of main, hardcore.');
+  });
+
+  it('ignores world with search or letter', () => {
+    expect(pipe.transform({ search: 'whip', world: 'ultimate' })).toEqual({ search: 'whip' });
   });
 
   it('rejects more than one mode', () => {

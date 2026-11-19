@@ -76,3 +76,55 @@ describe('ItemsService.searchItems', () => {
     expect(await service.searchItems('whip')).toEqual([whip]);
   });
 });
+
+describe('ItemsService lookups per world', () => {
+  const toArray = vi.fn(async () => [whip]);
+  const limit = vi.fn(() => ({ toArray }));
+  const sort = vi.fn(() => ({ limit }));
+  const find = vi.fn(() => ({ sort }));
+  const updateOne = vi.fn(async () => ({}));
+  const service = new ItemsService({ collection: () => ({ find, updateOne }) } as unknown as Db);
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('lists the main lookups by lastFetch without a world, as before', async () => {
+    await service.getLastFetchedItems(5);
+
+    expect(find).toHaveBeenCalledWith(
+      { lastFetch: { $exists: true } },
+      { hint: { lastFetch: -1 }, projection: { _id: 0, id: 1, icon: 1, name: 1, lastFetch: 1 } },
+    );
+    expect(sort).toHaveBeenCalledWith({ lastFetch: -1 });
+    expect(limit).toHaveBeenCalledWith(5);
+  });
+
+  it('lists the hardcore lookups by lastFetchHardcore, on its own index', async () => {
+    await service.getLastFetchedItems(5, 'hardcore');
+
+    expect(find).toHaveBeenCalledWith(
+      { lastFetchHardcore: { $exists: true } },
+      { hint: { lastFetchHardcore: -1 }, projection: { _id: 0, id: 1, icon: 1, name: 1, lastFetchHardcore: 1 } },
+    );
+    expect(sort).toHaveBeenCalledWith({ lastFetchHardcore: -1 });
+  });
+
+  it('records a lookup on lastFetch without a world and for main', async () => {
+    await service.recordLookup(4151);
+    await service.recordLookup(4151, 'main');
+
+    for (const call of updateOne.mock.calls) {
+      expect(call).toEqual([{ id: 4151 }, { $set: { lastFetch: expect.any(Date) } }, { hint: { id: 1 } }]);
+    }
+    expect(updateOne).toHaveBeenCalledTimes(2);
+  });
+
+  it('records a hardcore lookup on lastFetchHardcore only', async () => {
+    await service.recordLookup(4151, 'hardcore');
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { id: 4151 },
+      { $set: { lastFetchHardcore: expect.any(Date) } },
+      { hint: { id: 1 } },
+    );
+  });
+});

@@ -6,16 +6,23 @@ import { ITEMS_COLLECTION } from '../../common/mongo/collections';
 import { ITEM_NAME_COLLATION, MONGODB_DATABASE } from '../../common/mongo/mongo.provider';
 import { buildItemBrowseFilter } from './item-browse';
 import { ItemSearchIndex, ItemSearchResult } from './item-search';
+import { ItemWorld } from './parse-item-world.pipe';
 
 /** How long item search uses the item names it loaded: the hourly items refresh adds new items at most once an hour. */
 export const ITEM_SEARCH_TTL_MS = 600_000;
 /** After a failed reload, search the stale names this long before retrying. */
 export const ITEM_SEARCH_RETRY_MS = 60_000;
 
+/** The item field holding the last lookup on each world. */
+const LOOKUP_FIELD = { main: 'lastFetch', hardcore: 'lastFetchHardcore' } as const;
+
+/** `Item` plus `lastFetchHardcore`, until `@osrs-tracker/models` has it. */
+type StoredItem = Item & { lastFetchHardcore?: Date };
+
 @Injectable()
 export class ItemsService {
   private readonly logger = new Logger(ItemsService.name);
-  private readonly collection: Collection<Item>;
+  private readonly collection: Collection<StoredItem>;
 
   /**
    * Every item's name, searched in memory (about 4.7k items), since self-managed MongoDB has no Atlas Search. `forceFetch`
@@ -31,18 +38,16 @@ export class ItemsService {
     this.collection = db.collection(ITEMS_COLLECTION);
   }
 
-  getLastFetchedItems(limit: number): Promise<Item[]> {
+  /** The items most recently looked up on `world`, newest first, with that world's lookup date. */
+  getLastFetchedItems(limit: number, world: ItemWorld = 'main'): Promise<StoredItem[]> {
+    const field = LOOKUP_FIELD[world];
+
     return this.collection
-      .find<Item>(
-        {
-          lastFetch: { $exists: true }, // Ensure lastFetch exists
-        },
-        {
-          hint: { lastFetch: -1 }, // Use the index on lastFetch
-          projection: { _id: 0, id: 1, icon: 1, name: 1, lastFetch: 1 }, // Include lastFetch in the projection
-        },
+      .find<StoredItem>(
+        { [field]: { $exists: true } },
+        { hint: { [field]: -1 }, projection: { _id: 0, id: 1, icon: 1, name: 1, [field]: 1 } },
       )
-      .sort({ lastFetch: -1 }) // Sort by lastFetch in descending order
+      .sort({ [field]: -1 })
       .limit(limit)
       .toArray();
   }
@@ -63,9 +68,9 @@ export class ItemsService {
     return this.collection.findOne<Item>({ id: id }, { hint: { id: 1 }, projection: { _id: 0 } });
   }
 
-  /** Records a visitor's lookup for the recent items list. Doesn't create unknown items. */
-  async recordLookup(id: number): Promise<void> {
-    await this.collection.updateOne({ id: id }, { $set: { lastFetch: new Date() } }, { hint: { id: 1 } });
+  /** Records a visitor's lookup on `world` for its recent items list. Doesn't create unknown items. */
+  async recordLookup(id: number, world: ItemWorld = 'main'): Promise<void> {
+    await this.collection.updateOne({ id: id }, { $set: { [LOOKUP_FIELD[world]]: new Date() } }, { hint: { id: 1 } });
   }
 
   /** The items whose name starts with `letter` (see `buildItemBrowseFilter`), by name case-insensitively. */
