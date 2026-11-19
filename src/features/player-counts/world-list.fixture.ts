@@ -1,7 +1,11 @@
-/** A world in a test world list: `members` sets the flag `parseWorldList` counts as members. */
+/**
+ * A world in a test world list: `members` sets the flag `parseWorldList` counts as members; `flags`, when set, are the
+ * raw type flags instead (`0x801` a members Hardcore World), so a spec states Jagex's bits rather than the parser's.
+ */
 export interface FixtureWorld {
   players: number;
   members?: boolean;
+  flags?: number;
   location?: number;
 }
 
@@ -10,11 +14,11 @@ export interface FixtureWorld {
  * world count, then per world its ID, flags, address, activity, location and players.
  */
 export function encodeWorldList(worlds: FixtureWorld[]): Uint8Array<ArrayBuffer> {
-  const parts = worlds.map(({ players, members = false, location = 0 }, i) => {
+  const parts = worlds.map(({ players, members = false, flags = members ? 1 : 0, location = 0 }, i) => {
     const address = Buffer.from(`oldschool${i + 1}.runescape.com\0-\0`);
     const world = Buffer.alloc(6 + address.length + 3);
     world.writeUInt16BE(301 + i, 0);
-    world.writeInt32BE(members ? 1 : 0, 2);
+    world.writeInt32BE(flags, 2);
     address.copy(world, 6);
     world.writeUInt8(location, 6 + address.length);
     world.writeInt16BE(players, 7 + address.length);

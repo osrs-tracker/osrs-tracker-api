@@ -53,6 +53,7 @@ describe('buildPlayerCountHistoryPipeline', () => {
         total: 1,
         members: 1,
         f2p: 1,
+        hardcore: 1,
         byLocation: 1,
         peak: 1,
       });
@@ -72,6 +73,82 @@ describe('buildPlayerCountHistoryPipeline', () => {
       total: { $round: [{ $divide: ['$total', '$samples'] }, 0] },
       byLocation: { $arrayToObject: '$byLocation' },
     });
+  });
+
+  it('returns hardcore with every sample and stored day that has it', () => {
+    for (const range of ['24h', '7d', '1y', 'all'] as const)
+      expect(buildPlayerCountHistoryPipeline(range, now).at(-1)?.$project).toHaveProperty('hardcore', 1);
+  });
+
+  it('averages 30d hardcore per hour over only the samples that have it, and leaves it out of hours without any', () => {
+    const once = (value: unknown) => ({ $sum: { $cond: [{ $eq: ['$i', 0] }, value, 0] } });
+    const pipeline = buildPlayerCountHistoryPipeline('30d', now);
+
+    expect(pipeline.slice(1)).toEqual([
+      {
+        $project: {
+          date: { $dateTrunc: { date: '$date', unit: 'hour' } },
+          total: 1,
+          members: 1,
+          f2p: 1,
+          hardcore: 1,
+          location: { $objectToArray: '$byLocation' },
+        },
+      },
+      { $unwind: { path: '$location', includeArrayIndex: 'i' } },
+      {
+        $group: {
+          _id: { date: '$date', code: '$location.k' },
+          players: { $avg: '$location.v' },
+          samples: once(1),
+          total: once('$total'),
+          members: once('$members'),
+          f2p: once('$f2p'),
+          hardcore: once('$hardcore'),
+          hardcoreSamples: once({ $cond: [{ $isNumber: '$hardcore' }, 1, 0] }),
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.date',
+          samples: { $sum: '$samples' },
+          total: { $sum: '$total' },
+          members: { $sum: '$members' },
+          f2p: { $sum: '$f2p' },
+          hardcore: { $sum: '$hardcore' },
+          hardcoreSamples: { $sum: '$hardcoreSamples' },
+          byLocation: { $push: { k: '$_id.code', v: { $round: ['$players', 0] } } },
+        },
+      },
+      { $sort: { _id: 1 } },
+      {
+        $project: {
+          _id: 0,
+          date: '$_id',
+          total: { $round: [{ $divide: ['$total', '$samples'] }, 0] },
+          members: { $round: [{ $divide: ['$members', '$samples'] }, 0] },
+          f2p: { $round: [{ $divide: ['$f2p', '$samples'] }, 0] },
+          hardcore: {
+            $cond: [
+              { $gt: ['$hardcoreSamples', 0] },
+              { $round: [{ $divide: ['$hardcore', '$hardcoreSamples'] }, 0] },
+              '$$REMOVE',
+            ],
+          },
+          byLocation: { $arrayToObject: '$byLocation' },
+        },
+      },
+    ]);
+    // `toEqual` ignores key order, which is the points' field order
+    expect(Object.keys(pipeline.at(-1)?.$project)).toEqual([
+      '_id',
+      'date',
+      'total',
+      'members',
+      'f2p',
+      'hardcore',
+      'byLocation',
+    ]);
   });
 });
 

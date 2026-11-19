@@ -41,24 +41,35 @@ export function buildPlayerCountHistoryPipeline(range: PlayerCountRange, now = n
           total: 1,
           members: 1,
           f2p: 1,
+          hardcore: 1,
           byLocation: 1,
           ...(points === 'days' && { peak: 1 }),
         },
       },
     ];
 
+  return [...match, ...sampleGroupingStages('hour'), { $sort: { _id: 1 } }, { $project: SAMPLE_AVERAGES }];
+}
+
+/**
+ * Groups `playerCounts` samples per UTC hour (the 30d history) or day (the ingester's `playerCountDaysPipeline`) into
+ * the sums `SAMPLE_AVERAGES` divides, plus per day the highest `total` as `peak`. `hardcore` is summed and counted only
+ * over the samples that have it (`hardcoreSamples`), since samples from before it was recorded lack it.
+ */
+export function sampleGroupingStages(unit: 'hour' | 'day'): Document[] {
+  const withPeak = unit === 'day';
   // Each sample is one document per location code after the `$unwind`: its own fields count once, on its first code.
   const first = { $eq: ['$i', 0] };
-  const once = (value: string | number) => ({ $sum: { $cond: [first, value, 0] } });
+  const once = (value: string | number | Document) => ({ $sum: { $cond: [first, value, 0] } });
 
   return [
-    ...match,
     {
       $project: {
-        date: { $dateTrunc: { date: '$date', unit: 'hour' } },
+        date: { $dateTrunc: { date: '$date', unit } },
         total: 1,
         members: 1,
         f2p: 1,
+        hardcore: 1,
         location: { $objectToArray: '$byLocation' },
       },
     },
@@ -71,6 +82,9 @@ export function buildPlayerCountHistoryPipeline(range: PlayerCountRange, now = n
         total: once('$total'),
         members: once('$members'),
         f2p: once('$f2p'),
+        hardcore: once('$hardcore'),
+        hardcoreSamples: once({ $cond: [{ $isNumber: '$hardcore' }, 1, 0] }),
+        ...(withPeak && { peak: { $max: '$total' } }),
       },
     },
     {
@@ -80,19 +94,30 @@ export function buildPlayerCountHistoryPipeline(range: PlayerCountRange, now = n
         total: { $sum: '$total' },
         members: { $sum: '$members' },
         f2p: { $sum: '$f2p' },
+        hardcore: { $sum: '$hardcore' },
+        hardcoreSamples: { $sum: '$hardcoreSamples' },
+        ...(withPeak && { peak: { $max: '$peak' } }),
         byLocation: { $push: { k: '$_id.code', v: { $round: ['$players', 0] } } },
-      },
-    },
-    { $sort: { _id: 1 } },
-    {
-      $project: {
-        _id: 0,
-        date: '$_id',
-        total: { $round: [{ $divide: ['$total', '$samples'] }, 0] },
-        members: { $round: [{ $divide: ['$members', '$samples'] }, 0] },
-        f2p: { $round: [{ $divide: ['$f2p', '$samples'] }, 0] },
-        byLocation: { $arrayToObject: '$byLocation' },
       },
     },
   ];
 }
+
+const average = (sum: string, count: string) => ({ $round: [{ $divide: [sum, count] }, 0] });
+
+/**
+ * The `$project` fields that turn `sampleGroupingStages`' sums into a point. `hardcore` is left out of a bucket where no
+ * sample has it, never 0: `$sum` counts a missing field as 0, so dividing it by `samples` would understate the bucket
+ * where recording started and give every older one 0.
+ */
+export const SAMPLE_AVERAGES = {
+  _id: 0,
+  date: '$_id',
+  total: average('$total', '$samples'),
+  members: average('$members', '$samples'),
+  f2p: average('$f2p', '$samples'),
+  hardcore: {
+    $cond: [{ $gt: ['$hardcoreSamples', 0] }, average('$hardcore', '$hardcoreSamples'), '$$REMOVE'],
+  },
+  byLocation: { $arrayToObject: '$byLocation' },
+};

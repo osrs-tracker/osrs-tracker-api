@@ -4,6 +4,7 @@ import {
   hiscoreEntryUpdate,
   parseScrapeResult,
   pausedByNotFound,
+  playerCountDaysPipeline,
   playerCountUpsert,
   slotStart,
   startOfUTCDay,
@@ -102,6 +103,7 @@ describe('playerCountUpsert', () => {
     total: 120_000,
     members: 80_000,
     f2p: 40_000,
+    hardcore: 8_000,
     worlds: 200,
     byLocation: { US: 60_000, GB: 60_000 },
   };
@@ -109,11 +111,96 @@ describe('playerCountUpsert', () => {
   it('inserts the sample only when none with its date is stored, so a repeated sample is a no-op', () => {
     const { date, ...counts } = sample;
     expect(playerCountUpsert(sample)).toEqual({ filter: { date }, update: { $setOnInsert: counts } });
+    expect(playerCountUpsert(sample).update.$setOnInsert).toHaveProperty('hardcore', 8_000);
   });
 
   it("recomputes from the start of the sample's UTC day, also for a late sample of an earlier day", () => {
     expect(startOfUTCDay(sample.date)).toEqual(new Date('2026-10-21T00:00:00Z'));
     expect(startOfUTCDay(new Date('2026-10-20T23:50:00Z'))).toEqual(new Date('2026-10-20T00:00:00Z'));
+  });
+});
+
+/** Checked as built, like the history's: there's no database in the tests. */
+describe('playerCountDaysPipeline', () => {
+  const from = new Date('2026-10-21T00:00:00Z');
+  const once = (value: unknown) => ({ $sum: { $cond: [{ $eq: ['$i', 0] }, value, 0] } });
+
+  it('averages each UTC day from `from` on, hardcore over only the samples that have it, with its peak and sample count', () => {
+    const pipeline = playerCountDaysPipeline(from);
+
+    expect(pipeline).toEqual([
+      { $match: { date: { $gte: from } } },
+      {
+        $project: {
+          date: { $dateTrunc: { date: '$date', unit: 'day' } },
+          total: 1,
+          members: 1,
+          f2p: 1,
+          hardcore: 1,
+          location: { $objectToArray: '$byLocation' },
+        },
+      },
+      { $unwind: { path: '$location', includeArrayIndex: 'i' } },
+      {
+        $group: {
+          _id: { date: '$date', code: '$location.k' },
+          players: { $avg: '$location.v' },
+          samples: once(1),
+          total: once('$total'),
+          members: once('$members'),
+          f2p: once('$f2p'),
+          hardcore: once('$hardcore'),
+          hardcoreSamples: once({ $cond: [{ $isNumber: '$hardcore' }, 1, 0] }),
+          peak: { $max: '$total' },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.date',
+          samples: { $sum: '$samples' },
+          total: { $sum: '$total' },
+          members: { $sum: '$members' },
+          f2p: { $sum: '$f2p' },
+          hardcore: { $sum: '$hardcore' },
+          hardcoreSamples: { $sum: '$hardcoreSamples' },
+          peak: { $max: '$peak' },
+          byLocation: { $push: { k: '$_id.code', v: { $round: ['$players', 0] } } },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          date: '$_id',
+          total: { $round: [{ $divide: ['$total', '$samples'] }, 0] },
+          members: { $round: [{ $divide: ['$members', '$samples'] }, 0] },
+          f2p: { $round: [{ $divide: ['$f2p', '$samples'] }, 0] },
+          hardcore: {
+            $cond: [
+              { $gt: ['$hardcoreSamples', 0] },
+              { $round: [{ $divide: ['$hardcore', '$hardcoreSamples'] }, 0] },
+              '$$REMOVE',
+            ],
+          },
+          byLocation: { $arrayToObject: '$byLocation' },
+          peak: '$peak',
+          samples: '$samples',
+        },
+      },
+    ]);
+  });
+
+  it('stores the fields in PlayerCountDay order, without the helper sums', () => {
+    expect(Object.keys(playerCountDaysPipeline(from).at(-1)?.$project)).toEqual([
+      '_id',
+      'date',
+      'total',
+      'members',
+      'f2p',
+      'hardcore',
+      'byLocation',
+      'peak',
+      'samples',
+    ]);
   });
 });
 

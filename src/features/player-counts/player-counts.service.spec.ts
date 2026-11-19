@@ -44,6 +44,7 @@ describe('PlayerCountsService.getLive', () => {
       total: 1500,
       members: 1000,
       f2p: 500,
+      hardcore: 0,
       worlds: 2,
       byLocation: { 0: 1500 },
     });
@@ -51,6 +52,29 @@ describe('PlayerCountsService.getLive', () => {
       'https://www.runescape.com/g=oldscape/slr.ws?order=LPWM',
       expect.objectContaining({ headers: expect.objectContaining({ 'user-agent': USER_AGENT }), dispatcher: {} }),
     );
+  });
+
+  it('counts Hardcore Worlds players inside members and f2p, not beside them', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        encodeWorldList([
+          { players: 1000, flags: 0x1 },
+          { players: 300, flags: 0x801 },
+          { players: 500, flags: 0x0 },
+          { players: 20, flags: 0x800 },
+        ]),
+      ) as never,
+    );
+
+    expect(await service.getLive()).toEqual({
+      date: expect.any(Date),
+      total: 1820,
+      members: 1300,
+      f2p: 520,
+      hardcore: 320,
+      worlds: 4,
+      byLocation: { 0: 1820 },
+    });
   });
 
   it('shares one request between concurrent requests and keeps the count for a minute', async () => {
