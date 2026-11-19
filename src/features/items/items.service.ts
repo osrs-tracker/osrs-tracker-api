@@ -16,13 +16,10 @@ export const ITEM_SEARCH_RETRY_MS = 60_000;
 /** The item field holding the last lookup on each world. */
 const LOOKUP_FIELD = { main: 'lastFetch', hardcore: 'lastFetchHardcore' } as const;
 
-/** `Item` plus `lastFetchHardcore`, until `@osrs-tracker/models` has it. */
-type StoredItem = Item & { lastFetchHardcore?: Date };
-
 @Injectable()
 export class ItemsService {
   private readonly logger = new Logger(ItemsService.name);
-  private readonly collection: Collection<StoredItem>;
+  private readonly collection: Collection<Item>;
 
   /**
    * Every item's name, searched in memory (about 4.7k items), since self-managed MongoDB has no Atlas Search. `forceFetch`
@@ -39,11 +36,11 @@ export class ItemsService {
   }
 
   /** The items most recently looked up on `world`, newest first, with that world's lookup date. */
-  getLastFetchedItems(limit: number, world: ItemWorld = 'main'): Promise<StoredItem[]> {
+  getLastFetchedItems(limit: number, world: ItemWorld = 'main'): Promise<Item[]> {
     const field = LOOKUP_FIELD[world];
 
     return this.collection
-      .find<StoredItem>(
+      .find<Item>(
         { [field]: { $exists: true } },
         { hint: { [field]: -1 }, projection: { _id: 0, id: 1, icon: 1, name: 1, [field]: 1 } },
       )
