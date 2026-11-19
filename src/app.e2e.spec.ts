@@ -192,6 +192,14 @@ const CASES: Record<string, Case[]> = {
       status: 400,
       cacheControl: CACHE_CONTROL.REVALIDATE,
     },
+    {
+      name: 'hardcore lookups',
+      url: '/items?world=hardcore',
+      docs: [item],
+      status: 200,
+      cacheControl: CACHE_CONTROL.REVALIDATE,
+    },
+    { name: 'unknown world', url: '/items?world=ultimate', status: 400, cacheControl: CACHE_CONTROL.REVALIDATE },
     { name: 'two modes', url: '/items?search=whip&letter=a', status: 400, cacheControl: CACHE_CONTROL.REVALIDATE },
   ],
   '/items/:id': [{ url: '/items/4151', docs: [item], status: 200, cacheControl: CACHE_CONTROL.REVALIDATE }],
@@ -383,6 +391,32 @@ describe('GET routes', () => {
       (call) => !READ_METHODS.has(call.split('.')[1]) && !writes.includes(call),
     );
     expect(otherWrites).toEqual([]);
+  });
+
+  describe('POST /items/:id/lookup', () => {
+    const VISITOR = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/140.0';
+    const lookup = (query: string, userAgent = VISITOR) =>
+      fetch(`${baseUrl}/items/4151/lookup${query}`, { method: 'POST', headers: { 'User-Agent': userAgent } });
+
+    it.each(['', '?world=main', '?world=hardcore'])("records a visitor's lookup (%s)", async (query) => {
+      const response = await lookup(query);
+
+      expect(response.status).toBe(204);
+      expect(collectionCalls).toEqual(['items.updateOne']);
+    });
+
+    it('rejects an unknown or repeated world without recording', async () => {
+      expect((await lookup('?world=ultimate')).status).toBe(400);
+      expect((await lookup('?world=main&world=hardcore')).status).toBe(400);
+      expect(collectionCalls).toEqual([]);
+    });
+
+    it('records nothing for a bot', async () => {
+      const response = await lookup('?world=hardcore', 'Googlebot/2.1 (+http://www.google.com/bot.html)');
+
+      expect(response.status).toBe(204);
+      expect(collectionCalls).toEqual([]);
+    });
   });
 
   describe('POST /players/:username/lookup', () => {

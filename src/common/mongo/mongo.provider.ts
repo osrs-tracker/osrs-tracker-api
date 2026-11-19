@@ -101,6 +101,9 @@ export const mongoDBProvider: FactoryProvider = {
     await db
       .collection(ITEMS_COLLECTION)
       .createIndex({ lastFetch: -1 }, { partialFilterExpression: { lastFetch: { $exists: true } } });
+    await db
+      .collection(ITEMS_COLLECTION)
+      .createIndex({ lastFetchHardcore: -1 }, { partialFilterExpression: { lastFetchHardcore: { $exists: true } } });
     await db.collection(ITEMS_COLLECTION).createIndex({ name: 1 }, { collation: ITEM_NAME_COLLATION });
     await db
       .collection(ITEMS_COLLECTION)

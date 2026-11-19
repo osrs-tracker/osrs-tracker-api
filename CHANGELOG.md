@@ -3,6 +3,14 @@
 Every change to the API, tooling included, newest day first. Claude Code sessions read this as the repo's history, so
 housekeeping is logged too. Doc-only changes and routine dependency bumps aren't: version control holds those.
 
+## 2026-11-19
+
+- `POST /items/:id/lookup` and `GET /items?sort=lookedUp` take an optional `world` (`main`, the default, or `hardcore`;
+  400 for anything else), so Hardcore Worlds, which has its own Grand Exchange, keeps its own recent lookups instead of
+  pushing items into the main game's list (#262, roadmap osrs-tracker/osrs-tracker-web#516). A hardcore lookup sets the
+  new `lastFetchHardcore` on the item, with its own partial index, and the list sorts by it and returns it instead of
+  `lastFetch`. Without `world`, requests and responses are as before.
+
 ## 2026-11-04
 
 - **Breaking:** for the web, a player's `type` can now be `hardcore_mains`: a Hardcore Worlds character, which a lookup
