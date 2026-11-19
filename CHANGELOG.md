@@ -9,7 +9,8 @@ housekeeping is logged too. Doc-only changes and routine dependency bumps aren't
   400 for anything else), so Hardcore Worlds, which has its own Grand Exchange, keeps its own recent lookups instead of
   pushing items into the main game's list (#262, roadmap osrs-tracker/osrs-tracker-web#516). A hardcore lookup sets the
   new `lastFetchHardcore` on the item, with its own partial index, and the list sorts by it and returns it instead of
-  `lastFetch`. Without `world`, requests and responses are as before.
+  `lastFetch`. Without `world`, requests and responses are as before. `@osrs-tracker/models` 3.5.0 types the field
+  (#264), so the service's local `StoredItem` type is gone.
 
 ## 2026-11-04
 
