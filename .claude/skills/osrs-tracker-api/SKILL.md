@@ -143,9 +143,10 @@ Validate query and route params in pipes, not with checks in the handler: `Parse
 `ParseNewsCategoryPipe` (`/news/archive`'s `before` and `category`), `ParsePlayerCountRangePipe` (`/player-counts`'
 `range`: `24h`, `7d`, `30d`, `1y` or `all`; `24h` when absent), `ParseNewsImageUrlPipe` (`/news/image`'s `url`: only
 plain `https://cdn.runescape.com/` URLs, by parsed origin, never a prefix check), `ParseItemSearchQueryPipe` (item
-search, at most 64 characters), `ParseItemListQueryPipe` and `ParsePlayerListQueryPipe` (`GET /items`' and
-`GET /players`' whole query, into a union of modes, reusing the pipes above), each next to its feature,
-`singleQueryValue` (a 400 for a repeated param) in a whole-query pipe, and from `common/pipes/`
+search, at most 64 characters), `ParseItemWorldPipe` (`world` on `GET /items`' lookups list and
+`POST /items/:id/lookup`: `main`, the default, or `hardcore`), `ParseItemListQueryPipe` and `ParsePlayerListQueryPipe`
+(`GET /items`' and `GET /players`' whole query, into a union of modes, reusing the pipes above), each next to its
+feature, `singleQueryValue` (a 400 for a repeated param) in a whole-query pipe, and from `common/pipes/`
 `new ParseIntRangePipe({ min, max?, default?, optional?, message? })` for any other integer (its message is named after
 the param: `Limit must be between 1 and 50.`). Don't add `DefaultValuePipe` + `ParseIntPipe` + a range check, or an
 `isNaN` check after a parse pipe. Keep existing status codes and messages: the web may show them. A new pipe gets a
@@ -366,8 +367,9 @@ a local run uses production data, so stick to GETs, which never write. When a ch
 write; the first page is enough, since entries are prepended). A lookup overwrites the stored player fields, merges
 `scrapingOffsets` and may prepend a hiscore entry (`buildRefreshUpdate`). Claude restores that itself, with an
 `update-many` that puts back the changed fields and removes a prepended entry. `POST /items/:id/lookup` only sets the
-item's `lastFetch` (it moves to the top of `GET /items`), so it needs nothing restored. Automated tests never need a
-database: they run on fakes (Tests).
+item's `lastFetch` (`lastFetchHardcore` with `?world=hardcore`; it moves to the top of `GET /items`, or of
+`GET /items?world=hardcore`), so it needs nothing restored. Automated tests never need a database: they run on fakes
+(Tests).
 
 Live data is read and written through the `mongodb` MCP server (`.mcp.json`, database `osrs-tracker`), which connects
 with `OSRS_TRACKER_MONGO_URI` from the user's environment: the user `osrs-tracker-api` (`readWrite` on `osrs-tracker`
